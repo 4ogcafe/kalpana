@@ -1,201 +1,184 @@
 import express from 'express';
+import { ObjectId } from 'mongodb';
+import { z } from 'zod';
+import { notFound, AppError } from '../lib/errors.js';
+import { db, toObjectId } from '../lib/mongo.js';
 import { prisma } from '../lib/prisma.js';
-import { MongoClient, ObjectId } from 'mongodb';
+import { definedOnly, idParam, imageUrl, objectIdString, optionalNumber, optionalText } from '../lib/schemas.js';
+import { requireAdmin, requireStaff } from '../middleware/auth.js';
+import { publicCache } from '../middleware/cache.js';
 
 const router = express.Router();
 
-const getClient = () => new MongoClient(process.env.DATABASE_URL || 'mongodb://localhost:27017/kalpanarestro');
+const MAX_PRICE = 10_000_000;
 
-// GET all categories
-router.get('/categories', async (req, res) => {
-  try {
-    const categories = await prisma.category.findMany({
-      orderBy: { sortOrder: 'asc' }
-    });
-    res.json(categories);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to fetch categories' });
-  }
+const categoryCreateSchema = z.object({
+  nameEn: z.string().trim().min(1).max(100),
+  nameJa: optionalText(100),
+  parentId: objectIdString.nullable().optional(),
 });
 
-// POST a new category
-router.post('/categories', async (req, res) => {
-  const client = getClient();
-  try {
-    const { nameEn, parentId } = req.body;
-    await client.connect();
-    const db = client.db();
-    
-    const newCat: any = {
-      _id: new ObjectId(),
-      nameEn,
-      nameJa: nameEn,
-      sortOrder: 0,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    if (parentId) {
-      newCat.parentId = new ObjectId(parentId);
-    }
-    
-    await db.collection('Category').insertOne(newCat);
-    res.json(newCat);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to create category natively' });
-  } finally {
-    await client.close();
-  }
+const categoryUpdateSchema = z.object({
+  nameEn: z.string().trim().min(1).max(100).optional(),
+  nameJa: optionalText(100),
+  sortOrder: optionalNumber(z.number().int().min(0).max(10_000)),
+  parentId: z.preprocess((value) => (value === '' ? null : value), objectIdString.nullable().optional()),
 });
 
-// Update a category
-router.put('/categories/:id', async (req, res) => {
-  const client = getClient();
-  try {
-    const { nameEn, nameJa, sortOrder, parentId } = req.body;
-    await client.connect();
-    const db = client.db();
-    const updateData: any = { nameEn, nameJa, sortOrder: parseInt(sortOrder) || 0, updatedAt: new Date() };
-    if (parentId !== undefined) {
-      updateData.parentId = parentId ? new ObjectId(parentId) : null;
-    }
-    await db.collection('Category').updateOne(
-      { _id: new ObjectId(req.params.id) },
-      { $set: updateData }
-    );
-    res.json({ success: true });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to update category natively' });
-  } finally {
-    await client.close();
-  }
+const itemFields = {
+  nameEn: z.string().trim().min(1).max(200),
+  nameJa: optionalText(200),
+  descriptionEn: optionalText(2000),
+  descriptionJa: optionalText(2000),
+  price: z.coerce.number().int().min(0).max(MAX_PRICE),
+  imageUrl: imageUrl.optional(),
+  rating: optionalNumber(z.number().min(0).max(5)),
+  isRecommended: z.boolean().optional(),
+  isVegetarian: z.boolean().optional(),
+  isVegan: z.boolean().optional(),
+  isGlutenFree: z.boolean().optional(),
+};
+
+const itemCreateSchema = z.object({
+  ...itemFields,
+  categoryName: z.string().trim().min(1).max(100),
 });
 
-// GET all items
-router.get('/items', async (req, res) => {
-  try {
-    const items = await prisma.menuItem.findMany({
-      include: { category: true },
-      orderBy: { createdAt: 'desc' }
-    });
-    res.json(items);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to fetch items' });
-  }
+const itemUpdateSchema = z.object({
+  ...itemFields,
+  nameEn: itemFields.nameEn.optional(),
+  price: itemFields.price.optional(),
 });
 
-// POST a new item
-router.post('/items', async (req, res) => {
-  const client = getClient();
-  try {
-    const { nameEn, price, categoryName, descriptionEn, imageUrl, isRecommended, rating, isVegetarian, isVegan, isGlutenFree } = req.body;
-    await client.connect();
-    const db = client.db();
-    
-    let category = await db.collection('Category').findOne({ nameEn: categoryName });
-    if (!category) {
-      category = { _id: new ObjectId(), nameEn: categoryName, createdAt: new Date(), updatedAt: new Date(), sortOrder: 0 };
-      await db.collection('Category').insertOne(category);
-    }
+// ---- Categories ----------------------------------------------------------
 
-    const newItem = {
-      _id: new ObjectId(),
-      nameEn,
-      price: parseInt(price) || 0,
-      descriptionEn: descriptionEn || '',
-      categoryId: category._id,
-      imageUrl: imageUrl || '',
-      rating: parseFloat(rating) || 5.0,
-      isRecommended: !!isRecommended,
-      isVegetarian: !!isVegetarian,
-      isVegan: !!isVegan,
-      isGlutenFree: !!isGlutenFree,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    await db.collection('MenuItem').insertOne(newItem);
-    res.json(newItem);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to create item natively' });
-  } finally {
-    await client.close();
-  }
+router.get('/categories', publicCache, async (_req, res) => {
+  const categories = await prisma.category.findMany({ orderBy: { sortOrder: 'asc' } });
+  res.json(categories);
 });
 
-// Delete a category
-router.delete('/categories/:id', async (req, res) => {
-  const client = getClient();
-  try {
-    await client.connect();
-    const db = client.db();
-    
-    // Cascade delete all items in this category
-    await db.collection('MenuItem').deleteMany({ categoryId: new ObjectId(req.params.id) });
-    
-    // Also cascade delete any subcategories (optional, but good practice)
-    await db.collection('Category').deleteMany({ parentId: new ObjectId(req.params.id) });
-    
-    await db.collection('Category').deleteOne({ _id: new ObjectId(req.params.id) });
-    res.json({ success: true });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to delete category' });
-  } finally {
-    await client.close();
-  }
+router.post('/categories', requireAdmin, async (req, res) => {
+  const { nameEn, nameJa, parentId } = categoryCreateSchema.parse(req.body);
+  const now = new Date();
+  const category = {
+    _id: new ObjectId(),
+    nameEn,
+    nameJa: nameJa ?? nameEn,
+    sortOrder: 0,
+    ...(parentId ? { parentId: toObjectId(parentId, 'parentId') } : {}),
+    createdAt: now,
+    updatedAt: now,
+  };
+  await db().collection('Category').insertOne(category);
+  res.status(201).json({ ...category, id: category._id.toHexString() });
 });
 
-// Update an item
-router.put('/items/:id', async (req, res) => {
-  const client = getClient();
-  try {
-    const { nameEn, price, descriptionEn, isRecommended, imageUrl, rating, isVegetarian, isVegan, isGlutenFree } = req.body;
-    await client.connect();
-    const db = client.db();
-    
-    await db.collection('MenuItem').updateOne(
-      { _id: new ObjectId(req.params.id) },
-      { $set: { 
-        nameEn, 
-        price: parseInt(price) || 0, 
-        descriptionEn, 
-        imageUrl: imageUrl || '',
-        rating: parseFloat(rating) || 5.0,
-        isRecommended: !!isRecommended,
-        isVegetarian: !!isVegetarian,
-        isVegan: !!isVegan,
-        isGlutenFree: !!isGlutenFree,
-        updatedAt: new Date() 
-      } }
-    );
-    res.json({ success: true });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to update item natively' });
-  } finally {
-    await client.close();
+router.put('/categories/:id', requireAdmin, async (req, res) => {
+  const id = idParam(req.params);
+  const { parentId, ...fields } = categoryUpdateSchema.parse(req.body);
+  if (parentId && parentId === id.toHexString()) {
+    throw new AppError(400, 'VALIDATION_ERROR', 'A category cannot be its own parent');
   }
+
+  const update: Record<string, unknown> = { ...definedOnly(fields), updatedAt: new Date() };
+  if (parentId !== undefined) update.parentId = parentId ? toObjectId(parentId, 'parentId') : null;
+
+  const result = await db().collection('Category').updateOne({ _id: id }, { $set: update });
+  if (result.matchedCount === 0) throw notFound('Category');
+  res.json({ success: true });
 });
 
-// Delete an item
-router.delete('/items/:id', async (req, res) => {
-  const client = getClient();
-  try {
-    await client.connect();
-    const db = client.db();
-    await db.collection('MenuItem').deleteOne({ _id: new ObjectId(req.params.id) });
-    res.json({ success: true });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to delete item' });
-  } finally {
-    await client.close();
+/** The category plus every descendant, so deletes never leave orphaned subcategories or items. */
+async function categoryTree(rootId: ObjectId): Promise<ObjectId[]> {
+  const ids = [rootId];
+  for (let frontier = [rootId]; frontier.length > 0; ) {
+    const children = await db()
+      .collection('Category')
+      .find({ parentId: { $in: frontier } }, { projection: { _id: 1 } })
+      .toArray();
+    frontier = children.map((child) => child._id).filter((childId) => !ids.some((known) => known.equals(childId)));
+    ids.push(...frontier);
   }
+  return ids;
+}
+
+router.delete('/categories/:id', requireAdmin, async (req, res) => {
+  const id = idParam(req.params);
+  const exists = await db().collection('Category').countDocuments({ _id: id }, { limit: 1 });
+  if (!exists) throw notFound('Category');
+
+  const ids = await categoryTree(id);
+  // Items first: an item pointing at a deleted category breaks every menu read.
+  await db().collection('MenuItem').deleteMany({ categoryId: { $in: ids } });
+  await db().collection('Category').deleteMany({ _id: { $in: ids } });
+  res.json({ success: true });
+});
+
+// ---- Items ---------------------------------------------------------------
+
+router.get('/items', publicCache, async (_req, res) => {
+  const items = await prisma.menuItem.findMany({
+    include: { category: true },
+    orderBy: { createdAt: 'desc' },
+  });
+  res.json(items);
+});
+
+router.post('/items', requireStaff, async (req, res) => {
+  const { categoryName, ...fields } = itemCreateSchema.parse(req.body);
+  const categories = db().collection('Category');
+
+  let category = await categories.findOne({ nameEn: categoryName });
+  if (!category) {
+    const now = new Date();
+    category = { _id: new ObjectId(), nameEn: categoryName, nameJa: categoryName, sortOrder: 0, createdAt: now, updatedAt: now };
+    await categories.insertOne(category);
+  }
+
+  const now = new Date();
+  // Every field Prisma's MenuItem model requires gets a value, so reads never fail on this document.
+  const item = {
+    _id: new ObjectId(),
+    categoryId: category._id,
+    menuTypes: [],
+    nameEn: fields.nameEn,
+    nameJa: fields.nameJa ?? null,
+    descriptionEn: fields.descriptionEn ?? '',
+    descriptionJa: fields.descriptionJa ?? null,
+    price: fields.price,
+    imageUrl: fields.imageUrl ?? '',
+    rating: fields.rating ?? null,
+    spiceLevel: 0,
+    allergens: [],
+    isRecommended: fields.isRecommended ?? false,
+    isVegetarian: fields.isVegetarian ?? false,
+    isVegan: fields.isVegan ?? false,
+    isHalal: false,
+    isGlutenFree: fields.isGlutenFree ?? false,
+    isSoldOut: false,
+    isActive: true,
+    sortOrder: 0,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await db().collection('MenuItem').insertOne(item);
+  res.status(201).json({ ...item, id: item._id.toHexString() });
+});
+
+router.put('/items/:id', requireStaff, async (req, res) => {
+  const id = idParam(req.params);
+  const fields = definedOnly(itemUpdateSchema.parse(req.body));
+  const result = await db()
+    .collection('MenuItem')
+    .updateOne({ _id: id }, { $set: { ...fields, updatedAt: new Date() } });
+  if (result.matchedCount === 0) throw notFound('Menu item');
+  res.json({ success: true });
+});
+
+router.delete('/items/:id', requireAdmin, async (req, res) => {
+  const result = await db().collection('MenuItem').deleteOne({ _id: idParam(req.params) });
+  if (result.deletedCount === 0) throw notFound('Menu item');
+  res.json({ success: true });
 });
 
 export default router;

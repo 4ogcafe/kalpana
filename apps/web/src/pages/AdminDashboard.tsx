@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { apiFetch, assetUrl, errorMessage } from '../lib/api';
 import { 
   LayoutDashboard, 
   Settings, 
@@ -18,6 +18,9 @@ import {
   ChevronRight
 } from 'lucide-react';
 
+// STAFF may edit menu items; everything else is admin-only (enforced by the API too).
+const STAFF_TABS = ['Overview', 'Menu Management'];
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('Overview');
@@ -25,16 +28,14 @@ export default function AdminDashboard() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('user');
-    if (!token) {
-      navigate('/login');
-    } else if (userData) {
-      setUser(JSON.parse(userData));
-    }
-    
+    // The session lives in an httpOnly cookie; ask the API who is logged in.
+    apiFetch('/api/v1/auth/me')
+      .then(res => (res.ok ? res.json() : Promise.reject(new Error('Not logged in'))))
+      .then(data => setUser(data.user))
+      .catch(() => navigate('/login'));
+
     // Fetch unread count for notifications
-    fetch('http://localhost:4000/api/v1/dashboard/stats')
+    apiFetch('/api/v1/dashboard/stats')
       .then(res => res.json())
       .then(data => {
         if (data && data.unreadMessagesCount !== undefined) {
@@ -45,7 +46,7 @@ export default function AdminDashboard() {
       
     // Optional: poll every 30 seconds for new notifications
     const intervalId = setInterval(() => {
-      fetch('http://localhost:4000/api/v1/dashboard/stats')
+      apiFetch('/api/v1/dashboard/stats')
         .then(res => res.json())
         .then(data => {
           if (data && data.unreadMessagesCount !== undefined) {
@@ -58,9 +59,8 @@ export default function AdminDashboard() {
     return () => clearInterval(intervalId);
   }, [navigate]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+  const handleLogout = async () => {
+    await apiFetch('/api/v1/auth/logout', { method: 'POST' }).catch(() => undefined);
     navigate('/login');
   };
 
@@ -71,10 +71,16 @@ export default function AdminDashboard() {
     { name: 'Page Settings', icon: ImageIcon },
     { name: 'Contact Messages', icon: MessageSquare },
     { name: 'Staff Users', icon: Users },
-  ];
+  ].filter(tab => user?.role === 'ADMIN' || STAFF_TABS.includes(tab.name));
+
+  if (!user) {
+    return <div style={{ padding: '40px', textAlign: 'center' }}>Loading…</div>;
+  }
 
   return (
     <div style={{ display: 'flex', height: '100vh', backgroundColor: '#f3f4f6', fontFamily: "'Inter', sans-serif" }}>
+      <title>Admin | Kalpana</title>
+      <meta name="robots" content="noindex, nofollow" />
       
       {/* Sidebar */}
       <div style={{ 
@@ -219,7 +225,7 @@ function OverviewTab() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://localhost:4000/api/v1/dashboard/stats')
+    apiFetch('/api/v1/dashboard/stats')
       .then(res => res.json())
       .then(data => {
         setStatsData(data);
@@ -240,49 +246,22 @@ function OverviewTab() {
     { label: 'Unread Messages', value: statsData.unreadMessagesCount.toString(), change: statsData.unreadMessagesCount > 0 ? 'Needs Attention' : 'All clear', isPositive: statsData.unreadMessagesCount === 0 },
     { label: 'Active Carousels', value: statsData.carouselsCount.toString(), change: 'Live', isPositive: true },
     { label: 'Total Categories', value: statsData.categoriesCount.toString(), change: 'Live', isPositive: true },
+    { label: 'Sold-out Items', value: String(statsData.soldOutItemsCount ?? 0), change: statsData.soldOutItemsCount > 0 ? 'Check stock' : 'All available', isPositive: !statsData.soldOutItemsCount },
   ];
 
-  const chartData = statsData.chartData || [];
-
   return (
-    <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
-        {stats.map((stat, i) => (
-          <div key={i} style={{ backgroundColor: '#fff', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' }}>
-            <div style={{ fontSize: '0.875rem', color: '#6b7280', fontWeight: '500', marginBottom: '0.5rem' }}>{stat.label}</div>
-            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-              <div style={{ fontSize: '2rem', fontWeight: '700', color: '#111827', lineHeight: '1' }}>{stat.value}</div>
-              <div style={{ fontSize: '0.875rem', fontWeight: '600', color: stat.isPositive ? '#059669' : '#ef4444', backgroundColor: stat.isPositive ? '#d1fae5' : '#fee2e2', padding: '4px 8px', borderRadius: '9999px' }}>
-                {stat.change}
-              </div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+      {stats.map((stat, i) => (
+        <div key={i} style={{ backgroundColor: '#fff', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' }}>
+          <div style={{ fontSize: '0.875rem', color: '#6b7280', fontWeight: '500', marginBottom: '0.5rem' }}>{stat.label}</div>
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: '2rem', fontWeight: '700', color: '#111827', lineHeight: '1' }}>{stat.value}</div>
+            <div style={{ fontSize: '0.875rem', fontWeight: '600', color: stat.isPositive ? '#059669' : '#ef4444', backgroundColor: stat.isPositive ? '#d1fae5' : '#fee2e2', padding: '4px 8px', borderRadius: '9999px' }}>
+              {stat.change}
             </div>
           </div>
-        ))}
-      </div>
-      
-      <div style={{ backgroundColor: '#fff', padding: '2rem', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb', height: '400px' }}>
-        <h3 style={{ fontSize: '1.1rem', fontWeight: '600', color: '#111827', marginBottom: '1.5rem' }}>Weekly Views Overview</h3>
-        <div style={{ width: '100%', height: '300px' }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="colorVisits" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#e94235" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#e94235" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} dy={10} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} dx={-10} />
-              <Tooltip 
-                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
-                itemStyle={{ color: '#111827', fontWeight: 600 }}
-              />
-              <Area type="monotone" dataKey="visits" stroke="#e94235" strokeWidth={3} fillOpacity={1} fill="url(#colorVisits)" />
-            </AreaChart>
-          </ResponsiveContainer>
         </div>
-      </div>
+      ))}
     </div>
   );
 }
@@ -301,7 +280,7 @@ function SettingsTab() {
   });
 
   useEffect(() => {
-    fetch('http://localhost:4000/api/v1/settings')
+    apiFetch('/api/v1/settings')
       .then(res => res.json())
       .then(data => {
         if (data && (data._id || data.id)) {
@@ -349,7 +328,7 @@ function SettingsTab() {
 
   const handleSave = async () => {
     try {
-      const res = await fetch('http://localhost:4000/api/v1/settings', {
+      const res = await apiFetch('/api/v1/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings)
@@ -357,7 +336,7 @@ function SettingsTab() {
       if (res.ok) {
         toast.success('Settings saved successfully!');
       } else {
-        toast.error('Failed to save settings.');
+        toast.error(await errorMessage(res, 'Failed to save settings.'));
       }
     } catch (err) {
       toast.error('Network error while saving settings.');
@@ -501,7 +480,7 @@ function MenuTab() {
 
   const fetchData = async () => {
     try {
-      const catRes = await fetch('http://localhost:4000/api/v1/menu/categories');
+      const catRes = await apiFetch('/api/v1/menu/categories');
       const catData = await catRes.json();
       if (Array.isArray(catData)) {
         setCategories(catData);
@@ -511,7 +490,7 @@ function MenuTab() {
         }
       }
       
-      const itemRes = await fetch('http://localhost:4000/api/v1/menu/items');
+      const itemRes = await apiFetch('/api/v1/menu/items');
       const itemData = await itemRes.json();
       if (Array.isArray(itemData)) {
         setItems(itemData);
@@ -532,13 +511,13 @@ function MenuTab() {
     const formData = new FormData();
     formData.append('image', file);
     try {
-      const res = await fetch('http://localhost:4000/api/v1/upload', {
+      const res = await apiFetch('/api/v1/upload', {
         method: 'POST',
         body: formData
       });
       const data = await res.json();
       if (data.imageUrl) {
-        setNewItem(prev => ({ ...prev, imageUrl: `http://localhost:4000${data.imageUrl}` }));
+        setNewItem(prev => ({ ...prev, imageUrl: data.imageUrl }));
       } else {
         toast.error('Upload failed.');
       }
@@ -552,9 +531,9 @@ function MenuTab() {
   const handleSaveItem = async (e: any) => {
     e.preventDefault();
     try {
-      const url = newItem.id ? `http://localhost:4000/api/v1/menu/items/${newItem.id}` : 'http://localhost:4000/api/v1/menu/items';
+      const url = newItem.id ? `/api/v1/menu/items/${newItem.id}` : '/api/v1/menu/items';
       const method = newItem.id ? 'PUT' : 'POST';
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newItem)
@@ -567,7 +546,7 @@ function MenuTab() {
         });
         fetchData();
       } else {
-        toast.error('Failed to save food item.');
+        toast.error(await errorMessage(res, 'Failed to save food item.'));
       }
     } catch (err) {
       toast.error('Network error.');
@@ -594,7 +573,7 @@ function MenuTab() {
   const handleDeleteItem = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this item?')) return;
     try {
-      const res = await fetch(`http://localhost:4000/api/v1/menu/items/${id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/v1/menu/items/${id}`, { method: 'DELETE' });
       if (res.ok) {
         fetchData();
       } else {
@@ -612,7 +591,7 @@ function MenuTab() {
       const payload: any = { nameEn: newCategoryName };
       if (newCategoryParentId) payload.parentId = newCategoryParentId;
 
-      const res = await fetch('http://localhost:4000/api/v1/menu/categories', {
+      const res = await apiFetch('/api/v1/menu/categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -632,7 +611,7 @@ function MenuTab() {
 
   const handleEditCategory = async (id: string, newName: string) => {
     try {
-      const res = await fetch(`http://localhost:4000/api/v1/menu/categories/${id}`, {
+      const res = await apiFetch(`/api/v1/menu/categories/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nameEn: newName })
@@ -649,13 +628,12 @@ function MenuTab() {
   const handleDeleteCategory = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this category? This will also delete all items inside it!')) return;
     try {
-      const res = await fetch(`http://localhost:4000/api/v1/menu/categories/${id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/v1/menu/categories/${id}`, { method: 'DELETE' });
       if (res.ok) {
         fetchData();
         setSelectedCategory(null);
       } else {
-        const errData = await res.json();
-        toast.error(errData.error || 'Failed to delete category.');
+        toast.error(await errorMessage(res, 'Failed to delete category.'));
       }
     } catch (err) {
       toast.error('Network error.');
@@ -916,7 +894,7 @@ function MenuTab() {
               <label style={labelStyle}>Image Upload</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 {newItem.imageUrl && (
-                  <img src={newItem.imageUrl} alt="Preview" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #e5e7eb' }} />
+                  <img src={assetUrl(newItem.imageUrl)} alt="Preview" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #e5e7eb' }} />
                 )}
                 <div style={{ flex: 1 }}>
                   <input type="file" accept="image/*" onChange={handleFileUpload} style={{...inputStyle, padding: '0.5rem'}} />
@@ -1000,7 +978,7 @@ function MenuTab() {
               filteredItems.map(item => (
                 <div key={item.id} style={{ display: 'flex', gap: '1.5rem', padding: '1.5rem', backgroundColor: '#f9fafb', borderRadius: '12px', border: '1px solid #e5e7eb', alignItems: 'center' }}>
                   {item.imageUrl ? (
-                    <img src={item.imageUrl} alt={item.nameEn} style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }} />
+                    <img src={assetUrl(item.imageUrl)} alt={item.nameEn} style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }} />
                   ) : (
                     <div style={{ width: '100px', height: '100px', backgroundColor: '#e5e7eb', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: '0.8rem', flexShrink: 0 }}>No Image</div>
                   )}
@@ -1044,7 +1022,7 @@ function PageSettingsTab() {
   const [uploading, setUploading] = useState(false);
 
   const fetchCarousels = () => {
-    fetch('http://localhost:4000/api/v1/carousels?all=true')
+    apiFetch('/api/v1/carousels?all=true')
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -1065,7 +1043,7 @@ function PageSettingsTab() {
 
   useEffect(() => {
     fetchCarousels();
-    fetch('http://localhost:4000/api/v1/settings')
+    apiFetch('/api/v1/settings')
       .then(res => res.json())
       .then(data => {
         if (data && (data._id || data.id)) {
@@ -1088,13 +1066,13 @@ function PageSettingsTab() {
     const formData = new FormData();
     formData.append('image', file);
     try {
-      const res = await fetch('http://localhost:4000/api/v1/upload', {
+      const res = await apiFetch('/api/v1/upload', {
         method: 'POST',
         body: formData
       });
       const data = await res.json();
       if (data.imageUrl) {
-        setFormState({ ...currentState, imageUrl: `http://localhost:4000${data.imageUrl}` });
+        setFormState({ ...currentState, imageUrl: data.imageUrl });
       } else {
         toast.error('Upload failed.');
       }
@@ -1112,13 +1090,13 @@ function PageSettingsTab() {
     const formData = new FormData();
     formData.append('image', file);
     try {
-      const res = await fetch('http://localhost:4000/api/v1/upload', {
+      const res = await apiFetch('/api/v1/upload', {
         method: 'POST',
         body: formData
       });
       const data = await res.json();
       if (data.imageUrl) {
-        setSettings((prev: any) => ({ ...prev, [fieldName]: `http://localhost:4000${data.imageUrl}` }));
+        setSettings((prev: any) => ({ ...prev, [fieldName]: data.imageUrl }));
       } else {
         toast.error('Upload failed.');
       }
@@ -1137,13 +1115,13 @@ function PageSettingsTab() {
   const handleSaveSettings = async (e: any) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://localhost:4000/api/v1/settings', {
+      const res = await apiFetch('/api/v1/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings)
       });
       if (res.ok) toast.success('Settings saved successfully!');
-      else toast.error('Failed to save settings.');
+      else toast.error(await errorMessage(res, 'Failed to save settings.'));
     } catch (err) {
       toast.error('Network error while saving settings.');
     }
@@ -1152,7 +1130,7 @@ function PageSettingsTab() {
   const handleSaveCarousel = async (e: any) => {
     e.preventDefault();
     try {
-      const res = await fetch(`http://localhost:4000/api/v1/carousels/${editing.id}`, {
+      const res = await apiFetch(`/api/v1/carousels/${editing.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editing)
@@ -1171,7 +1149,7 @@ function PageSettingsTab() {
   const handleAddSubmit = async (e: any) => {
     e.preventDefault();
     try {
-      const res = await fetch(`http://localhost:4000/api/v1/carousels`, {
+      const res = await apiFetch(`/api/v1/carousels`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newSlide)
@@ -1505,7 +1483,7 @@ function MessagesTab() {
   const [editing, setEditing] = useState<any>(null);
 
   const fetchMessages = () => {
-    fetch('http://localhost:4000/api/v1/contact')
+    apiFetch('/api/v1/contact')
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -1537,7 +1515,7 @@ function MessagesTab() {
   const handleSave = async (e: any) => {
     e.preventDefault();
     try {
-      const res = await fetch(`http://localhost:4000/api/v1/contact/${editing.id}`, {
+      const res = await apiFetch(`/api/v1/contact/${editing.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editing)
@@ -1618,7 +1596,7 @@ function UsersTab() {
   const [editing, setEditing] = useState<any>(null);
 
   const fetchUsers = () => {
-    fetch('http://localhost:4000/api/v1/users')
+    apiFetch('/api/v1/users')
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -1649,7 +1627,7 @@ function UsersTab() {
   const handleSave = async (e: any) => {
     e.preventDefault();
     try {
-      const res = await fetch(`http://localhost:4000/api/v1/users/${editing.id}`, {
+      const res = await apiFetch(`/api/v1/users/${editing.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editing)

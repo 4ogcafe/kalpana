@@ -82,6 +82,7 @@ model MenuItem {
   price         Int
   variants      ItemVariant[]
   imageUrl      String?
+  rating        Float?   // admin-entered 0–5; null when not set
   spiceLevel    Int      @default(0)
   isVegetarian  Boolean  @default(false)
   isVegan       Boolean  @default(false)

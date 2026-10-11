@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { apiFetch, errorMessage } from '../lib/api';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -10,22 +11,14 @@ export default function Login() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://localhost:4000/api/v1/auth/login', {
+      const res = await apiFetch('/api/v1/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
 
-      const contentType = res.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('API is unreachable. Please make sure the backend server is running on port 4000.');
-      }
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Login failed');
-      
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      if (!res.ok) throw new Error(await errorMessage(res, 'Login failed. Is the API server running?'));
+      // The API sets an httpOnly session cookie; nothing is stored in localStorage.
       navigate('/admin');
     } catch (err: any) {
       setError(err.message);
@@ -34,14 +27,16 @@ export default function Login() {
 
   return (
     <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f3f4f6' }}>
+      <title>Admin Login | Kalpana</title>
+      <meta name="robots" content="noindex, nofollow" />
       <form onSubmit={handleLogin} style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', width: '100%', maxWidth: '400px' }}>
         <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem', textAlign: 'center' }}>Admin Login</h1>
         
-        {error && <div style={{ color: 'red', marginBottom: '1rem', textAlign: 'center' }}>{error}</div>}
+        {error && <div role="alert" style={{ color: 'red', marginBottom: '1rem', textAlign: 'center' }}>{error}</div>}
         
         <div style={{ marginBottom: '1rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.5rem' }}>Email</label>
-          <input 
+          <label htmlFor="login-email" style={{ display: 'block', marginBottom: '0.5rem' }}>Email</label>
+          <input id="login-email" autoComplete="username" 
             type="email" 
             value={email} 
             onChange={e => setEmail(e.target.value)} 
@@ -51,8 +46,8 @@ export default function Login() {
         </div>
         
         <div style={{ marginBottom: '1.5rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.5rem' }}>Password</label>
-          <input 
+          <label htmlFor="login-password" style={{ display: 'block', marginBottom: '0.5rem' }}>Password</label>
+          <input id="login-password" autoComplete="current-password" 
             type="password" 
             value={password} 
             onChange={e => setPassword(e.target.value)} 

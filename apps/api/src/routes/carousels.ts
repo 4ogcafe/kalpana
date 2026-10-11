@@ -1,75 +1,77 @@
 import express from 'express';
+import { ObjectId } from 'mongodb';
+import { z } from 'zod';
+import { notFound } from '../lib/errors.js';
+import { db } from '../lib/mongo.js';
 import { prisma } from '../lib/prisma.js';
-import { MongoClient, ObjectId } from 'mongodb';
+import { definedOnly, idParam, imageUrl, optionalText } from '../lib/schemas.js';
+import { requireAdmin } from '../middleware/auth.js';
+import { publicCache } from '../middleware/cache.js';
 
 const router = express.Router();
-const getClient = () => new MongoClient(process.env.DATABASE_URL || 'mongodb://localhost:27017/kalpanarestro');
 
-router.get('/', async (req, res) => {
-  try {
-    const filter: any = { orderBy: { sortOrder: 'asc' } };
-    if (!req.query.all) {
-      filter.where = { placement: 'HOME', isActive: true };
-    }
-    const slides = await prisma.carouselSlide.findMany(filter);
-    res.json(slides);
-  } catch (error) {
-    console.error('Error fetching carousels:', error);
-    res.status(500).json({ error: 'Failed to fetch carousels' });
-  }
+const placement = z.enum(['HOME', 'CONTACT']);
+
+const slideUpdateSchema = z.object({
+  titleEn: optionalText(200),
+  titleJa: optionalText(200),
+  altEn: optionalText(300),
+  imageUrl: imageUrl.optional(),
+  isActive: z.boolean().optional(),
 });
 
-// Update a carousel
-router.put('/:id', async (req, res) => {
-  const client = getClient();
-  try {
-    await client.connect();
-    const db = client.db();
-    const { titleEn, titleJa, imageUrl, isActive } = req.body;
-    
-    await db.collection('CarouselSlide').updateOne(
-      { _id: new ObjectId(req.params.id) },
-      { $set: { titleEn, titleJa, imageUrl, isActive, updatedAt: new Date() } }
-    );
-    res.json({ success: true });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to update carousel' });
-  } finally {
-    await client.close();
-  }
+const slideCreateSchema = z.object({
+  titleEn: optionalText(200),
+  titleJa: optionalText(200),
+  altEn: optionalText(300),
+  imageUrl: imageUrl.refine((value) => value !== '', 'An image is required'),
+  placement: placement.default('HOME'),
 });
 
-// Create a carousel
-router.post('/', async (req, res) => {
-  const client = getClient();
-  try {
-    await client.connect();
-    const db = client.db();
-    const { titleEn, titleJa, imageUrl, placement } = req.body;
-    
-    const count = await db.collection('CarouselSlide').countDocuments({ placement: placement || 'HOME' });
-    
-    const newSlide = {
-      _id: new ObjectId(),
-      titleEn: titleEn || '',
-      titleJa: titleJa || '',
-      imageUrl: imageUrl || '',
-      placement: placement || 'HOME',
-      isActive: true,
-      sortOrder: count,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    
-    await db.collection('CarouselSlide').insertOne(newSlide);
-    res.json(newSlide);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to create carousel' });
-  } finally {
-    await client.close();
-  }
+router.get('/', publicCache, async (req, res) => {
+  // ?all=true is the admin list (every placement, inactive included); everything here is public content.
+  const showAll = req.query.all === 'true';
+  const slides = await prisma.carouselSlide.findMany({
+    orderBy: { sortOrder: 'asc' },
+    where: showAll ? undefined : { placement: placement.catch('HOME').parse(req.query.placement), isActive: true },
+  });
+  if (showAll) res.setHeader('Cache-Control', 'no-store');
+  res.json(slides);
+});
+
+router.put('/:id', requireAdmin, async (req, res) => {
+  const id = idParam(req.params);
+  const fields = definedOnly(slideUpdateSchema.parse(req.body));
+  // altEn is required by the schema; never let an update null it out.
+  if (fields.altEn === null) fields.altEn = '';
+  const result = await db()
+    .collection('CarouselSlide')
+    .updateOne({ _id: id }, { $set: { ...fields, updatedAt: new Date() } });
+  if (result.matchedCount === 0) throw notFound('Slide');
+  res.json({ success: true });
+});
+
+router.post('/', requireAdmin, async (req, res) => {
+  const { titleEn, titleJa, altEn, imageUrl: image, placement: slidePlacement } = slideCreateSchema.parse(req.body);
+  const slides = db().collection('CarouselSlide');
+  const count = await slides.countDocuments({ placement: slidePlacement });
+  const now = new Date();
+
+  const slide = {
+    _id: new ObjectId(),
+    titleEn: titleEn ?? '',
+    titleJa: titleJa ?? '',
+    // Required by the Prisma model: a slide without it makes every carousel read fail.
+    altEn: altEn || titleEn || titleJa || '',
+    imageUrl: image,
+    placement: slidePlacement,
+    isActive: true,
+    sortOrder: count,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await slides.insertOne(slide);
+  res.status(201).json({ ...slide, id: slide._id.toHexString() });
 });
 
 export default router;

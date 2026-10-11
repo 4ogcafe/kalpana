@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { getPublic } from '../lib/api';
 
 export default function Footer() {
   const [settings, setSettings] = useState({
@@ -10,8 +11,7 @@ export default function Footer() {
   });
 
   useEffect(() => {
-    fetch('http://localhost:4000/api/v1/settings')
-      .then(res => res.json())
+    getPublic<any>('/api/v1/settings')
       .then(data => {
         if (data && data._id) {
           setSettings(data);

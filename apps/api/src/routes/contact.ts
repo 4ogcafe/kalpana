@@ -1,74 +1,79 @@
 import express from 'express';
+import { ObjectId } from 'mongodb';
+import { z } from 'zod';
+import { notFound } from '../lib/errors.js';
+import { db } from '../lib/mongo.js';
 import { prisma } from '../lib/prisma.js';
-import { MongoClient, ObjectId } from 'mongodb';
+import { idParam, optionalNumber, optionalText } from '../lib/schemas.js';
+import { requireAdmin } from '../middleware/auth.js';
+import { rateLimit } from '../middleware/rateLimit.js';
 
 const router = express.Router();
-const getClient = () => new MongoClient(process.env.DATABASE_URL || 'mongodb://localhost:27017/kalpanarestro');
 
-// GET all messages (for dashboard)
-router.get('/', async (req, res) => {
-  try {
-    const messages = await prisma.contactMessage.findMany({
-      orderBy: { createdAt: 'desc' }
-    });
-    res.json(messages);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to fetch messages' });
-  }
+const CONTACT_WINDOW_MS = 60 * 60 * 1000;
+const CONTACT_MAX_PER_WINDOW = 5;
+
+const messageSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  email: z.email().max(254),
+  phone: optionalText(30),
+  type: z.enum(['GENERAL', 'RESERVATION', 'CATERING', 'FEEDBACK']).default('GENERAL'),
+  message: z.string().trim().max(5000).default(''),
+  date: z.preprocess(
+    (value) => (value === '' || value === null ? undefined : value),
+    z.coerce.date().optional(),
+  ),
+  guests: optionalNumber(z.number().int().min(1).max(100)),
+  // Honeypot: hidden from people, filled in by bots.
+  website: z.string().optional(),
 });
 
-// POST a new message (from contact page)
-router.post('/', async (req, res) => {
-  const client = getClient();
-  try {
-    const { name, email, phone, message, type, date, guests } = req.body;
-    await client.connect();
-    const db = client.db();
-    
-    const newMsg = {
-      _id: new ObjectId(),
-      name: name || 'Anonymous',
-      email: email || '',
-      phone: phone || '',
-      type: type || 'GENERAL',
-      message: message || '',
-      date: date ? new Date(date) : null,
-      guests: guests ? parseInt(guests, 10) : null,
-      isRead: false,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    
-    await db.collection('ContactMessage').insertOne(newMsg);
-    res.json(newMsg);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to send message natively' });
-  } finally {
-    await client.close();
-  }
+const contactLimiter = rateLimit({
+  windowMs: CONTACT_WINDOW_MS,
+  max: CONTACT_MAX_PER_WINDOW,
+  key: (req) => req.ip ?? 'unknown',
 });
 
-// Update a message (e.g. mark as read)
-router.put('/:id', async (req, res) => {
-  const client = getClient();
-  try {
-    const { isRead } = req.body;
-    await client.connect();
-    const db = client.db();
-    
-    await db.collection('ContactMessage').updateOne(
-      { _id: new ObjectId(req.params.id) },
-      { $set: { isRead: !!isRead, updatedAt: new Date() } }
-    );
-    res.json({ success: true });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to update message natively' });
-  } finally {
-    await client.close();
+router.get('/', requireAdmin, async (_req, res) => {
+  const messages = await prisma.contactMessage.findMany({ orderBy: { createdAt: 'desc' } });
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(messages);
+});
+
+router.post('/', contactLimiter, async (req, res) => {
+  const { website, ...input } = messageSchema.parse(req.body);
+  if (website) {
+    // Pretend success so bots don't learn they were filtered.
+    res.status(201).json({ success: true });
+    return;
   }
+
+  const now = new Date();
+  const message = {
+    _id: new ObjectId(),
+    name: input.name,
+    email: input.email,
+    phone: input.phone ?? '',
+    type: input.type,
+    message: input.message,
+    date: input.date ?? null,
+    guests: input.guests ?? null,
+    isRead: false,
+    ip: req.ip ?? null,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await db().collection('ContactMessage').insertOne(message);
+  res.status(201).json({ success: true, id: message._id.toHexString() });
+});
+
+router.put('/:id', requireAdmin, async (req, res) => {
+  const { isRead } = z.object({ isRead: z.boolean() }).parse(req.body);
+  const result = await db()
+    .collection('ContactMessage')
+    .updateOne({ _id: idParam(req.params) }, { $set: { isRead, updatedAt: new Date() } });
+  if (result.matchedCount === 0) throw notFound('Message');
+  res.json({ success: true });
 });
 
 export default router;

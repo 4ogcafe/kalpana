@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Navigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
+import { assetUrl, getPublic } from '../lib/api';
+import NotFound from './NotFound';
 
 const HERO_IMAGES: Record<string, string> = {
   lunch: 'https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&w=1920&q=80',
@@ -19,8 +21,7 @@ export default function Menu() {
   const [settings, setSettings] = useState<any>({});
 
   useEffect(() => {
-    fetch('http://localhost:4000/api/v1/menu/items')
-      .then(res => res.json())
+    getPublic<any>('/api/v1/menu/items')
       .then(data => {
         if(Array.isArray(data)) setMenuItems(data);
         setLoading(false);
@@ -30,29 +31,26 @@ export default function Menu() {
         setLoading(false);
       });
 
-    fetch('http://localhost:4000/api/v1/carousels')
-      .then(res => res.json())
+    getPublic<any>('/api/v1/carousels')
       .then(data => {
         if(Array.isArray(data)) setCarousels(data);
       })
       .catch(console.error);
 
-    fetch('http://localhost:4000/api/v1/settings')
-      .then(res => res.json())
+    getPublic<any>('/api/v1/settings')
       .then(data => setSettings(data))
       .catch(console.error);
   }, []);
 
-  if (!type || !['lunch', 'takeout', 'grand'].includes(type.toLowerCase())) {
-    return <Navigate to="/" replace />;
-  }
+  const menuType = (type ?? '').toLowerCase();
+  const isValidType = ['lunch', 'takeout', 'grand'].includes(menuType);
 
-  const menuTypeEnum = type.toUpperCase();
+  const menuTypeEnum = menuType.toUpperCase();
   
   const dynamicHeroImages: Record<string, string> = {
-    lunch: settings.lunchMenuHeroImage || HERO_IMAGES.lunch,
-    takeout: settings.takeoutMenuHeroImage || HERO_IMAGES.takeout,
-    grand: settings.grandMenuHeroImage || HERO_IMAGES.grand
+    lunch: assetUrl(settings.lunchMenuHeroImage) || HERO_IMAGES.lunch,
+    takeout: assetUrl(settings.takeoutMenuHeroImage) || HERO_IMAGES.takeout,
+    grand: assetUrl(settings.grandMenuHeroImage) || HERO_IMAGES.grand
   };
   
   // Filter items by menu type (GRAND, LUNCH, TAKEOUT)
@@ -89,9 +87,10 @@ export default function Menu() {
       name: item.nameJa || item.nameEn,
       desc: item.descriptionJa || item.descriptionEn,
       price: `¥${(item.price || 0).toLocaleString()}`,
-      img: item.imageUrl || DEFAULT_IMAGE,
-      rating: item.rating || 5.0,
-      stars: '★'.repeat(Math.round(item.rating || 5)) + '☆'.repeat(5 - Math.round(item.rating || 5))
+      img: assetUrl(item.imageUrl) || DEFAULT_IMAGE,
+      // Only show a rating the restaurant actually entered; never invent one.
+      rating: typeof item.rating === 'number' ? item.rating : null,
+      stars: typeof item.rating === 'number' ? '★'.repeat(Math.round(item.rating)) + '☆'.repeat(5 - Math.round(item.rating)) : ''
     });
   });
 
@@ -101,8 +100,8 @@ export default function Menu() {
   const defaultHero = carousels.length > 0 ? carousels[0].imageUrl : 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1920&q=80';
 
   const menuInfo = {
-    title: type === 'lunch' ? 'ランチメニュー' : type === 'takeout' ? 'テイクアウト' : 'グランドメニュー',
-    tag: type.toUpperCase() + ' MENU',
+    title: menuType === 'lunch' ? 'ランチメニュー' : menuType === 'takeout' ? 'テイクアウト' : 'グランドメニュー',
+    tag: menuTypeEnum + ' MENU',
     image: defaultHero
   };
 
@@ -141,13 +140,18 @@ export default function Menu() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedIndex, flatItems.length]);
 
+  // After all hooks, so the hook order is the same on every render.
+  if (!isValidType) return <NotFound />;
+
   if (loading) return <div style={{ padding: '100px', textAlign: 'center' }}>Loading menu...</div>;
 
   return (
     <main>
+      <title>{`${menuInfo.title} | Kalpana (カルパナ)`}</title>
+      <meta name="description" content={`熊谷の本格インド料理店カルパナの${menuInfo.title}。カレー、ナン、タンドール料理などを価格とともにご紹介します。`} />
       {/* Hero Section */}
       <div className="home-hero" style={{ height: '40vh', minHeight: '300px' }}>
-        <img src={dynamicHeroImages[type.toLowerCase()]} alt={menuInfo.title} className="slide-bg-img" style={{ opacity: 0.5, objectFit: 'cover' }} />
+        <img src={dynamicHeroImages[menuType]} alt="" fetchPriority="high" className="slide-bg-img" style={{ opacity: 0.5, objectFit: 'cover' }} />
         <div className="hero-content">
           <div className="hero-tag">{menuInfo.tag}</div>
           <h1 className="hero-title">{menuInfo.title}</h1>
@@ -228,16 +232,18 @@ export default function Menu() {
                           onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
                         >
                           <div style={{ height: '220px', width: '100%', backgroundColor: '#f9f6f0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-                            <img src={item.img} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }} />
+                            <img src={item.img} alt={item.name} loading="lazy" decoding="async" width={240} height={180} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }} />
                           </div>
                           <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', flex: '1' }}>
                             <h3 style={{ fontSize: '1.2rem', color: 'var(--dark-bark)', margin: '0 0 10px 0' }}>{item.name}</h3>
                             <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', lineHeight: '1.5', margin: '0 0 16px 0', flex: '1' }}>{item.desc}</p>
                             
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
-                              <span style={{ color: 'var(--gold)', letterSpacing: '2px', fontSize: '0.8rem' }}>{item.stars}</span>
-                              <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{item.rating.toFixed(1)}</span>
-                            </div>
+                            {item.rating !== null && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
+                                <span aria-hidden="true" style={{ color: 'var(--gold)', letterSpacing: '2px', fontSize: '0.8rem' }}>{item.stars}</span>
+                                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{item.rating.toFixed(1)}</span>
+                              </div>
+                            )}
 
                             <div style={{ color: 'var(--spice)', fontSize: '1.4rem', fontWeight: 'bold', fontFamily: 'serif' }}>
                               {item.price} <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal', fontFamily: 'sans-serif' }}>(税抜)</span>
@@ -258,9 +264,9 @@ export default function Menu() {
       {selectedIndex !== null && (
         <div onClick={closeLightbox} style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', boxSizing: 'border-box' }}>
           
-          <button onClick={closeLightbox} style={{ position: 'absolute', top: '20px', right: '20px', background: 'none', border: 'none', color: 'white', fontSize: '2rem', cursor: 'pointer', padding: '10px' }}>×</button>
+          <button onClick={closeLightbox} aria-label="閉じる" style={{ position: 'absolute', top: '20px', right: '20px', background: 'none', border: 'none', color: 'white', fontSize: '2rem', cursor: 'pointer', padding: '10px' }}>×</button>
           
-          <button onClick={handlePrev} style={{ position: 'absolute', left: '20px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontSize: '2rem', cursor: 'pointer', padding: '15px 20px', borderRadius: '50%' }}>❮</button>
+          <button onClick={handlePrev} aria-label="前の商品" style={{ position: 'absolute', left: '20px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontSize: '2rem', cursor: 'pointer', padding: '15px 20px', borderRadius: '50%' }}>❮</button>
           
           <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: 'white', borderRadius: '12px', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxWidth: '600px', width: '100%', maxHeight: '90vh' }}>
             <div style={{ width: '100%', height: '350px', backgroundColor: '#f9f6f0', padding: '0' }}>
@@ -270,10 +276,12 @@ export default function Menu() {
               <h2 style={{ margin: '0 0 10px 0', color: 'var(--dark-bark)' }}>{flatItems[selectedIndex].name}</h2>
               <p style={{ color: 'var(--text-muted)', lineHeight: '1.6', marginBottom: '15px' }}>{flatItems[selectedIndex].desc}</p>
               
-              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', marginBottom: '20px' }}>
-                <span style={{ color: 'var(--gold)', letterSpacing: '2px', fontSize: '1rem' }}>{flatItems[selectedIndex].stars}</span>
-                <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{flatItems[selectedIndex].rating.toFixed(1)}</span>
-              </div>
+              {flatItems[selectedIndex].rating !== null && (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', marginBottom: '20px' }}>
+                  <span aria-hidden="true" style={{ color: 'var(--gold)', letterSpacing: '2px', fontSize: '1rem' }}>{flatItems[selectedIndex].stars}</span>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{flatItems[selectedIndex].rating.toFixed(1)}</span>
+                </div>
+              )}
 
               <div style={{ color: 'var(--spice)', fontSize: '1.8rem', fontWeight: 'bold', fontFamily: 'serif' }}>
                 {flatItems[selectedIndex].price} <span style={{ fontSize: '1rem', color: 'var(--text-muted)', fontWeight: 'normal', fontFamily: 'sans-serif' }}>(税抜)</span>
@@ -314,7 +322,7 @@ export default function Menu() {
             </div>
           </div>
 
-          <button onClick={handleNext} style={{ position: 'absolute', right: '20px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontSize: '2rem', cursor: 'pointer', padding: '15px 20px', borderRadius: '50%' }}>❯</button>
+          <button onClick={handleNext} aria-label="次の商品" style={{ position: 'absolute', right: '20px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontSize: '2rem', cursor: 'pointer', padding: '15px 20px', borderRadius: '50%' }}>❯</button>
           
         </div>
       )}

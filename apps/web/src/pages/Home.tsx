@@ -1,18 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
+import { apiFetch, assetUrl, getPublic } from '../lib/api';
+import EmphasisText from '../components/EmphasisText';
 
 const DEFAULT_HERO_IMAGES = [
   "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1920&q=80",
 ];
 
-const GOOGLE_REVIEWS = [
-  { name: 'Akira S.', initial: 'A', color: '#e94235', text: 'カレーもナンも最高に美味しいです！特にチーズナンは絶品。店員さんも親切でリピートしています。' },
-  { name: 'Yuki T.', initial: 'Y', color: '#34a853', text: '熊谷でインドカレーを食べるならここ。スパイスが効いていて本格的な味です。ランチがお得！' },
-  { name: 'Kenji M.', initial: 'K', color: '#fbbc05', text: 'ボリューム満点で大満足。タンドリーチキンがとてもジューシーでした。' },
-  { name: 'Sato H.', initial: 'S', color: '#4285f4', text: '家族でよく利用します。子供用のマイルドなカレーもあるので安心です。' },
-  { name: 'Rina W.', initial: 'R', color: '#e94235', text: 'ここのバターチキンカレーの大ファンです！定期的に食べに行きたくなる味。' }
-];
+const MAP_EMBED_PREFIX = 'https://www.google.com/maps/embed';
+const DEFAULT_MAP_EMBED = "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3221.724944983944!2d139.41883000000002!3d36.1251!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x601f2b0605446c1f%3A0x1a31a406a1c1b3d6!2sKalpna%20Indian%20Cuisine!5e0!3m2!1sen!2sus!4v1700000000000!5m2!1sen!2sus";
+const UNSPLASH_WIDTHS = [640, 1080, 1920];
+// Unsplash images can be resized by URL, so phones get a 640px image instead of the 1920px one.
+const responsiveSrcSet = (url: string) =>
+  url.startsWith('https://images.unsplash.com/')
+    ? UNSPLASH_WIDTHS.map(w => `${url.replace(/([?&])w=\d+/, `$1w=${w}`)} ${w}w`).join(', ')
+    : undefined;
+const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 export default function Home() {
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -21,12 +25,14 @@ export default function Home() {
   const [settings, setSettings] = useState<any>({});
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [menuSlideIndex, setMenuSlideIndex] = useState(0);
+  // Only slides that have been shown (plus the next one) are mounted, so hidden hero images don't compete with the first one.
+  const [loadedSlides, setLoadedSlides] = useState(1);
 
   const handleNewsletterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newsletterEmail) return;
     try {
-      const res = await fetch('http://localhost:4000/api/v1/contact', {
+      const res = await apiFetch('/api/v1/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -49,32 +55,29 @@ export default function Home() {
 
   useEffect(() => {
     // Fetch Settings
-    fetch('http://localhost:4000/api/v1/settings')
-      .then(res => res.json())
+    getPublic<any>('/api/v1/settings')
       .then(data => setSettings(data))
       .catch(console.error);
 
     // Fetch Carousels
-    fetch('http://localhost:4000/api/v1/carousels')
-      .then(res => res.json())
+    getPublic<any>('/api/v1/carousels')
       .then(data => setCarousels(data))
       .catch(console.error);
 
     // Fetch Menu Items
-    fetch('http://localhost:4000/api/v1/menu/items')
-      .then(res => res.json())
+    getPublic<any>('/api/v1/menu/items')
       .then(data => {
         if(Array.isArray(data)) setMenuItems(data);
       })
       .catch(console.error);
   }, []);
 
-  const heroImages = carousels.length > 0 ? carousels.map(c => c.imageUrl) : DEFAULT_HERO_IMAGES;
+  const heroImages = carousels.length > 0 ? carousels.map(c => assetUrl(c.imageUrl)) : DEFAULT_HERO_IMAGES;
   const recommendedItems = menuItems.filter(item => item.isRecommended).slice(0, 4);
   const regularItems = menuItems.filter(item => !item.isRecommended);
 
   useEffect(() => {
-    if (regularItems.length <= 1) return;
+    if (regularItems.length <= 1 || prefersReducedMotion()) return;
     const timer = setInterval(() => {
       setMenuSlideIndex((prev) => (prev + 1) % regularItems.length);
     }, 4000);
@@ -82,6 +85,11 @@ export default function Home() {
   }, [regularItems.length]);
 
   useEffect(() => {
+    setLoadedSlides(prev => Math.max(prev, Math.min(currentSlide + 2, heroImages.length)));
+  }, [currentSlide, heroImages.length]);
+
+  useEffect(() => {
+    if (heroImages.length <= 1 || prefersReducedMotion()) return;
     const timer = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % heroImages.length);
     }, 5000);
@@ -90,13 +98,19 @@ export default function Home() {
 
   return (
     <main>
+      <title>Kalpana (カルパナ) | 熊谷の本格インド料理</title>
+      <meta name="description" content="埼玉・熊谷の本格インド料理店カルパナ。タンドール窯で焼き上げるナン、スパイス香るカレー、ランチ・テイクアウト・グランドメニューをご案内します。" />
       {/* Hero Slider */}
       <div className="home-hero">
-        {heroImages.map((img, index) => (
+        {heroImages.slice(0, loadedSlides).map((img, index) => (
           <img 
             key={index}
             src={img} 
-            alt="Restaurant Background" 
+            srcSet={responsiveSrcSet(img)}
+            sizes="100vw"
+            alt=""
+            fetchPriority={index === 0 ? 'high' : 'low'}
+            decoding="async" 
             className="slide-bg-img" 
             style={{ 
               opacity: currentSlide === index ? 0.6 : 0, 
@@ -188,16 +202,18 @@ export default function Home() {
               {regularItems.length > 0 ? [...regularItems, ...regularItems, ...regularItems].map((item, idx) => (
                 <div key={`${item.id}-${idx}`} style={{ minWidth: '280px', flex: '0 0 280px', backgroundColor: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column' }}>
                   <div style={{ height: '220px', width: '100%', backgroundColor: '#f9f6f0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-                    <img src={item.imageUrl || "https://images.unsplash.com/photo-1589302168068-964664d93dc0?auto=format&fit=crop&w=400&q=80"} alt={item.nameJa || item.nameEn} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }} />
+                    <img src={assetUrl(item.imageUrl) || "https://images.unsplash.com/photo-1589302168068-964664d93dc0?auto=format&fit=crop&w=400&q=80"} alt={item.nameJa || item.nameEn} loading="lazy" decoding="async" width={240} height={180} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }} />
                   </div>
                   <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', flex: '1' }}>
                     <h3 style={{ fontSize: '1.2rem', color: 'var(--dark-bark)', margin: '0 0 10px 0' }}>{item.nameJa || item.nameEn}</h3>
                     <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', lineHeight: '1.5', margin: '0 0 16px 0', flex: '1' }}>{item.descriptionJa || item.descriptionEn || '本格インドの味をお楽しみください。'}</p>
                     
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
-                      <span style={{ color: 'var(--gold)', letterSpacing: '2px', fontSize: '0.8rem' }}>★★★★☆</span>
-                      <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>4.5</span>
-                    </div>
+                    {typeof item.rating === 'number' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
+                        <span aria-hidden="true" style={{ color: 'var(--gold)', letterSpacing: '2px', fontSize: '0.8rem' }}>{'★'.repeat(Math.round(item.rating))}{'☆'.repeat(5 - Math.round(item.rating))}</span>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{item.rating.toFixed(1)}</span>
+                      </div>
+                    )}
                     
                     <div style={{ color: 'var(--spice)', fontSize: '1.4rem', fontWeight: 'bold', fontFamily: 'serif' }}>
                       ¥{item.price.toLocaleString()} <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal', fontFamily: 'sans-serif' }}>(税抜)</span>
@@ -225,16 +241,18 @@ export default function Home() {
               {recommendedItems.map(item => (
                 <div key={item.id} style={{ backgroundColor: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column' }}>
                   <div style={{ height: '220px', width: '100%', backgroundColor: '#f9f6f0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-                    <img src={item.imageUrl || "https://images.unsplash.com/photo-1551224650-9c25e628120e?auto=format&fit=crop&w=400&q=80"} alt={item.nameJa || item.nameEn} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }} />
+                    <img src={assetUrl(item.imageUrl) || "https://images.unsplash.com/photo-1551224650-9c25e628120e?auto=format&fit=crop&w=400&q=80"} alt={item.nameJa || item.nameEn} loading="lazy" decoding="async" width={240} height={180} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }} />
                   </div>
                   <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', flex: '1' }}>
                     <h3 style={{ fontSize: '1.2rem', color: 'var(--dark-bark)', margin: '0 0 10px 0' }}>{item.nameJa || item.nameEn}</h3>
                     <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', lineHeight: '1.5', margin: '0 0 16px 0', flex: '1' }}>{item.descriptionJa || item.descriptionEn}</p>
                     
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
-                      <span style={{ color: 'var(--gold)', letterSpacing: '2px', fontSize: '0.8rem' }}>★★★★★</span>
-                      <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>5.0</span>
-                    </div>
+                    {typeof item.rating === 'number' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
+                        <span aria-hidden="true" style={{ color: 'var(--gold)', letterSpacing: '2px', fontSize: '0.8rem' }}>{'★'.repeat(Math.round(item.rating))}{'☆'.repeat(5 - Math.round(item.rating))}</span>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{item.rating.toFixed(1)}</span>
+                      </div>
+                    )}
                     
                     <div style={{ color: 'var(--spice)', fontSize: '1.4rem', fontWeight: 'bold', fontFamily: 'serif' }}>
                       ¥{item.price.toLocaleString()} <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal', fontFamily: 'sans-serif' }}>(税抜)</span>
@@ -251,7 +269,7 @@ export default function Home() {
       <div id="locations" className="section" style={{ backgroundColor: 'var(--cream)', padding: '4rem 20px' }}>
         <div className="centered" style={{ marginBottom: '2rem' }}>
           <div className="section-label">{settings.storeSectionLabelJa || '店舗を探す'}</div>
-          <h2 className="section-title" dangerouslySetInnerHTML={{ __html: settings.storeSectionTitleJa || '私たちの<em>店舗</em>' }}></h2>
+          <h2 className="section-title"><EmphasisText text={settings.storeSectionTitleJa || '私たちの<em>店舗</em>'} /></h2>
           <div className="divider"></div>
           <p className="section-sub">{settings.storeSectionSubJa || '店舗を選択して、住所、営業時間、地図をご確認ください。'}</p>
         </div>
@@ -316,8 +334,12 @@ export default function Home() {
 
               {/* Reviews Pill */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: 'var(--cream)', padding: '10px 16px', borderRadius: '4px', border: '1px solid #e5dbcd', marginBottom: '20px', width: 'fit-content', position: 'relative', zIndex: 1 }}>
-                <span style={{ color: 'var(--gold)', letterSpacing: '2px', fontSize: '0.9rem' }}>★★★★★</span>
-                <span style={{ fontWeight: 'bold', color: 'var(--dark-bark)' }}>{settings.storeReviewScore || '4.4'}</span>
+                {settings.storeReviewScore && (
+                  <>
+                    <span aria-hidden="true" style={{ color: 'var(--gold)', letterSpacing: '2px', fontSize: '0.9rem' }}>★</span>
+                    <span style={{ fontWeight: 'bold', color: 'var(--dark-bark)' }}>{settings.storeReviewScore}</span>
+                  </>
+                )}
                 {settings.storeReviewLink ? (
                   <a href={settings.storeReviewLink} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textDecoration: 'none' }}>
                     ・ {settings.storeReviewText || 'Googleでレビューを見る'}
@@ -328,7 +350,7 @@ export default function Home() {
               </div>
 
               {/* Action Button */}
-              <a href="https://www.google.com/maps" target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', backgroundColor: '#c75626', color: 'white', textDecoration: 'none', padding: '14px', borderRadius: '4px', fontWeight: 'bold', transition: 'background 0.2s', width: '100%', borderBottom: '4px solid #a64117', position: 'relative', zIndex: 1 }}>
+              <a href={settings.googleMapsLink || 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(settings.name || 'Kalpana Indian Cuisine')} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', backgroundColor: '#c75626', color: 'white', textDecoration: 'none', padding: '14px', borderRadius: '4px', fontWeight: 'bold', transition: 'background 0.2s', width: '100%', borderBottom: '4px solid #a64117', position: 'relative', zIndex: 1 }}>
                 🗺️ ルートを検索
               </a>
 
@@ -337,7 +359,8 @@ export default function Home() {
             {/* Right Map Column */}
             <div style={{ flex: '1 1 500px', minHeight: '500px', backgroundColor: '#e5e3df', position: 'relative' }}>
               <iframe 
-                src={(settings.mapUrl && settings.mapUrl.includes('embed')) ? settings.mapUrl : "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3221.724944983944!2d139.41883000000002!3d36.1251!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x601f2b0605446c1f%3A0x1a31a406a1c1b3d6!2sKalpna%20Indian%20Cuisine!5e0!3m2!1sen!2sus!4v1700000000000!5m2!1sen!2sus"} 
+                src={settings.mapUrl?.startsWith(MAP_EMBED_PREFIX) ? settings.mapUrl : DEFAULT_MAP_EMBED}
+                title="Google マップ: Kalpana Indian Cuisine" 
                 width="100%" 
                 height="100%" 
                 style={{ border: 0, position: 'absolute', top: 0, left: 0 }} 
@@ -357,28 +380,19 @@ export default function Home() {
           <div className="section-label">お客様の声</div>
           <h2 className="section-title">Google <em>Reviews</em></h2>
           <div className="divider"></div>
-          <p className="section-sub">熊谷で愛される本格インド料理。多くのお客様から嬉しいお言葉をいただいております。</p>
+          <p className="section-sub">お客様の声はGoogleマップでご覧いただけます。</p>
         </div>
         
-        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', overflow: 'hidden' }}>
-          <div className="review-marquee-container" style={{ marginBottom: '3rem', padding: '10px 0' }}>
-            <div className="review-marquee">
-              {[...GOOGLE_REVIEWS, ...GOOGLE_REVIEWS].map((review, idx) => (
-                <div key={idx} style={{ width: '300px', flexShrink: 0, padding: '24px', border: '1px solid #eee', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.02)', backgroundColor: 'white' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
-                    <div style={{ width: '40px', height: '40px', backgroundColor: review.color, color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', marginRight: '12px' }}>{review.initial}</div>
-                    <div>
-                      <div style={{ fontWeight: '600', color: 'var(--dark-bark)' }}>{review.name}</div>
-                      <div style={{ color: 'var(--gold)', fontSize: '0.9rem' }}>★★★★★</div>
-                    </div>
-                  </div>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: '1.5' }}>
-                    「{review.text}」
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
+        <div className="centered">
+          <a
+            href={settings.storeReviewLink || settings.googleMapsLink || 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(settings.name || 'Kalpana Indian Cuisine')}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-warm"
+            style={{ display: 'inline-block', textDecoration: 'none' }}
+          >
+            Googleでレビューを読む
+          </a>
         </div>
       </div>
       
@@ -390,7 +404,7 @@ export default function Home() {
           <p style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.8)', marginBottom: '40px', lineHeight: '1.6' }}>最新のメニュー、シークレットレシピ、そして限定のお得な情報を<br/>あなたのメールボックスへ直接お届けします。</p>
           
           <form style={{ display: 'flex', gap: '10px', maxWidth: '500px', margin: '0 auto', flexWrap: 'wrap', justifyContent: 'center' }} onSubmit={handleNewsletterSubmit}>
-            <input type="email" value={newsletterEmail} onChange={(e) => setNewsletterEmail(e.target.value)} placeholder="メールアドレスを入力" required style={{ flex: '1', minWidth: '250px', padding: '16px 24px', borderRadius: '50px', border: 'none', fontSize: '1rem', outline: 'none' }} />
+            <input type="email" aria-label="メールアドレス" value={newsletterEmail} onChange={(e) => setNewsletterEmail(e.target.value)} placeholder="メールアドレスを入力" required style={{ flex: '1', minWidth: '250px', padding: '16px 24px', borderRadius: '50px', border: 'none', fontSize: '1rem', outline: 'none' }} />
             <button type="submit" style={{ backgroundColor: 'var(--spice)', color: 'white', border: 'none', padding: '16px 36px', borderRadius: '50px', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', transition: 'all 0.3s', whiteSpace: 'nowrap', boxShadow: '0 4px 15px rgba(181, 69, 27, 0.4)' }}>
               登録する
             </button>

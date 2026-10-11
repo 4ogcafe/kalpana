@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
+import { apiFetch } from '../lib/api';
 
 export default function Navbar() {
   const [isPopupOpen, setIsPopupOpen] = useState(false);
@@ -32,7 +33,7 @@ export default function Navbar() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://localhost:4000/api/v1/contact', {
+      const res = await apiFetch('/api/v1/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -62,7 +63,7 @@ export default function Navbar() {
         <div className="nav-inner">
           <Link className="nav-logo" to="/">
             <div style={{ height: '40px', display: 'flex', alignItems: 'center' }}>
-              <img src="/site-logo-01.webp" alt="Kalpana Logo" style={{ height: '100%', width: 'auto', objectFit: 'contain' }} />
+              <img src="/site-logo-01.webp" alt="Kalpana" width={40} height={40} style={{ height: '100%', width: 'auto', objectFit: 'contain' }} />
             </div>
             <div>
               <div className="nav-logo-text">カルパナ<span>.</span></div>
@@ -91,7 +92,7 @@ export default function Navbar() {
           
           <div style={{ backgroundColor: 'white', borderRadius: '16px', overflow: 'hidden', maxWidth: '500px', width: '100%', position: 'relative', boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }} onClick={(e) => e.stopPropagation()}>
             
-            <button onClick={handleClose} style={{ position: 'absolute', top: '15px', right: '15px', background: 'white', border: 'none', color: 'var(--text-muted)', fontSize: '1.5rem', cursor: 'pointer', width: '30px', height: '30px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 10px rgba(0,0,0,0.1)', zIndex: 10 }}>×</button>
+            <button onClick={handleClose} aria-label="閉じる" style={{ position: 'absolute', top: '15px', right: '15px', background: 'white', border: 'none', color: 'var(--text-muted)', fontSize: '1.5rem', cursor: 'pointer', width: '30px', height: '30px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 10px rgba(0,0,0,0.1)', zIndex: 10 }}>×</button>
             
             {/* Header image */}
             <div style={{ height: '120px', width: '100%', backgroundImage: 'url(https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80)', backgroundSize: 'cover', backgroundPosition: 'center', position: 'relative' }}>
@@ -106,7 +107,7 @@ export default function Navbar() {
                 <div style={{ textAlign: 'center', padding: '40px 20px' }}>
                   <div style={{ fontSize: '3rem', marginBottom: '20px' }}>✅</div>
                   <h3 style={{ fontSize: '1.4rem', color: 'var(--dark-bark)', marginBottom: '10px' }}>ご予約を受け付けました</h3>
-                  <p style={{ color: 'var(--text-muted)', lineHeight: '1.6' }}>ご入力いただいたメールアドレスに確認メールを送信いたしました。ご来店を心よりお待ちしております。</p>
+                  <p style={{ color: 'var(--text-muted)', lineHeight: '1.6' }}>ご予約リクエストを受け付けました。内容を確認のうえ、店舗よりご連絡いたします。ご来店を心よりお待ちしております。</p>
                   <button onClick={handleClose} style={{ marginTop: '30px', backgroundColor: 'var(--spice)', color: 'white', border: 'none', padding: '12px 30px', borderRadius: '50px', fontWeight: 'bold', cursor: 'pointer' }}>閉じる</button>
                 </div>
               ) : (
