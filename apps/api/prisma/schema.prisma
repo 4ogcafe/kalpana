@@ -1,0 +1,189 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  STAFF
+}
+
+enum MenuType {
+  LUNCH
+  TAKEOUT
+  GRAND
+}
+
+enum Placement {
+  HOME
+  CONTACT
+}
+
+enum EnquiryType {
+  GENERAL
+  RESERVATION
+  CATERING
+  FEEDBACK
+}
+
+model User {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role     @default(STAFF)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Menu {
+  id           String     @id @default(auto()) @map("_id") @db.ObjectId
+  type         MenuType   @unique
+  nameEn       String
+  nameJa       String?
+  descriptionEn String?
+  descriptionJa String?
+  servingHours Json?      // [{ day: 1, open: "11:00", close: "15:00" }]
+  notesEn      String?    // e.g. pickup info for takeout
+  notesJa      String?
+  pdfUrl       String?
+  isActive     Boolean    @default(true)
+  categoryIDs  String[]   @db.ObjectId
+  categories   Category[] @relation(fields: [categoryIDs], references: [id])
+}
+
+model Category {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  nameEn    String
+  nameJa    String?
+  sortOrder Int      @default(0)
+  parentId  String?  @db.ObjectId
+  parent    Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  subCategories Category[] @relation("CategoryHierarchy")
+  menuIDs   String[] @db.ObjectId
+  menus     Menu[]   @relation(fields: [menuIDs], references: [id])
+  items     MenuItem[]
+}
+
+model MenuItem {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  categoryId    String   @db.ObjectId
+  category      Category @relation(fields: [categoryId], references: [id])
+  menuTypes     MenuType[]
+  nameEn        String
+  nameJa        String?
+  descriptionEn String?
+  descriptionJa String?
+  price         Int
+  variants      ItemVariant[]
+  imageUrl      String?
+  spiceLevel    Int      @default(0)
+  isVegetarian  Boolean  @default(false)
+  isVegan       Boolean  @default(false)
+  isHalal       Boolean  @default(false)
+  isGlutenFree  Boolean  @default(false)
+  allergens     String[]
+  isRecommended Boolean  @default(false)
+  isSoldOut     Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([categoryId, sortOrder])
+}
+
+model ItemVariant {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  itemId    String   @db.ObjectId
+  item      MenuItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  labelEn   String
+  labelJa   String?
+  price     Int
+  sortOrder Int      @default(0)
+}
+
+model CarouselSlide {
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  placement  Placement
+  imageUrl   String
+  altEn      String
+  altJa      String?
+  titleEn    String?
+  titleJa    String?
+  subtitleEn String?
+  subtitleJa String?
+  ctaLabelEn String?
+  ctaLabelJa String?
+  ctaLink    String?
+  sortOrder  Int       @default(0)
+  startAt    DateTime?
+  endAt      DateTime?
+  isActive   Boolean   @default(true)
+}
+
+model Settings {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  name         String
+  addressEn    String
+  addressJa    String?
+  lat          Float
+  lng          Float
+  phone        String
+  email        String
+  timezone     String   @default("Asia/Tokyo")
+  currency     String   @default("JPY")
+  weeklyHours  Json
+  holidays     Json
+  socials      Json
+  googlePlaceId String?
+  mapUrl       String?
+  aboutEn      String?
+  aboutJa      String?
+  aboutHeroImage    String?
+  aboutStoryJa      String?
+  aboutStoryLabelJa String?
+  aboutStoryTitleJa String?
+  aboutSpiceLabelJa String?
+  aboutSpiceTitleJa String?
+  aboutSpiceDescJa  String?
+  aboutSpiceImage   String?
+  aboutChefLabelJa  String?
+  aboutChefTitleJa  String?
+  aboutChefDescJa   String?
+  aboutChefImage    String?
+  contactHeroImage  String?
+  menuLunchHeroImage  String?
+  menuTakeoutHeroImage String?
+  menuGrandHeroImage  String?
+  updatedAt    DateTime @updatedAt
+}
+
+model ContactMessage {
+  id        String      @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  email     String
+  phone     String?
+  type      EnquiryType @default(GENERAL)
+  date      DateTime?
+  guests    Int?
+  message   String
+  isRead    Boolean     @default(false)
+  ip        String?
+  createdAt DateTime    @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  action    String
+  entity    String
+  entityId  String
+  diff      Json?
+  createdAt DateTime @default(now())
+}

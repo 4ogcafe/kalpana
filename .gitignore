@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Environment (keep .env.example)
+.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Runtime uploads
+apps/api/public/uploads/*
+!apps/api/public/uploads/.gitkeep
+
+# OS / editor
+.DS_Store
+.vscode/
+*.log
