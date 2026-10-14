@@ -495,9 +495,10 @@ function dineInByDefault(category: any, categories: any[]): boolean {
 }
 
 function MenuTab({ intent }: { intent: TabIntent | null }) {
+  const [menuSubTab, setMenuSubTab] = useState<'items' | 'option-groups'>('items');
   const [categories, setCategories] = useState<any[]>([]);
   const [items, setItems] = useState<any[]>([]);
-  
+
   const [selectedCategory, setSelectedCategory] = useState<any>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
@@ -505,6 +506,58 @@ function MenuTab({ intent }: { intent: TabIntent | null }) {
   useEffect(() => {
     if (intent?.action === 'add-item') setIsAdding(true);
   }, [intent]);
+
+  // --- Option groups state ---
+  const [optionGroups, setOptionGroups] = useState<any[]>([]);
+  const [ogEditing, setOgEditing] = useState<any | null>(null);
+  const [ogForm, setOgForm] = useState({ nameJa: '', nameEn: '', type: 'RADIO', required: true, sortOrder: 0, options: [{ id: '', nameJa: '', nameEn: '', priceAdjust: 0 }] });
+
+  const fetchOptionGroups = async () => {
+    try {
+      const res = await apiFetch('/api/v1/menu/option-groups');
+      const data = await res.json();
+      if (Array.isArray(data)) setOptionGroups(data);
+    } catch { /* ignore */ }
+  };
+
+  useEffect(() => { fetchOptionGroups(); }, []);
+
+  const ogReset = () => {
+    setOgEditing(null);
+    setOgForm({ nameJa: '', nameEn: '', type: 'RADIO', required: true, sortOrder: 0, options: [{ id: '', nameJa: '', nameEn: '', priceAdjust: 0 }] });
+  };
+
+  const ogStartEdit = (g: any) => {
+    setOgEditing(g);
+    setOgForm({ nameJa: g.nameJa, nameEn: g.nameEn, type: g.type, required: g.required, sortOrder: g.sortOrder ?? 0, options: g.options.map((o: any) => ({ ...o })) });
+  };
+
+  const ogSave = async (e: any) => {
+    e.preventDefault();
+    const opts = ogForm.options.filter(o => o.nameJa.trim() && o.id.trim());
+    if (opts.length === 0) { toast.error('少なくとも1つの選択肢を追加してください。'); return; }
+    const payload = { ...ogForm, options: opts };
+    try {
+      const url = ogEditing ? `/api/v1/menu/option-groups/${ogEditing.id}` : '/api/v1/menu/option-groups';
+      const res = await apiFetch(url, { method: ogEditing ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (res.ok) {
+        toast.success(ogEditing ? 'Option group updated.' : 'Option group created.');
+        ogReset();
+        fetchOptionGroups();
+      } else toast.error(await errorMessage(res, 'Failed to save.'));
+    } catch { toast.error('Network error.'); }
+  };
+
+  const ogDelete = async (id: string) => {
+    if (!window.confirm('Delete this option group?')) return;
+    const res = await apiFetch(`/api/v1/menu/option-groups/${id}`, { method: 'DELETE' });
+    if (res.ok) { toast.success('Deleted.'); fetchOptionGroups(); }
+    else toast.error('Failed to delete.');
+  };
+
+  const ogAddChoice = () => setOgForm(f => ({ ...f, options: [...f.options, { id: '', nameJa: '', nameEn: '', priceAdjust: 0 }] }));
+  const ogRemoveChoice = (i: number) => setOgForm(f => ({ ...f, options: f.options.filter((_, idx) => idx !== i) }));
+  const ogUpdateChoice = (i: number, field: string, value: any) => setOgForm(f => ({ ...f, options: f.options.map((o, idx) => idx === i ? { ...o, [field]: value } : o) }));
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryParentId, setNewCategoryParentId] = useState('');
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -522,7 +575,8 @@ function MenuTab({ intent }: { intent: TabIntent | null }) {
     isRecommended: false,
     isVegetarian: false,
     isVegan: false,
-    isGlutenFree: false
+    isGlutenFree: false,
+    optionGroupIds: [] as string[],
   });
 
   const fetchData = async () => {
@@ -589,7 +643,7 @@ function MenuTab({ intent }: { intent: TabIntent | null }) {
         toast.success(newItem.id ? 'Food item updated successfully!' : 'Food item added successfully!');
         setIsAdding(false);
         setNewItem({
-          id: '', nameEn: '', price: '', categoryName: selectedCategory?.nameEn || '', descriptionEn: '', imageUrl: '', rating: '5', isRecommended: false, isVegetarian: false, isVegan: false, isGlutenFree: false
+          id: '', nameEn: '', price: '', categoryName: selectedCategory?.nameEn || '', descriptionEn: '', imageUrl: '', rating: '5', isRecommended: false, isVegetarian: false, isVegan: false, isGlutenFree: false, optionGroupIds: [],
         });
         fetchData();
       } else {
@@ -612,7 +666,8 @@ function MenuTab({ intent }: { intent: TabIntent | null }) {
       isRecommended: item.isRecommended || false,
       isVegetarian: item.isVegetarian || false,
       isVegan: item.isVegan || false,
-      isGlutenFree: item.isGlutenFree || false
+      isGlutenFree: item.isGlutenFree || false,
+      optionGroupIds: item.optionGroupIds || [],
     });
     setIsAdding(true);
   };
@@ -807,7 +862,112 @@ function MenuTab({ intent }: { intent: TabIntent | null }) {
   };
 
   return (
-    <div className="adm-menu-layout" style={{ display: 'flex', gap: '2rem', height: '100%', alignItems: 'flex-start' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', height: '100%' }}>
+      {/* Sub-tab toggle */}
+      <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid #e5e7eb', paddingBottom: '12px' }}>
+        {(['items', 'option-groups'] as const).map(t => (
+          <button key={t} type="button" onClick={() => setMenuSubTab(t)}
+            style={{ padding: '6px 18px', borderRadius: '8px', border: '1px solid', fontWeight: '600', fontSize: '0.9rem', cursor: 'pointer', transition: 'all 0.15s',
+              backgroundColor: menuSubTab === t ? '#111827' : '#fff',
+              color: menuSubTab === t ? '#fff' : '#374151',
+              borderColor: menuSubTab === t ? '#111827' : '#d1d5db' }}>
+            {t === 'items' ? 'Menu Items' : 'Option Groups'}
+          </button>
+        ))}
+      </div>
+
+    {menuSubTab === 'option-groups' ? (
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', alignItems: 'flex-start' }}>
+        {/* Option group list */}
+        <div>
+          <h3 style={{ margin: '0 0 1rem', fontSize: '1.1rem', fontWeight: '700' }}>Existing Option Groups</h3>
+          {optionGroups.length === 0
+            ? <p style={{ color: '#6b7280' }}>No option groups yet.</p>
+            : optionGroups.map(g => (
+              <div key={g.id} style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '12px 14px', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
+                  <div>
+                    <strong style={{ fontSize: '1rem' }}>{g.nameJa}</strong>
+                    <span style={{ marginLeft: '8px', fontSize: '0.8rem', color: '#6b7280' }}>{g.nameEn}</span>
+                    <span style={{ marginLeft: '8px', fontSize: '0.75rem', padding: '1px 7px', borderRadius: '9999px', background: g.type === 'RADIO' ? '#dbeafe' : '#fce7f3', color: g.type === 'RADIO' ? '#1e40af' : '#9d174d' }}>{g.type}</span>
+                    {g.required && <span style={{ marginLeft: '4px', fontSize: '0.75rem', padding: '1px 7px', borderRadius: '9999px', background: '#fee2e2', color: '#991b1b' }}>必須</span>}
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button onClick={() => ogStartEdit(g)} style={{ padding: '3px 10px', fontSize: '0.8rem', border: '1px solid #d1d5db', borderRadius: '5px', background: '#fff', cursor: 'pointer' }}>Edit</button>
+                    <button onClick={() => ogDelete(g.id)} style={{ padding: '3px 10px', fontSize: '0.8rem', border: '1px solid #fca5a5', borderRadius: '5px', background: '#fee2e2', color: '#ef4444', cursor: 'pointer' }}>Delete</button>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                  {g.options.map((o: any) => (
+                    <span key={o.id} style={{ fontSize: '0.8rem', padding: '2px 9px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '9999px' }}>
+                      {o.nameJa}{o.priceAdjust ? ` (+¥${o.priceAdjust})` : ''}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+        </div>
+
+        {/* Option group form */}
+        <div>
+          <h3 style={{ margin: '0 0 1rem', fontSize: '1.1rem', fontWeight: '700' }}>{ogEditing ? 'Edit Option Group' : 'New Option Group'}</h3>
+          <form onSubmit={ogSave} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div>
+                <label style={labelStyle}>表示名（日本語）</label>
+                <input required value={ogForm.nameJa} onChange={e => setOgForm(f => ({ ...f, nameJa: e.target.value }))} style={inputStyle} placeholder="例：辛さ" />
+              </div>
+              <div>
+                <label style={labelStyle}>Name (English)</label>
+                <input required value={ogForm.nameEn} onChange={e => setOgForm(f => ({ ...f, nameEn: e.target.value }))} style={inputStyle} placeholder="e.g. Spice Level" />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+              <div>
+                <label style={labelStyle}>Type</label>
+                <select value={ogForm.type} onChange={e => setOgForm(f => ({ ...f, type: e.target.value }))} style={inputStyle}>
+                  <option value="RADIO">Single choice (RADIO)</option>
+                  <option value="CHECKBOX">Multi choice (CHECKBOX)</option>
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Required?</label>
+                <select value={String(ogForm.required)} onChange={e => setOgForm(f => ({ ...f, required: e.target.value === 'true' }))} style={inputStyle}>
+                  <option value="true">Required 必須</option>
+                  <option value="false">Optional 任意</option>
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Sort order</label>
+                <input type="number" min={0} value={ogForm.sortOrder} onChange={e => setOgForm(f => ({ ...f, sortOrder: Number(e.target.value) }))} style={inputStyle} />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ ...labelStyle, marginBottom: '8px', display: 'block' }}>Choices</label>
+              {ogForm.options.map((opt, i) => (
+                <div key={i} style={{ display: 'grid', gridTemplateColumns: '100px 1fr 1fr 80px 32px', gap: '6px', marginBottom: '6px', alignItems: 'center' }}>
+                  <input placeholder="id (slug)" value={opt.id} onChange={e => ogUpdateChoice(i, 'id', e.target.value.replace(/\s+/g, '-').toLowerCase())} style={{ ...inputStyle, padding: '6px 8px', fontSize: '0.8rem' }} />
+                  <input placeholder="日本語名" value={opt.nameJa} onChange={e => ogUpdateChoice(i, 'nameJa', e.target.value)} style={{ ...inputStyle, padding: '6px 8px', fontSize: '0.8rem' }} />
+                  <input placeholder="English name" value={opt.nameEn} onChange={e => ogUpdateChoice(i, 'nameEn', e.target.value)} style={{ ...inputStyle, padding: '6px 8px', fontSize: '0.8rem' }} />
+                  <input type="number" placeholder="±¥" value={opt.priceAdjust} onChange={e => ogUpdateChoice(i, 'priceAdjust', Number(e.target.value))} style={{ ...inputStyle, padding: '6px 8px', fontSize: '0.8rem' }} />
+                  <button type="button" onClick={() => ogRemoveChoice(i)} style={{ background: '#fee2e2', border: 'none', borderRadius: '5px', color: '#ef4444', cursor: 'pointer', padding: '4px', fontSize: '1rem', lineHeight: 1 }}>×</button>
+                </div>
+              ))}
+              <button type="button" onClick={ogAddChoice} style={{ fontSize: '0.85rem', padding: '5px 12px', border: '1px dashed #d1d5db', borderRadius: '6px', background: '#fff', color: '#6b7280', cursor: 'pointer' }}>+ Add choice</button>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button type="submit" style={{ flex: 1, padding: '0.65rem', background: '#111827', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
+                {ogEditing ? 'Update' : 'Create'}
+              </button>
+              {ogEditing && <button type="button" onClick={ogReset} style={{ padding: '0.65rem 1rem', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancel</button>}
+            </div>
+          </form>
+        </div>
+      </div>
+    ) : (
+    <div className="adm-menu-layout" style={{ display: 'flex', gap: '2rem', flex: 1, alignItems: 'flex-start' }}>
       
       {/* Sidebar Section */}
       <div className="adm-menu-categories" style={{ 
@@ -1051,6 +1211,35 @@ function MenuTab({ intent }: { intent: TabIntent | null }) {
               </label>
             </div>
 
+            {optionGroups.length > 0 && (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={labelStyle}>Customization Options (Option Groups)</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', padding: '10px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
+                  {optionGroups.map((g: any) => {
+                    const checked = newItem.optionGroupIds.includes(g.id);
+                    return (
+                      <label key={g.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.875rem', cursor: 'pointer', padding: '4px 10px', borderRadius: '9999px', border: `1px solid ${checked ? '#c7d2fe' : '#e5e7eb'}`, background: checked ? '#eef2ff' : '#fff', transition: 'all 0.15s' }}>
+                        <input type="checkbox" checked={checked}
+                          onChange={e => setNewItem(prev => ({
+                            ...prev,
+                            optionGroupIds: e.target.checked
+                              ? [...prev.optionGroupIds, g.id]
+                              : prev.optionGroupIds.filter((id: string) => id !== g.id)
+                          }))}
+                          style={{ width: '14px', height: '14px' }}
+                        />
+                        {g.nameJa}
+                        <span style={{ fontSize: '0.7rem', color: '#6b7280' }}>({g.type})</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '4px 0 0' }}>
+                  Selected groups will appear as required/optional choices when the customer taps "追加" on this item in the table menu.
+                </p>
+              </div>
+            )}
+
             <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
               <button type="submit" disabled={uploading} style={{ padding: '0.75rem 2rem', backgroundColor: '#000', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: uploading ? 'not-allowed' : 'pointer' }}>
                 Save Food Item
@@ -1103,6 +1292,8 @@ function MenuTab({ intent }: { intent: TabIntent | null }) {
           </div>
         )}
       </div>
+    </div>
+    )} {/* end menuSubTab === 'items' */}
     </div>
   );
 }

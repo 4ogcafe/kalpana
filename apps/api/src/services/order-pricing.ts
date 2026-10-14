@@ -10,6 +10,14 @@ import { findUsableReward } from './stamps.js';
 
 export const MAX_QUANTITY = 20;
 
+export interface OrderLineOption {
+  groupId: string;
+  groupNameJa: string;
+  optionId: string;
+  nameJa: string;
+  priceAdjust: number;
+}
+
 export interface OrderLine {
   itemId: ObjectId;
   nameEn: string;
@@ -17,6 +25,7 @@ export interface OrderLine {
   unitPrice: number;
   quantity: number;
   lineTotal: number;
+  options?: OrderLineOption[];
 }
 
 export interface AppliedOffer {
@@ -51,9 +60,17 @@ export interface OrderQuote {
 }
 
 /** Prices and availability come from the database, never from the client. */
-export async function priceLines(requested: { itemId: string; quantity: number }[]): Promise<OrderLine[]> {
+export async function priceLines(
+  requested: { itemId: string; quantity: number; optionAdjust?: number; options?: OrderLineOption[] }[]
+): Promise<OrderLine[]> {
   const quantities = new Map<string, number>();
-  for (const { itemId, quantity } of requested) quantities.set(itemId, (quantities.get(itemId) ?? 0) + quantity);
+  const optionAdjusts = new Map<string, number>();
+  const optionsByItemId = new Map<string, OrderLineOption[]>();
+  for (const req of requested) {
+    quantities.set(req.itemId, (quantities.get(req.itemId) ?? 0) + req.quantity);
+    if (req.optionAdjust) optionAdjusts.set(req.itemId, req.optionAdjust);
+    if (req.options) optionsByItemId.set(req.itemId, req.options);
+  }
 
   const ids = [...quantities.keys()].map((id) => new ObjectId(id));
   const items = await db().collection('MenuItem').find({ _id: { $in: ids } }).toArray();
@@ -67,8 +84,10 @@ export async function priceLines(requested: { itemId: string; quantity: number }
       throw new AppError(409, 'ITEM_UNAVAILABLE', `「${name}」は現在ご注文いただけません。カートから削除してください。`, { itemId: id });
     }
     const quantity = Math.min(requestedQuantity, MAX_QUANTITY);
-    const unitPrice = Number(item.price) || 0;
-    return { itemId: item._id, nameEn: item.nameEn, nameJa: item.nameJa ?? null, unitPrice, quantity, lineTotal: unitPrice * quantity };
+    const optionAdjust = optionAdjusts.get(id) ?? 0;
+    const unitPrice = (Number(item.price) || 0) + optionAdjust;
+    const options = optionsByItemId.get(id);
+    return { itemId: item._id, nameEn: item.nameEn, nameJa: item.nameJa ?? null, unitPrice, quantity, lineTotal: unitPrice * quantity, ...(options ? { options } : {}) };
   });
 }
 
@@ -93,7 +112,7 @@ async function usableOffer(offerId: string, customerId: ObjectId) {
 
 /** The full price of a cart for this customer (or guest), with the chosen offer and points applied. */
 export async function quoteOrder(input: {
-  items: { itemId: string; quantity: number }[];
+  items: { itemId: string; quantity: number; optionAdjust?: number; options?: OrderLineOption[] }[];
   offerId?: string | null;
   rewardId?: string | null;
   pointsToUse?: number;

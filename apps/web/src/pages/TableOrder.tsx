@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { BellRing, ChefHat, CircleCheck, Droplets, Flame, Leaf, Minus, Plus, Receipt, ShoppingBag, Sparkles, UtensilsCrossed, X } from 'lucide-react';
+import { BellRing, ChefHat, Check, CircleCheck, Droplets, Flame, Leaf, Minus, Plus, Receipt, ShoppingBag, Sparkles, UtensilsCrossed, X } from 'lucide-react';
 import { apiFetch, assetUrl, errorMessage, getPublic } from '../lib/api';
 import { useCustomer } from '../lib/customer-context';
 import { yen } from '../lib/format';
@@ -10,6 +10,22 @@ import { readyChime } from '../lib/push';
 import './table.css';
 
 // The page a table's QR code opens (/t/<code>): the dine-in menu, the table's orders, and the bill.
+
+interface OptionChoice {
+  id: string;
+  nameJa: string;
+  nameEn: string;
+  priceAdjust: number;
+}
+
+interface OptionGroup {
+  id: string;
+  nameJa: string;
+  nameEn: string;
+  type: 'RADIO' | 'CHECKBOX';
+  required: boolean;
+  options: OptionChoice[];
+}
 
 interface MenuItem {
   id: string;
@@ -23,6 +39,7 @@ interface MenuItem {
   isRecommended: boolean;
   allergens: string[];
   isSoldOut: boolean;
+  optionGroups: OptionGroup[];
 }
 interface MenuGroup {
   id: string;
@@ -34,7 +51,7 @@ interface TableOrder {
   id: string;
   number: number;
   status: 'NEW' | 'CONFIRMED' | 'READY' | 'COMPLETED' | 'CANCELLED';
-  items: { nameEn: string; nameJa: string | null; quantity: number; lineTotal: number }[];
+  items: { nameEn: string; nameJa: string | null; quantity: number; lineTotal: number; options?: { groupNameJa: string; nameJa: string }[] }[];
   total: number;
   grandTotal: number;
   createdAt: string;
@@ -54,6 +71,20 @@ interface TableInfo {
   session: Session | null;
 }
 
+// --- Cart with options support ---
+
+interface CartLine {
+  itemId: string;
+  quantity: number;
+  options: { groupId: string; optionId: string }[];
+  optionAdjust: number;
+}
+
+function cartLineKey(itemId: string, options: { groupId: string; optionId: string }[]): string {
+  const sorted = [...options].sort((a, b) => a.groupId.localeCompare(b.groupId) || a.optionId.localeCompare(b.optionId));
+  return `${itemId}|${sorted.map(o => `${o.groupId}:${o.optionId}`).join(',')}`;
+}
+
 const POLL_MS = 8_000;
 const DEFAULT_TAX_PERCENT = 8;
 const STATUS: Record<TableOrder['status'], { label: string; tone: string }> = {
@@ -70,21 +101,20 @@ const CALLS = [
 
 const time = (iso: string) => new Date(iso).toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' });
 
-/** The cart lives per visit in this browser tab, so a refresh doesn't lose it. */
 function useTableCart(sessionId: string | undefined) {
-  const key = sessionId ? `kalpana_table_cart_${sessionId}` : null;
-  const [cart, setCart] = useState<Record<string, number>>({});
+  const key = sessionId ? `kalpana_table_cart_v2_${sessionId}` : null;
+  const [cart, setCartState] = useState<Record<string, CartLine>>({});
   useEffect(() => {
     if (!key) return;
     try {
-      setCart(JSON.parse(sessionStorage.getItem(key) ?? '{}'));
+      setCartState(JSON.parse(sessionStorage.getItem(key) ?? '{}'));
     } catch {
-      setCart({});
+      setCartState({});
     }
   }, [key]);
   const update = useCallback(
-    (next: Record<string, number>) => {
-      setCart(next);
+    (next: Record<string, CartLine>) => {
+      setCartState(next);
       try {
         if (key) sessionStorage.setItem(key, JSON.stringify(next));
       } catch {
@@ -116,6 +146,10 @@ export default function TableOrderPage() {
   const [taxPercent, setTaxPercent] = useState(DEFAULT_TAX_PERCENT);
   const [cart, setCart] = useTableCart(info?.session?.id);
 
+  // Customization modal state
+  const [customizing, setCustomizing] = useState<{ item: MenuItem } | null>(null);
+  const [selections, setSelections] = useState<Record<string, string[]>>({});
+
   const load = useCallback(async () => {
     try {
       const res = await fetch(`/api/v1/dining/t/${encodeURIComponent(token)}`, { cache: 'no-store' });
@@ -125,15 +159,12 @@ export default function TableOrderPage() {
       }
       if (!res.ok) return;
       const data: TableInfo = await res.json();
-      // The visit ended (paid at the register) while this page was open.
       if (sessionRef.current && !data.session) setFinished(true);
-      // A call the guests made was accepted by staff: let them know someone is coming.
       const nowOpen = data.session?.openCalls ?? [];
       for (const type of callsRef.current) {
         if (!nowOpen.includes(type) && type !== 'BILL') toast.success(type === 'WATER' ? 'スタッフがお水をお持ちします。' : 'スタッフがまいります。', { id: `accepted-${type}` });
       }
       callsRef.current = nowOpen;
-      // A round of food that just became ready: tell the table (the phone may be on the table, face up).
       const readyNow = (data.session?.orders ?? []).filter(order => order.status === 'READY').map(order => order.id);
       if (readyRef.current && readyNow.some(id => !readyRef.current!.includes(id))) {
         readyChime();
@@ -169,16 +200,100 @@ export default function TableOrderPage() {
   }, [load]);
 
   const items = useMemo(() => new Map((menu ?? []).flatMap(group => group.items.map(item => [item.id, item] as const))), [menu]);
+
   const cartLines = Object.entries(cart)
-    .map(([id, quantity]) => ({ item: items.get(id), quantity }))
-    .filter((line): line is { item: MenuItem; quantity: number } => Boolean(line.item) && line.quantity > 0);
+    .map(([key, line]) => ({ key, item: items.get(line.itemId), ...line }))
+    .filter((line): line is { key: string; item: MenuItem; itemId: string; quantity: number; options: { groupId: string; optionId: string }[]; optionAdjust: number } => Boolean(line.item) && line.quantity > 0);
+
   const cartCount = cartLines.reduce((sum, line) => sum + line.quantity, 0);
-  const cartSubtotal = cartLines.reduce((sum, line) => sum + line.item.price * line.quantity, 0);
-  const setQuantity = (id: string, quantity: number) => {
+  const cartSubtotal = cartLines.reduce((sum, line) => sum + (line.item.price + line.optionAdjust) * line.quantity, 0);
+
+  const updateQuantity = (key: string, quantity: number) => {
     const next = { ...cart };
-    if (quantity > 0) next[id] = Math.min(20, quantity);
-    else delete next[id];
+    if (quantity > 0) {
+      next[key] = { ...next[key], quantity: Math.min(20, quantity) };
+    } else {
+      delete next[key];
+    }
     setCart(next);
+  };
+
+  // Add a plain (no-options) item directly to cart
+  const addPlain = (item: MenuItem) => {
+    const k = cartLineKey(item.id, []);
+    const next = { ...cart };
+    if (next[k]) {
+      next[k] = { ...next[k], quantity: Math.min(20, next[k].quantity + 1) };
+    } else {
+      next[k] = { itemId: item.id, quantity: 1, options: [], optionAdjust: 0 };
+    }
+    setCart(next);
+  };
+
+  // Total units in cart for a given item id (across all option combos)
+  const itemCartCount = (itemId: string) =>
+    Object.values(cart).filter(l => l.itemId === itemId).reduce((s, l) => s + l.quantity, 0);
+
+  // Open the customization modal
+  const openCustomize = (item: MenuItem) => {
+    setCustomizing({ item });
+    // Pre-select the first option for each RADIO group with exactly 1 option
+    const pre: Record<string, string[]> = {};
+    for (const group of item.optionGroups) {
+      if (group.type === 'RADIO' && group.options.length === 1) {
+        pre[group.id] = [group.options[0].id];
+      }
+    }
+    setSelections(pre);
+  };
+
+  const toggleSelection = (group: OptionGroup, optionId: string) => {
+    setSelections(prev => {
+      const current = prev[group.id] ?? [];
+      if (group.type === 'RADIO') {
+        return { ...prev, [group.id]: [optionId] };
+      } else {
+        const has = current.includes(optionId);
+        return { ...prev, [group.id]: has ? current.filter(id => id !== optionId) : [...current, optionId] };
+      }
+    });
+  };
+
+  const canConfirmCustomize = customizing
+    ? customizing.item.optionGroups.filter(g => g.required).every(g => (selections[g.id]?.length ?? 0) > 0)
+    : false;
+
+  const optionAdjustForSelections = (item: MenuItem, sels: Record<string, string[]>) => {
+    let adjust = 0;
+    for (const group of item.optionGroups) {
+      for (const optId of sels[group.id] ?? []) {
+        const choice = group.options.find(o => o.id === optId);
+        adjust += choice?.priceAdjust ?? 0;
+      }
+    }
+    return adjust;
+  };
+
+  const confirmCustomize = () => {
+    if (!customizing || !canConfirmCustomize) return;
+    const { item } = customizing;
+    const opts: { groupId: string; optionId: string }[] = [];
+    for (const group of item.optionGroups) {
+      for (const optId of selections[group.id] ?? []) {
+        opts.push({ groupId: group.id, optionId: optId });
+      }
+    }
+    const adjust = optionAdjustForSelections(item, selections);
+    const k = cartLineKey(item.id, opts);
+    const next = { ...cart };
+    if (next[k]) {
+      next[k] = { ...next[k], quantity: Math.min(20, next[k].quantity + 1) };
+    } else {
+      next[k] = { itemId: item.id, quantity: 1, options: opts, optionAdjust: adjust };
+    }
+    setCart(next);
+    setCustomizing(null);
+    setSelections({});
   };
 
   const session = info?.session ?? null;
@@ -196,7 +311,15 @@ export default function TableOrderPage() {
       const res = await apiFetch(`/api/v1/dining/t/${encodeURIComponent(token)}/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: session.id, items: cartLines.map(line => ({ itemId: line.item.id, quantity: line.quantity })), note: note.trim() || null }),
+        body: JSON.stringify({
+          sessionId: session.id,
+          items: cartLines.map(line => ({
+            itemId: line.itemId,
+            quantity: line.quantity,
+            options: line.options.map(o => ({ groupId: o.groupId, optionId: o.optionId })),
+          })),
+          note: note.trim() || null,
+        }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -345,9 +468,28 @@ export default function TableOrderPage() {
                 <h2 id={`h-${group.id}`}>{group.nameJa || group.nameEn}</h2>
                 <ul className="tb-items">
                   {group.items.map(item => {
-                    const quantity = cart[item.id] ?? 0;
+                    const hasOptions = item.optionGroups.length > 0;
+                    // For plain items (no options), check the plain cart line
+                    const plainKey = cartLineKey(item.id, []);
+                    const plainQty = !hasOptions ? (cart[plainKey]?.quantity ?? 0) : 0;
+
+                    // All cart lines for this item (used when it has options)
+                    const itemLines = hasOptions
+                      ? Object.entries(cart)
+                          .filter(([, line]) => line.itemId === item.id && line.quantity > 0)
+                          .map(([key, line]) => ({
+                            key,
+                            quantity: line.quantity,
+                            optionAdjust: line.optionAdjust,
+                            optionLabels: line.options.map(o => {
+                              const grp = item.optionGroups.find(g => g.id === o.groupId);
+                              return grp?.options.find(c => c.id === o.optionId)?.nameJa ?? o.optionId;
+                            }),
+                          }))
+                      : [];
+
                     return (
-                      <li key={item.id} className={`tb-item${item.isSoldOut ? ' is-out' : ''}`}>
+                      <li key={item.id} className={`tb-item${item.isSoldOut ? ' is-out' : ''}${itemLines.length > 0 ? ' has-cart' : ''}`}>
                         {item.imageUrl ? <img src={assetUrl(item.imageUrl)} alt="" loading="lazy" /> : <div className="tb-noimg" aria-hidden="true"><UtensilsCrossed size={22} /></div>}
                         <div className="tb-item-body">
                           <div className="tb-item-name">
@@ -356,6 +498,15 @@ export default function TableOrderPage() {
                           </div>
                           {item.nameJa && <div className="tb-item-en">{item.nameEn}</div>}
                           {item.descriptionJa && <p className="tb-item-desc">{item.descriptionJa}</p>}
+                          {hasOptions && (
+                            <div className="tb-item-opts">
+                              {item.optionGroups.map(g => (
+                                <span key={g.id} className="tb-opt-badge">
+                                  {g.nameJa}{g.required ? '' : '（任意）'}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                           <div className="tb-item-meta">
                             {item.spiceLevel > 0 && <span title={`辛さ ${item.spiceLevel}`}>{Array.from({ length: Math.min(item.spiceLevel, 5) }, (_, i) => <Flame key={i} size={12} aria-hidden="true" />)}<span className="sr-only">辛さ{item.spiceLevel}</span></span>}
                             {item.isVegetarian && <span className="tb-veg"><Leaf size={12} aria-hidden="true" /> ベジ</span>}
@@ -364,16 +515,43 @@ export default function TableOrderPage() {
                             <span className="tb-price">{yen(item.price)}<small>（税込{yen(Math.floor((item.price * (100 + taxPercent)) / 100))}）</small></span>
                             {item.isSoldOut ? (
                               <span className="tb-soldout">売り切れ</span>
-                            ) : quantity === 0 ? (
-                              <button type="button" className="tb-add" onClick={() => setQuantity(item.id, 1)} aria-label={`${item.nameJa || item.nameEn}を追加`}><Plus size={18} /> 追加</button>
+                            ) : hasOptions ? (
+                              <button type="button" className="tb-add" onClick={() => openCustomize(item)} aria-label={`${item.nameJa || item.nameEn}をカスタマイズして追加`}>
+                                <Plus size={18} /> 追加
+                              </button>
+                            ) : plainQty === 0 ? (
+                              <button type="button" className="tb-add" onClick={() => addPlain(item)} aria-label={`${item.nameJa || item.nameEn}を追加`}><Plus size={18} /> 追加</button>
                             ) : (
                               <div className="tb-stepper" role="group" aria-label={`${item.nameJa || item.nameEn}の数量`}>
-                                <button type="button" onClick={() => setQuantity(item.id, quantity - 1)} aria-label="1つ減らす"><Minus size={16} /></button>
-                                <span aria-live="polite">{quantity}</span>
-                                <button type="button" onClick={() => setQuantity(item.id, quantity + 1)} aria-label="1つ増やす"><Plus size={16} /></button>
+                                <button type="button" onClick={() => updateQuantity(plainKey, plainQty - 1)} aria-label="1つ減らす"><Minus size={16} /></button>
+                                <span aria-live="polite">{plainQty}</span>
+                                <button type="button" onClick={() => updateQuantity(plainKey, plainQty + 1)} aria-label="1つ増やす"><Plus size={16} /></button>
                               </div>
                             )}
                           </div>
+
+                          {/* Selected option combinations in cart */}
+                          {itemLines.length > 0 && (
+                            <div className="tb-item-cart-lines" aria-label="カート内の内訳">
+                              {itemLines.map(line => (
+                                <div key={line.key} className="tb-item-cart-line">
+                                  <div className="tb-item-cart-line-info">
+                                    <span className="tb-item-cart-line-opts">
+                                      {line.optionLabels.length > 0 ? line.optionLabels.join(' · ') : item.nameJa || item.nameEn}
+                                    </span>
+                                    {line.optionAdjust !== 0 && (
+                                      <span className="tb-item-cart-line-price">{yen(item.price + line.optionAdjust)}</span>
+                                    )}
+                                  </div>
+                                  <div className="tb-stepper tb-stepper-sm" role="group" aria-label="数量">
+                                    <button type="button" onClick={() => updateQuantity(line.key, line.quantity - 1)} aria-label="1つ減らす"><Minus size={14} /></button>
+                                    <span aria-live="polite">{line.quantity}</span>
+                                    <button type="button" onClick={() => updateQuantity(line.key, line.quantity + 1)} aria-label="1つ増やす"><Plus size={14} /></button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </li>
                     );
@@ -397,7 +575,15 @@ export default function TableOrderPage() {
                 </header>
                 <ul>
                   {order.items.map((line, i) => (
-                    <li key={i}><span>{line.nameJa || line.nameEn} × {line.quantity}</span><span>{yen(line.lineTotal)}</span></li>
+                    <li key={i}>
+                      <span>
+                        {line.nameJa || line.nameEn} × {line.quantity}
+                        {line.options && line.options.length > 0 && (
+                          <span className="tb-order-opts">{line.options.map(o => o.nameJa).join(' · ')}</span>
+                        )}
+                      </span>
+                      <span>{yen(line.lineTotal)}</span>
+                    </li>
                   ))}
                 </ul>
               </article>
@@ -439,6 +625,7 @@ export default function TableOrderPage() {
         </button>
       )}
 
+      {/* Cart sheet */}
       {cartOpen && (
         <div className="tb-sheet-wrap" role="dialog" aria-modal="true" aria-labelledby="cart-title" onClick={() => setCartOpen(false)}>
           <div className="tb-sheet" onClick={e => e.stopPropagation()}>
@@ -450,17 +637,31 @@ export default function TableOrderPage() {
               <p className="tb-empty">カートは空です。</p>
             ) : (
               <ul className="tb-cart">
-                {cartLines.map(({ item, quantity }) => (
-                  <li key={item.id}>
-                    <span className="tb-cart-name">{item.nameJa || item.nameEn}<small>{yen(item.price)}</small></span>
-                    <div className="tb-stepper">
-                      <button type="button" onClick={() => setQuantity(item.id, quantity - 1)} aria-label="1つ減らす"><Minus size={16} /></button>
-                      <span>{quantity}</span>
-                      <button type="button" onClick={() => setQuantity(item.id, quantity + 1)} aria-label="1つ増やす"><Plus size={16} /></button>
-                    </div>
-                    <strong>{yen(item.price * quantity)}</strong>
-                  </li>
-                ))}
+                {cartLines.map(({ key, item, quantity, options, optionAdjust }) => {
+                  const unitPrice = item.price + optionAdjust;
+                  const optionLabels = options.map(o => {
+                    const group = item.optionGroups.find(g => g.id === o.groupId);
+                    const choice = group?.options.find(c => c.id === o.optionId);
+                    return choice?.nameJa ?? o.optionId;
+                  });
+                  return (
+                    <li key={key}>
+                      <span className="tb-cart-name">
+                        {item.nameJa || item.nameEn}
+                        <small>{yen(unitPrice)}</small>
+                        {optionLabels.length > 0 && (
+                          <span className="tb-cart-opts">{optionLabels.join(' · ')}</span>
+                        )}
+                      </span>
+                      <div className="tb-stepper">
+                        <button type="button" onClick={() => updateQuantity(key, quantity - 1)} aria-label="1つ減らす"><Minus size={16} /></button>
+                        <span>{quantity}</span>
+                        <button type="button" onClick={() => updateQuantity(key, quantity + 1)} aria-label="1つ増やす"><Plus size={16} /></button>
+                      </div>
+                      <strong>{yen(unitPrice * quantity)}</strong>
+                    </li>
+                  );
+                })}
               </ul>
             )}
             <label className="tb-note">
@@ -474,6 +675,76 @@ export default function TableOrderPage() {
               {sending ? '送信中…' : `この内容で注文する（${cartCount}点）`}
             </button>
             <p className="tb-muted" style={{ textAlign: 'center' }}>お支払いはお帰りの際にまとめてレジでお願いします。</p>
+          </div>
+        </div>
+      )}
+
+      {/* Customization modal */}
+      {customizing && (
+        <div className="tb-sheet-wrap tb-opts-wrap" role="dialog" aria-modal="true" aria-labelledby="opts-title" onClick={() => setCustomizing(null)}>
+          <div className="tb-sheet tb-opts-sheet" onClick={e => e.stopPropagation()}>
+            <div className="tb-sheet-head">
+              <div>
+                <h2 id="opts-title" className="tb-opts-title">{customizing.item.nameJa || customizing.item.nameEn}</h2>
+                <p className="tb-opts-base">{yen(customizing.item.price + optionAdjustForSelections(customizing.item, selections))}</p>
+              </div>
+              <button type="button" onClick={() => setCustomizing(null)} aria-label="閉じる"><X size={22} /></button>
+            </div>
+
+            <div className="tb-opts-body">
+              {customizing.item.optionGroups.map(group => (
+                <fieldset key={group.id} className="tb-opt-group">
+                  <legend>
+                    <span className="tb-opt-group-name">{group.nameJa}</span>
+                    {group.required
+                      ? <span className="tb-opt-required">必須</span>
+                      : <span className="tb-opt-optional">任意</span>}
+                    {group.type === 'CHECKBOX' && <span className="tb-opt-hint">（複数選択可）</span>}
+                  </legend>
+                  <div className="tb-opt-choices">
+                    {group.options.map(choice => {
+                      const isSelected = (selections[group.id] ?? []).includes(choice.id);
+                      return (
+                        <button
+                          key={choice.id}
+                          type="button"
+                          role={group.type === 'RADIO' ? 'radio' : 'checkbox'}
+                          aria-checked={isSelected}
+                          className={`tb-opt-choice${isSelected ? ' is-selected' : ''}`}
+                          onClick={() => toggleSelection(group, choice.id)}
+                        >
+                          <span className="tb-opt-check" aria-hidden="true">{isSelected && <Check size={14} strokeWidth={3} />}</span>
+                          <span className="tb-opt-label">{choice.nameJa}</span>
+                          {choice.priceAdjust !== 0 && (
+                            <span className="tb-opt-price">{choice.priceAdjust > 0 ? `+${yen(choice.priceAdjust)}` : yen(choice.priceAdjust)}</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              ))}
+            </div>
+
+            <div className="tb-opts-foot">
+              <div className="tb-opts-total">
+                <span>合計（税抜）</span>
+                <strong>{yen(customizing.item.price + optionAdjustForSelections(customizing.item, selections))}</strong>
+              </div>
+              <button
+                type="button"
+                className="tb-btn tb-btn-lg"
+                disabled={!canConfirmCustomize}
+                onClick={confirmCustomize}
+              >
+                <Plus size={18} /> カートに追加
+              </button>
+              {!canConfirmCustomize && (
+                <p className="tb-opts-hint">
+                  {customizing.item.optionGroups.filter(g => g.required && !(selections[g.id]?.length)).map(g => g.nameJa).join('、')}を選択してください
+                </p>
+              )}
+            </div>
           </div>
         </div>
       )}

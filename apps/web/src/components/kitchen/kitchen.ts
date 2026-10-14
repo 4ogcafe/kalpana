@@ -5,11 +5,17 @@ import type { DietaryAlert } from '../admin/dietary';
 export type KitchenStatus = 'NEW' | 'CONFIRMED' | 'READY' | 'COMPLETED' | 'CANCELLED';
 export type ActiveStatus = 'NEW' | 'CONFIRMED' | 'READY';
 
+export interface KitchenLineOption {
+  groupNameJa: string;
+  nameJa: string;
+}
+
 export interface KitchenLine {
   itemId: string;
   nameEn: string;
   nameJa: string | null;
   quantity: number;
+  options?: KitchenLineOption[];
   doneAt?: string | null;
 }
 

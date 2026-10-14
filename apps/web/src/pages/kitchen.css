@@ -149,6 +149,7 @@
 .kt-qty { font-size: 1.35rem; font-weight: 800; min-width: 44px; color: #fcd34d; font-variant-numeric: tabular-nums; }
 .kt-name { flex: 1; font-size: 1.1rem; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
 .kt-name small { display: block; font-size: 0.8rem; font-weight: 500; color: var(--kd-muted); }
+.kt-line-opts { display: block; font-size: 0.75rem; font-weight: 600; color: #fbbf24; margin-top: 2px; }
 .kt-check { width: 26px; height: 26px; border-radius: 7px; border: 2px solid #6b7280; display: grid; place-items: center; flex-shrink: 0; }
 .kt-lines li.is-done .kt-name, .kt-lines li.is-done .kt-qty { text-decoration: line-through; opacity: 0.45; }
 .kt-lines li.is-done .kt-check { background: var(--kd-ready); border-color: var(--kd-ready); color: #000; }

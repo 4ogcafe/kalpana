@@ -5,7 +5,7 @@ import { ObjectId, type Document } from 'mongodb';
 import { z } from 'zod';
 import { config } from '../config.js';
 import { dietaryAlert } from '../lib/customer-profile.js';
-import { PAYMENT_METHODS, QR_TOKEN_PATTERN, TABLE_CALL_TYPES, diningConfig, isDineInCategory, newQrToken, tableBill, tableSchema } from '../lib/dining.js';
+import { PAYMENT_METHODS, QR_TOKEN_PATTERN, TABLE_CALL_TYPES, diningConfig, newQrToken, tableBill, tableSchema } from '../lib/dining.js';
 import { AppError, notFound } from '../lib/errors.js';
 import { db } from '../lib/mongo.js';
 import { localDateKey, localDayStart } from '../lib/pickup.js';
@@ -13,7 +13,7 @@ import { idParam, objectIdString, optionalText } from '../lib/schemas.js';
 import { requireAdmin, requireStaff } from '../middleware/auth.js';
 import { optionalCustomer } from '../middleware/customerAuth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
-import { MAX_QUANTITY, quoteOrder, type OrderLine } from '../services/order-pricing.js';
+import { MAX_QUANTITY, quoteOrder, type OrderLine, type OrderLineOption } from '../services/order-pricing.js';
 import { loadSettings } from '../services/settings-store.js';
 
 // Dine-in: each table has a QR code (/t/<code>). Guests scan it, order in as many rounds as they like,
@@ -45,7 +45,14 @@ const orderSchema = z.object({
   /** The visit the guest's page was showing; a new party at the table can't receive an old page's order. */
   sessionId: objectIdString,
   items: z
-    .array(z.object({ itemId: objectIdString, quantity: z.number().int().min(1).max(MAX_QUANTITY) }))
+    .array(z.object({
+      itemId: objectIdString,
+      quantity: z.number().int().min(1).max(MAX_QUANTITY),
+      options: z.array(z.object({
+        groupId: objectIdString,
+        optionId: z.string().min(1).max(50),
+      })).optional(),
+    }))
     .min(1)
     .max(MAX_LINES),
   note: optionalText(300),
@@ -127,15 +134,53 @@ async function placeTableOrder(table: Document, session: Document, input: z.infe
   const settings = await loadSettings();
   const dining = diningConfig(settings);
 
-  // Only dine-in dishes: takeout-only categories are not served at the table.
   const itemIds = input.items.map((item) => new ObjectId(item.itemId));
-  const menuItems = await db().collection('MenuItem').find({ _id: { $in: itemIds } }, { projection: { categoryId: 1, nameJa: 1, nameEn: 1 } }).toArray();
-  const categories = await db().collection('Category').find({}).toArray();
-  const categoryById = new Map(categories.map((category) => [category._id.toHexString(), category as object]));
-  const notHere = menuItems.find((item) => !isDineInCategory(categoryById.get(String(item.categoryId)), categoryById));
-  if (notHere) throw new AppError(409, 'NOT_DINE_IN', `「${notHere.nameJa || notHere.nameEn}」はテイクアウト専用です。`);
 
-  const { lines, breakdown } = await quoteOrder({ items: input.items, customerId: by.customerId, fulfillment: 'PICKUP', settings });
+  // Validate options against OptionGroup documents and compute price adjustments.
+  const allOptionGroupIds = new Set<string>();
+  for (const line of input.items) {
+    if (line.options) {
+      for (const sel of line.options) allOptionGroupIds.add(sel.groupId);
+    }
+  }
+  const optionGroupDocs = allOptionGroupIds.size > 0
+    ? await db().collection('OptionGroup').find({ _id: { $in: [...allOptionGroupIds].map(id => new ObjectId(id)) } }).toArray()
+    : [];
+  const optionGroupById = new Map(optionGroupDocs.map(g => [g._id.toHexString(), g]));
+
+  // For each item, resolve its option groups and build the validated option list + price adjustment.
+  const menuItemDocs = await db().collection('MenuItem').find({ _id: { $in: itemIds } }).toArray();
+  const menuItemById = new Map(menuItemDocs.map(item => [item._id.toHexString(), item]));
+
+  const itemsWithOptions = input.items.map(line => {
+    const menuItem = menuItemById.get(line.itemId);
+    const groupIds: string[] = menuItem?.optionGroupIds?.map((id: any) => String(id)) ?? [];
+    // Fetch the option groups attached to this item.
+    const itemGroups = groupIds.map(gid => optionGroupById.get(gid)).filter(Boolean) as any[];
+
+    // Check required groups have a selection.
+    for (const group of itemGroups) {
+      if (group.required) {
+        const hasSelection = (line.options ?? []).some((sel: any) => sel.groupId === group._id.toHexString());
+        if (!hasSelection) throw new AppError(409, 'OPTION_REQUIRED', `「${group.nameJa}」の選択は必須です。`);
+      }
+    }
+
+    // Resolve each selection to a choice document for price and display.
+    let optionAdjust = 0;
+    const resolvedOptions: OrderLineOption[] = [];
+    for (const sel of line.options ?? []) {
+      const group = optionGroupById.get(sel.groupId);
+      if (!group) continue;
+      const choice = group.options?.find((o: any) => o.id === sel.optionId);
+      if (!choice) throw new AppError(409, 'INVALID_OPTION', `無効なオプションが選択されています。`);
+      optionAdjust += Number(choice.priceAdjust) || 0;
+      resolvedOptions.push({ groupId: sel.groupId, groupNameJa: group.nameJa, optionId: sel.optionId, nameJa: choice.nameJa, priceAdjust: Number(choice.priceAdjust) || 0 });
+    }
+    return { itemId: line.itemId, quantity: line.quantity, optionAdjust, options: resolvedOptions };
+  });
+
+  const { lines, breakdown } = await quoteOrder({ items: itemsWithOptions, customerId: by.customerId, fulfillment: 'PICKUP', settings });
   const now = new Date();
   const dateKey = localDateKey(now, settings.timezone);
   const order = {
@@ -181,15 +226,24 @@ async function placeTableOrder(table: Document, session: Document, input: z.infe
 
 // ---- Guests (public, by the table's QR code) --------------------------------------
 
-/** The dine-in menu: every available dish outside the takeout-only categories, grouped by category. */
+/** The dine-in menu: every available dish, grouped by category. */
 router.get('/menu', async (_req, res) => {
   const [categories, items] = await Promise.all([
     db().collection('Category').find({}).sort({ sortOrder: 1 }).toArray(),
     db().collection('MenuItem').find({ isActive: { $ne: false } }).sort({ sortOrder: 1, createdAt: 1 }).toArray(),
   ]);
-  const byId = new Map(categories.map((category) => [category._id.toHexString(), category as object]));
+
+  // Collect all referenced OptionGroup IDs.
+  const allGroupIds = new Set<string>();
+  for (const item of items) {
+    for (const gid of item.optionGroupIds ?? []) allGroupIds.add(String(gid));
+  }
+  const groupDocs = allGroupIds.size > 0
+    ? await db().collection('OptionGroup').find({ _id: { $in: [...allGroupIds].map(id => new ObjectId(id)) } }).sort({ sortOrder: 1 }).toArray()
+    : [];
+  const groupById = new Map(groupDocs.map(g => [g._id.toHexString(), g]));
+
   const groups = categories
-    .filter((category) => isDineInCategory(category, byId))
     .map((category) => ({
       id: category._id.toHexString(),
       nameEn: category.nameEn,
@@ -208,6 +262,17 @@ router.get('/menu', async (_req, res) => {
           isRecommended: Boolean(item.isRecommended),
           allergens: item.allergens ?? [],
           isSoldOut: Boolean(item.isSoldOut),
+          optionGroups: (item.optionGroupIds ?? [])
+            .map((gid: any) => groupById.get(String(gid)))
+            .filter(Boolean)
+            .map((g: any) => ({
+              id: g._id.toHexString(),
+              nameJa: g.nameJa,
+              nameEn: g.nameEn,
+              type: g.type,
+              required: Boolean(g.required),
+              options: g.options ?? [],
+            })),
         })),
     }))
     .filter((group) => group.items.length > 0);

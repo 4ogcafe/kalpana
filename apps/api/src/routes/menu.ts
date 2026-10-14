@@ -51,6 +51,7 @@ const itemUpdateSchema = z.object({
   ...itemFields,
   nameEn: itemFields.nameEn.optional(),
   price: itemFields.price.optional(),
+  optionGroupIds: z.array(objectIdString).optional(),
 });
 
 // ---- Categories ----------------------------------------------------------
@@ -170,10 +171,14 @@ router.post('/items', requireStaff, async (req, res) => {
 
 router.put('/items/:id', requireStaff, async (req, res) => {
   const id = idParam(req.params);
-  const fields = definedOnly(itemUpdateSchema.parse(req.body));
+  const { optionGroupIds, ...rest } = definedOnly(itemUpdateSchema.parse(req.body));
+  const update: Record<string, unknown> = { ...rest, updatedAt: new Date() };
+  if (optionGroupIds !== undefined) {
+    update.optionGroupIds = optionGroupIds.map((gid: string) => new ObjectId(gid));
+  }
   const result = await db()
     .collection('MenuItem')
-    .updateOne({ _id: id }, { $set: { ...fields, updatedAt: new Date() } });
+    .updateOne({ _id: id }, { $set: update });
   if (result.matchedCount === 0) throw notFound('Menu item');
   res.json({ success: true });
 });
@@ -182,6 +187,55 @@ router.delete('/items/:id', requireAdmin, async (req, res) => {
   const result = await db().collection('MenuItem').deleteOne({ _id: idParam(req.params) });
   if (result.deletedCount === 0) throw notFound('Menu item');
   res.json({ success: true });
+});
+
+// ---- Option Groups ---------------------------------------------------------
+
+const optionChoiceSchema = z.object({
+  id: z.string().trim().min(1).max(50),
+  nameJa: z.string().trim().min(1).max(100),
+  nameEn: z.string().trim().min(1).max(100),
+  priceAdjust: z.coerce.number().int().min(-100000).max(100000).default(0),
+});
+
+const optionGroupSchema = z.object({
+  nameJa: z.string().trim().min(1).max(100),
+  nameEn: z.string().trim().min(1).max(100),
+  type: z.enum(['RADIO', 'CHECKBOX']).default('RADIO'),
+  required: z.boolean().default(true),
+  options: z.array(optionChoiceSchema).min(1).max(30),
+  sortOrder: z.coerce.number().int().min(0).max(10000).default(0),
+});
+
+const optionGroups = () => db().collection('OptionGroup');
+
+router.get('/option-groups', publicCache, async (_req, res) => {
+  const groups = await optionGroups().find({}).sort({ sortOrder: 1, createdAt: 1 }).toArray();
+  res.json(groups.map(g => ({ id: g._id.toHexString(), nameJa: g.nameJa, nameEn: g.nameEn, type: g.type, required: g.required, options: g.options, sortOrder: g.sortOrder })));
+});
+
+router.post('/option-groups', requireAdmin, async (req, res) => {
+  const data = optionGroupSchema.parse(req.body);
+  const now = new Date();
+  const result = await optionGroups().insertOne({ ...data, createdAt: now, updatedAt: now });
+  res.status(201).json({ id: result.insertedId.toHexString(), ...data });
+});
+
+router.put('/option-groups/:id', requireAdmin, async (req, res) => {
+  const id = idParam(req.params);
+  const group = await optionGroups().findOne({ _id: id });
+  if (!group) throw notFound('OptionGroup');
+  const data = optionGroupSchema.partial().parse(req.body);
+  await optionGroups().updateOne({ _id: group._id }, { $set: { ...data, updatedAt: new Date() } });
+  res.json({ id: group._id.toHexString(), ...group, ...data, _id: undefined });
+});
+
+router.delete('/option-groups/:id', requireAdmin, async (req, res) => {
+  const id = idParam(req.params);
+  const group = await optionGroups().findOne({ _id: id });
+  if (!group) throw notFound('OptionGroup');
+  await optionGroups().deleteOne({ _id: group._id });
+  res.status(204).end();
 });
 
 export default router;

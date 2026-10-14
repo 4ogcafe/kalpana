@@ -53,6 +53,9 @@ export default function KitchenTicket({ order, now, busy, onMove, onToggleLine, 
               <span className="kt-name">
                 {line.nameEn}
                 {line.nameJa && line.nameJa !== line.nameEn && <small>{line.nameJa}</small>}
+                {line.options && line.options.length > 0 && (
+                  <span className="kt-line-opts">{line.options.map(o => o.nameJa).join(' · ')}</span>
+                )}
               </span>
               {canTick && <span className="kt-check" aria-hidden="true">{done && <Check size={16} strokeWidth={3} />}</span>}
             </>

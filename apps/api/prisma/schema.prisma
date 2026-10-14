@@ -100,13 +100,14 @@ model MenuItem {
   isVegan       Boolean  @default(false)
   isHalal       Boolean  @default(false)
   isGlutenFree  Boolean  @default(false)
-  allergens     String[]
-  isRecommended Boolean  @default(false)
-  isSoldOut     Boolean  @default(false)
-  isActive      Boolean  @default(true)
-  sortOrder     Int      @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  allergens      String[]
+  isRecommended  Boolean  @default(false)
+  isSoldOut      Boolean  @default(false)
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  optionGroupIds String[] @db.ObjectId
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
   
   @@index([categoryId, sortOrder])
 }
@@ -119,6 +120,25 @@ model ItemVariant {
   labelJa   String?
   price     Int
   sortOrder Int      @default(0)
+}
+
+type OptionChoice {
+  id          String
+  nameJa      String
+  nameEn      String
+  priceAdjust Int    @default(0)
+}
+
+model OptionGroup {
+  id        String         @id @default(auto()) @map("_id") @db.ObjectId
+  nameJa    String
+  nameEn    String
+  type      String         @default("RADIO")   // RADIO | CHECKBOX
+  required  Boolean        @default(true)
+  options   OptionChoice[]
+  sortOrder Int            @default(0)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
 }
 
 model CarouselSlide {
@@ -223,6 +243,14 @@ model ContactMessage {
   createdAt DateTime    @default(now())
 }
 
+type OrderLineOption {
+  groupId     String
+  groupNameJa String
+  optionId    String
+  nameJa      String
+  priceAdjust Int    @default(0)
+}
+
 type OrderLine {
   itemId    String @db.ObjectId
   nameEn    String
@@ -230,6 +258,7 @@ type OrderLine {
   unitPrice Int
   quantity  Int
   lineTotal Int
+  options   OrderLineOption[]
   // Ticked off on the kitchen display.
   doneAt    DateTime?
 }
