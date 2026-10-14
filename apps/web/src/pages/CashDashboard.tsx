@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import {
-  AlertCircle, Banknote, CheckCircle, ChefHat, ChevronRight,
-  Clock, CreditCard, LogOut, Monitor, MoreHorizontal, QrCode, RefreshCw, ScanLine, Users, X,
+  CircleAlert, Banknote, CircleCheck, ChefHat, ChevronRight,
+  Clock, CreditCard, LogOut, Monitor, Ellipsis, QrCode, RefreshCw, ScanLine, Users, X,
 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import './cash.css';
@@ -17,7 +17,7 @@ const PAYMENT_METHODS = ['CASH', 'CARD', 'QR', 'OTHER'] as const;
 type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
 const PM_LABEL: Record<PaymentMethod, string> = { CASH: '現金', CARD: 'カード', QR: 'QR払い', OTHER: 'その他' };
-const PM_ICONS = { CASH: Banknote, CARD: CreditCard, QR: QrCode, OTHER: MoreHorizontal };
+const PM_ICONS = { CASH: Banknote, CARD: CreditCard, QR: QrCode, OTHER: Ellipsis };
 
 // ---- Square types ----
 
@@ -494,7 +494,7 @@ export default function CashDashboard() {
 
           {queue.length === 0 ? (
             <div className="ca-queue-empty">
-              <CheckCircle size={36} />
+              <CircleCheck size={36} />
               <p>待ちのテーブルなし</p>
             </div>
           ) : (
@@ -561,7 +561,7 @@ export default function CashDashboard() {
                 </div>
                 {blocked && (
                   <div className="ca-bill-blocked">
-                    <AlertCircle size={14} />
+                    <CircleAlert size={14} />
                     調理中 / 提供待ち {detail.bill.inProgress + detail.bill.ready}件
                   </div>
                 )}
@@ -757,7 +757,7 @@ export default function CashDashboard() {
                     <div className="ca-sq-terminal-wait">
                       <CreditCard size={48} />
                       <p>{squareActive.status === 'COMPLETED' ? '決済完了' : squareActive.status === 'IN_PROGRESS' ? 'カードを処理中…' : '端末で決済をお待ちください'}</p>
-                      <p className="ca-sq-status-badge is-{squareActive.status.toLowerCase()}">{squareActive.status}</p>
+                      <p className={`ca-sq-status-badge is-${squareActive.status.toLowerCase()}`}>{squareActive.status}</p>
                     </div>
                     <div className="ca-sq-waiting">
                       <RefreshCw size={14} className="ca-spin" />
@@ -820,19 +820,19 @@ export default function CashDashboard() {
                   >
                     {paying
                       ? <><RefreshCw size={18} className="ca-spin" /> 処理中…</>
-                      : <><CheckCircle size={18} /> 会計完了</>}
+                      : <><CircleCheck size={18} /> 会計完了</>}
                   </button>
                 )}
 
                 {blocked && (
                   <p className="ca-pay-warn">
-                    <AlertCircle size={14} />
+                    <CircleAlert size={14} />
                     調理中または提供待ちの注文があります。キッチンで完了（提供済み）にしてから会計してください。
                   </p>
                 )}
                 {paymentMethod === 'CASH' && !blocked && received > 0 && received < billTotal && (
                   <p className="ca-pay-warn">
-                    <AlertCircle size={14} />
+                    <CircleAlert size={14} />
                     お預かり金額が合計より {yen(billTotal - received)} 不足しています。
                   </p>
                 )}
