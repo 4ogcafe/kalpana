@@ -8,8 +8,16 @@ interface Window {
 
 const PRUNE_THRESHOLD = 10_000;
 
+interface RateLimitOptions {
+  windowMs: number;
+  max: number;
+  key: (req: Request) => string;
+  /** Count only requests that fail (4xx/5xx) and clear the count on success, e.g. for login lockout. */
+  failuresOnly?: boolean;
+}
+
 /** Fixed-window, in-memory limiter. Fine for a single API instance; use a shared store if scaled out. */
-export function rateLimit(options: { windowMs: number; max: number; key: (req: Request) => string }): RequestHandler {
+export function rateLimit(options: RateLimitOptions): RequestHandler {
   const windows = new Map<string, Window>();
 
   return (req, res, next) => {
@@ -24,11 +32,19 @@ export function rateLimit(options: { windowMs: number; max: number; key: (req: R
       window = { count: 0, resetAt: now + options.windowMs };
       windows.set(key, window);
     }
-    window.count += 1;
-
-    if (window.count > options.max) {
+    if (window.count >= options.max) {
       res.setHeader('Retry-After', Math.ceil((window.resetAt - now) / 1000));
       throw new AppError(429, 'RATE_LIMITED', 'Too many requests. Please try again later.');
+    }
+
+    if (!options.failuresOnly) {
+      window.count += 1;
+    } else {
+      const counted = window;
+      res.on('finish', () => {
+        if (res.statusCode < 400) windows.delete(key);
+        else counted.count += 1;
+      });
     }
     next();
   };

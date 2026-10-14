@@ -10,6 +10,8 @@ datasource db {
 enum Role {
   ADMIN
   STAFF
+  // Kitchen display only (/kitchen): sees and moves orders, nothing else.
+  KITCHEN
 }
 
 enum MenuType {
@@ -21,6 +23,14 @@ enum MenuType {
 enum Placement {
   HOME
   CONTACT
+}
+
+enum OrderStatus {
+  NEW
+  CONFIRMED
+  READY
+  COMPLETED
+  CANCELLED
 }
 
 enum EnquiryType {
@@ -59,6 +69,8 @@ model Menu {
 
 model Category {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  // Table QR menu: true = show, false = hide, null/unset = automatic.
+  dineIn    Boolean?
   nameEn    String
   nameJa    String?
   sortOrder Int      @default(0)
@@ -162,6 +174,38 @@ model Settings {
   menuLunchHeroImage  String?
   menuTakeoutHeroImage String?
   menuGrandHeroImage  String?
+  pickupEnabled     Boolean  @default(false)
+  pickupHours       String?  // "11:30-14:30, 17:00-21:30"
+  pickupClosedDays  Int[]    // 0 = Sunday … 6 = Saturday
+  pickupClosedDates String[] // YYYY-MM-DD
+  pickupLeadMinutes Int?
+  pickupNoteJa      String?
+  // The website address printed in table QR codes ('' = the admin's own address).
+  publicSiteUrl       String?
+  // Footer: logo, brand name, description, links (JSON [{label, url}]), copyright, what to show.
+  footerLogo        String?
+  footerBrand       String?
+  footerTaglineJa   String?
+  footerCopyright   String?
+  footerLinks       Json?
+  footerShowHours   Boolean?
+  footerShowSocials Boolean?
+  // Google reviews: the lowest star rating to show (the Place ID is googlePlaceId).
+  googleReviewsMinRating Int?
+  // Shown until Google is connected: total Google review count and reviews copied from the listing.
+  storeReviewCount       Int?
+  featuredReviews        Json?
+  // Dine-in ordering from the table QR codes.
+  diningEnabled       Boolean?
+  diningSelfOpen      Boolean?
+  diningTargetMinutes Int?
+  // Set from the kitchen display when it is too busy: no new online orders until then.
+  orderingPausedUntil DateTime?
+  pointsEnabled     Boolean? // missing = on
+  pointsPer100Yen   Int?
+  pointValueYen     Int?
+  signupBonusPoints Int?
+  taxRatePercent    Int?     // consumption tax on orders; missing = 8 (reduced rate for takeout)
   updatedAt    DateTime @updatedAt
 }
 
@@ -179,6 +223,150 @@ model ContactMessage {
   createdAt DateTime    @default(now())
 }
 
+type OrderLine {
+  itemId    String @db.ObjectId
+  nameEn    String
+  nameJa    String?
+  unitPrice Int
+  quantity  Int
+  lineTotal Int
+  // Ticked off on the kitchen display.
+  doneAt    DateTime?
+}
+
+// Pay-at-pickup orders. `number` restarts each day (dateKey, restaurant timezone);
+// `token` is the unguessable key for the customer's status page.
+model PickupOrder {
+  id           String      @id @default(auto()) @map("_id") @db.ObjectId
+  number       Int
+  dateKey      String
+  token        String      @unique
+  status       OrderStatus @default(NEW)
+  customerName String
+  phone        String
+  email        String?
+  note         String?
+  pickupAt     DateTime
+  items        OrderLine[]
+  customerId   String?     @db.ObjectId
+  subtotal     Int?
+  offer        AppliedOffer?
+  pointsUsed   Int         @default(0)
+  pointsDiscount Int       @default(0)
+  total        Int         // after discounts, tax excluded; points are earned on this
+  taxRate      Int?
+  tax          Int?
+  grandTotal   Int?        // what the customer pays at pickup, tax included
+  pointsEarned Int         @default(0)
+  // Dine-in orders: the table and the visit (one bill per visit). Pickup/delivery orders leave these empty.
+  tableId      String?     @db.ObjectId
+  tableNumber  String?
+  sessionId    String?     @db.ObjectId
+  // When each step happened, for the kitchen's timers and prep-time stats.
+  confirmedAt  DateTime?
+  readyAt      DateTime?
+  completedAt  DateTime?
+  cancelledAt  DateTime?
+  ip           String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([status, pickupAt])
+  @@index([customerId, createdAt])
+}
+
+type AppliedOffer {
+  id       String @db.ObjectId
+  titleJa  String
+  discount Int
+}
+
+enum DiscountType {
+  PERCENT
+  AMOUNT
+}
+
+enum PointType {
+  EARN
+  REDEEM
+  REFUND
+  BONUS
+  ADJUST
+}
+
+// Registered customers. Kept apart from staff `User`s: separate collection, cookie and token audience.
+model Customer {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  email        String   @unique
+  passwordHash String
+  name         String
+  nameKana     String?
+  phone        String?
+  birthDate    String?  // YYYY-MM-DD; a calendar date, so no timezone
+  address      CustomerAddress?
+  preferences  CustomerPreferences?
+  newsletterOptIn   Boolean   @default(false)
+  newsletterOptInAt DateTime? // when consent was given
+  points       Int      @default(0)
+  isActive     Boolean  @default(true)
+  deletedAt    DateTime? // set when the member closes the account (personal data erased)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+type CustomerAddress {
+  postalCode String?
+  prefecture String?
+  city       String?
+  line1      String?
+  building   String?
+}
+
+type CustomerPreferences {
+  allergens      String[]
+  otherAllergies String?
+  diets          String[] // VEGETARIAN | VEGAN | HALAL | GLUTEN_FREE
+  spiceLevel     Int?     // 0–5
+  note           String?
+}
+
+// Every change to a customer's points, with the balance afterwards.
+model PointTransaction {
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  customerId   String    @db.ObjectId
+  type         PointType
+  points       Int
+  balanceAfter Int
+  orderId      String?   @db.ObjectId
+  orderNumber  Int?
+  note         String?
+  userId       String?   @db.ObjectId // staff member, for manual adjustments
+  createdAt    DateTime  @default(now())
+
+  @@index([customerId, createdAt])
+}
+
+model Offer {
+  id              String       @id @default(auto()) @map("_id") @db.ObjectId
+  titleJa         String
+  descriptionJa   String?
+  imageUrl        String?
+  discountType    DiscountType
+  discountValue   Int          // percent, or yen
+  minSubtotal     Int          @default(0)
+  startsAt        DateTime?
+  endsAt          DateTime?
+  oncePerCustomer Boolean      @default(false)
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+model OrderCounter {
+  id  String @id @map("_id")
+  seq Int
+}
+
 model AuditLog {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   userId    String   @db.ObjectId
@@ -187,4 +375,52 @@ model AuditLog {
   entityId  String
   diff      Json?
   createdAt DateTime @default(now())
+}
+
+// A table in the restaurant. Its QR code links to /t/<qrToken>; a new token makes old printouts stop working.
+model DiningTable {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  number    String   @unique
+  name      String?
+  seats     Int      @default(4)
+  area      String?
+  qrToken   String   @unique
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum TableSessionStatus {
+  OPEN
+  BILL_REQUESTED
+  CLOSED
+}
+
+type TableCall {
+  id         String
+  type       String    // STAFF | WATER | BILL
+  createdAt  DateTime
+  resolvedAt DateTime?
+}
+
+// One visit to a table: every order placed while it is open goes on one bill, paid at the register.
+model TableSession {
+  id            String             @id @default(auto()) @map("_id") @db.ObjectId
+  tableId       String             @db.ObjectId
+  tableNumber   String
+  status        TableSessionStatus @default(OPEN)
+  guests        Int?
+  openedAt      DateTime           @default(now())
+  openedBy      String             // GUEST | STAFF
+  calls         TableCall[]
+  customerIds   String[]           @db.ObjectId
+  lastOrderAt   DateTime?
+  closedAt      DateTime?
+  paymentMethod String?            // CASH | CARD | QR | OTHER
+  subtotal      Int?
+  tax           Int?
+  total         Int?
+
+  @@index([tableId, status])
 }

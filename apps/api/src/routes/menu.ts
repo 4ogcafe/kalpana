@@ -23,6 +23,8 @@ const categoryUpdateSchema = z.object({
   nameJa: optionalText(100),
   sortOrder: optionalNumber(z.number().int().min(0).max(10_000)),
   parentId: z.preprocess((value) => (value === '' ? null : value), objectIdString.nullable().optional()),
+  // Table QR menu: true = show, false = hide, null = automatic (follow the parent / hide takeout-only).
+  dineIn: z.boolean().nullable().optional(),
 });
 
 const itemFields = {
@@ -37,6 +39,7 @@ const itemFields = {
   isVegetarian: z.boolean().optional(),
   isVegan: z.boolean().optional(),
   isGlutenFree: z.boolean().optional(),
+  isSoldOut: z.boolean().optional(),
 };
 
 const itemCreateSchema = z.object({

@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { AppError } from '../lib/errors.js';
 import { prisma } from '../lib/prisma.js';
-import { clearSession, issueSession, requireAuth } from '../middleware/auth.js';
+import { clearSession, issueSession, requireKitchen } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 
 const router = Router();
@@ -23,6 +23,8 @@ const getDummyHash = async () => (dummyHash ??= await bcrypt.hash('not-a-real-pa
 const loginLimiter = rateLimit({
   windowMs: LOGIN_WINDOW_MS,
   max: LOGIN_MAX_ATTEMPTS,
+  // Lock out after repeated wrong passwords (PRD FR-A1), not after normal successful logins.
+  failuresOnly: true,
   key: (req) => `${req.ip}|${String(req.body?.email ?? '').trim().toLowerCase()}`,
 });
 
@@ -45,7 +47,7 @@ router.post('/logout', (_req, res) => {
   res.status(204).end();
 });
 
-router.get('/me', requireAuth, (req, res) => {
+router.get('/me', requireKitchen, (req, res) => {
   res.json({ user: req.user });
 });
 

@@ -1,63 +1,114 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch, assetUrl, errorMessage } from '../lib/api';
+import OrdersTab from '../components/admin/OrdersTab';
+import './admin.css';
+import OffersTab from '../components/admin/OffersTab';
+import CustomersTab from '../components/admin/CustomersTab';
+import StaffUsersTab from '../components/admin/StaffUsersTab';
+import OverviewTab from '../components/admin/overview/OverviewTab';
+import { GlobalSearch, NotificationBell, QuickAdd, type Navigate, type TabIntent } from '../components/admin/TopBar';
+import TablesTab from '../components/admin/tables/TablesTab';
+import TableCallAlerts from '../components/admin/TableCallAlerts';
+import GoogleReviewsSettings from '../components/admin/GoogleReviewsSettings';
+import FooterSettings from '../components/admin/FooterSettings';
 import { 
   LayoutDashboard, 
   Settings, 
   Menu as MenuIcon, 
   Image as ImageIcon, 
+  ShoppingBag,
+  Gift,
+  UserCircle,
   MessageSquare, 
   Users, 
   LogOut,
-  Bell,
-  Search,
   Plus,
   MoreVertical,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  ChefHat,
+  Armchair,
+  X
 } from 'lucide-react';
 
 // STAFF may edit menu items; everything else is admin-only (enforced by the API too).
-const STAFF_TABS = ['Overview', 'Menu Management'];
+const STAFF_TABS = ['Overview', 'Orders', 'Tables', 'Menu Management'];
+const STATS_POLL_MS = 30_000;
+
+/** A short beep for new orders; browsers only allow it after the user has clicked on the page. */
+function playOrderChime() {
+  try {
+    const audio = new AudioContext();
+    const tone = audio.createOscillator();
+    tone.frequency.value = 880;
+    tone.connect(audio.destination);
+    tone.start();
+    tone.stop(audio.currentTime + 0.3);
+    tone.onended = () => audio.close();
+  } catch {
+    // No audio available; the toast still shows.
+  }
+}
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('Overview');
+  // Phones and tablets: the sidebar slides in from the ☰ button.
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [newOrdersCount, setNewOrdersCount] = useState(0);
+  const lastNewOrders = useRef<number | null>(null);
+  const [tableCalls, setTableCalls] = useState(0);
+  const lastTableCalls = useRef<number | null>(null);
 
   useEffect(() => {
     // The session lives in an httpOnly cookie; ask the API who is logged in.
     apiFetch('/api/v1/auth/me')
       .then(res => (res.ok ? res.json() : Promise.reject(new Error('Not logged in'))))
-      .then(data => setUser(data.user))
+      .then(data => {
+        // Kitchen accounts have no admin access; their screen is the kitchen display.
+        if (data.user?.role === 'KITCHEN') navigate('/kitchen', { replace: true });
+        else setUser(data.user);
+      })
       .catch(() => navigate('/login'));
 
-    // Fetch unread count for notifications
-    apiFetch('/api/v1/dashboard/stats')
-      .then(res => res.json())
-      .then(data => {
-        if (data && data.unreadMessagesCount !== undefined) {
-          setUnreadCount(data.unreadMessagesCount);
-        }
-      })
-      .catch(console.error);
-      
-    // Optional: poll every 30 seconds for new notifications
-    const intervalId = setInterval(() => {
+    // Poll for unread messages and new pickup orders; announce orders that arrived since the last check.
+    const loadStats = () =>
       apiFetch('/api/v1/dashboard/stats')
         .then(res => res.json())
         .then(data => {
-          if (data && data.unreadMessagesCount !== undefined) {
-            setUnreadCount(data.unreadMessagesCount);
+          if (data?.unreadMessagesCount !== undefined) setUnreadCount(data.unreadMessagesCount);
+          if (typeof data?.newOrdersCount === 'number') {
+            if (lastNewOrders.current !== null && data.newOrdersCount > lastNewOrders.current) {
+              toast.success('New pickup order received!', { duration: 8000 });
+              playOrderChime();
+            }
+            lastNewOrders.current = data.newOrdersCount;
+            setNewOrdersCount(data.newOrdersCount);
+          }
+          // Guests calling from their table (staff, water, bill).
+          if (typeof data?.tableCallsCount === 'number') {
+            lastTableCalls.current = data.tableCallsCount;
+            setTableCalls(data.tableCallsCount);
           }
         })
         .catch(console.error);
-    }, 30000);
-    
+
+    loadStats();
+    const intervalId = setInterval(loadStats, STATS_POLL_MS);
     return () => clearInterval(intervalId);
   }, [navigate]);
+
+  // Top-bar search, notifications and Quick Add open a tab, optionally asking it to do something.
+  const [intent, setIntent] = useState<TabIntent | null>(null);
+  const navigateTo: Navigate = (tab, next) => {
+    setActiveTab(tab);
+    setSidebarOpen(false);
+    setIntent(prev => (next ? { ...next, nonce: (prev?.nonce ?? 0) + 1 } : null));
+  };
 
   const handleLogout = async () => {
     await apiFetch('/api/v1/auth/logout', { method: 'POST' }).catch(() => undefined);
@@ -66,6 +117,10 @@ export default function AdminDashboard() {
 
   const tabs = [
     { name: 'Overview', icon: LayoutDashboard },
+    { name: 'Orders', icon: ShoppingBag },
+    { name: 'Tables', icon: Armchair },
+    { name: 'Stamps, Offers & Points', icon: Gift },
+    { name: 'Members', icon: UserCircle },
     { name: 'Restaurant Settings', icon: Settings },
     { name: 'Menu Management', icon: MenuIcon },
     { name: 'Page Settings', icon: ImageIcon },
@@ -78,12 +133,13 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100vh', backgroundColor: '#f3f4f6', fontFamily: "'Inter', sans-serif" }}>
+    <div className="adm-root" style={{ display: 'flex', height: '100vh', backgroundColor: '#f3f4f6', fontFamily: "'Inter', sans-serif" }}>
+      {sidebarOpen && <div className="adm-backdrop" onClick={() => setSidebarOpen(false)} aria-hidden="true" />}
       <title>Admin | Kalpana</title>
       <meta name="robots" content="noindex, nofollow" />
       
       {/* Sidebar */}
-      <div style={{ 
+      <div id="admin-sidebar" className={`adm-sidebar${sidebarOpen ? ' is-open' : ''}`} style={{ 
         width: '280px', 
         backgroundColor: '#ffffff', 
         borderRight: '1px solid #e5e7eb',
@@ -96,6 +152,9 @@ export default function AdminDashboard() {
             K
           </div>
           <span style={{ fontSize: '1.25rem', fontWeight: '700', color: '#111827', letterSpacing: '-0.5px' }}>Kalpana Admin</span>
+          <button type="button" className="adm-close-btn" onClick={() => setSidebarOpen(false)} aria-label="Close menu">
+            <X size={22} aria-hidden="true" />
+          </button>
         </div>
 
         <nav style={{ flex: 1, padding: '0 1rem', marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -106,7 +165,11 @@ export default function AdminDashboard() {
             return (
               <div 
                 key={tab.name} 
-                onClick={() => setActiveTab(tab.name)}
+                role="button"
+                tabIndex={0}
+                aria-current={isActive ? 'page' : undefined}
+                onClick={() => navigateTo(tab.name)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigateTo(tab.name); } }}
                 style={{ 
                   padding: '0.875rem 1rem', 
                   cursor: 'pointer',
@@ -122,9 +185,33 @@ export default function AdminDashboard() {
               >
                 <Icon size={20} strokeWidth={isActive ? 2.5 : 2} style={{ color: isActive ? '#000' : '#9ca3af' }} />
                 {tab.name}
+                {tab.name === 'Contact Messages' && unreadCount > 0 && (
+                  <span style={{ marginLeft: 'auto', backgroundColor: '#6b7280', color: '#fff', borderRadius: '9999px', padding: '2px 8px', fontSize: '0.75rem', fontWeight: 700 }} aria-label={`${unreadCount} unread`}>
+                    {unreadCount}
+                  </span>
+                )}
+                {tab.name === 'Tables' && tableCalls > 0 && (
+                  <span style={{ marginLeft: 'auto', backgroundColor: '#ef4444', color: '#fff', borderRadius: '9999px', padding: '2px 8px', fontSize: '0.75rem', fontWeight: 700 }} aria-label={`${tableCalls} table calls`}>
+                    🔔 {tableCalls}
+                  </span>
+                )}
+                {tab.name === 'Orders' && newOrdersCount > 0 && (
+                  <span style={{ marginLeft: 'auto', backgroundColor: '#ef4444', color: '#fff', borderRadius: '9999px', padding: '2px 8px', fontSize: '0.75rem', fontWeight: 700 }}>
+                    {newOrdersCount}
+                  </span>
+                )}
               </div>
             );
           })}
+          <a
+            href="/kitchen"
+            target="_blank"
+            rel="noopener"
+            style={{ marginTop: '8px', padding: '0.875rem 1rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '12px', fontWeight: 600, color: '#111827', textDecoration: 'none', border: '1px dashed #d1d5db' }}
+          >
+            <ChefHat size={20} style={{ color: '#d97706' }} aria-hidden="true" />
+            Kitchen display ↗
+          </a>
         </nav>
 
         <div style={{ padding: '1.5rem', borderTop: '1px solid #e5e7eb' }}>
@@ -155,62 +242,51 @@ export default function AdminDashboard() {
       </div>
 
       {/* Main Content Area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="adm-main" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         
         {/* Topbar */}
-        <div style={{ height: '72px', backgroundColor: '#fff', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 2rem' }}>
-          <div style={{ position: 'relative', width: '300px' }}>
-            <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
-            <input 
-              type="text" 
-              placeholder="Search anything..." 
-              style={{ width: '100%', padding: '0.6rem 1rem 0.6rem 2.5rem', borderRadius: '9999px', border: '1px solid #e5e7eb', backgroundColor: '#f9fafb', outline: 'none' }} 
-            />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <button 
-              onClick={() => {
-                if (unreadCount > 0) {
-                  setActiveTab('Contact Messages');
-                } else {
-                  toast('No new notifications');
-                }
-              }}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', position: 'relative', color: '#4b5563' }}
-            >
-              <Bell size={22} />
-              {unreadCount > 0 && (
-                <span style={{ position: 'absolute', top: '-6px', right: '-8px', backgroundColor: '#ef4444', color: 'white', borderRadius: '50%', padding: '2px 6px', fontSize: '0.65rem', fontWeight: 'bold', border: '2px solid #fff' }}>
-                  {unreadCount}
-                </span>
-              )}
-            </button>
-            <button 
-              onClick={() => toast('Quick Add feature coming soon!')}
-              style={{ padding: '0.6rem 1.25rem', backgroundColor: '#000', color: '#fff', border: 'none', borderRadius: '9999px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
-            >
-              <Plus size={18} />
-              Quick Add
-            </button>
+        <div className="adm-topbar" style={{ height: '72px', backgroundColor: '#fff', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', padding: '0 2rem' }}>
+          <button type="button" className="adm-menu-btn" onClick={() => setSidebarOpen(true)} aria-label="Open menu" aria-expanded={sidebarOpen} aria-controls="admin-sidebar">
+            <MenuIcon size={24} aria-hidden="true" />
+          </button>
+          <GlobalSearch isAdmin={user.role === 'ADMIN'} onNavigate={navigateTo} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <NotificationBell onNavigate={navigateTo} />
+            <QuickAdd isAdmin={user.role === 'ADMIN'} onNavigate={navigateTo} />
           </div>
         </div>
 
+        {/* Guest calls ring here (on every tab) until someone accepts them. */}
+        <TableCallAlerts onOpenTables={() => navigateTo('Tables')} />
+
         {/* Dynamic Content */}
-        <div style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>
+        <div className="adm-content" style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>
           
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '2rem' }}>
             <div>
-              <h1 style={{ fontSize: '2rem', fontWeight: '700', color: '#111827', margin: '0 0 0.5rem 0', letterSpacing: '-0.5px' }}>{activeTab}</h1>
-              <p style={{ color: '#6b7280', margin: 0 }}>Manage your restaurant's {activeTab.toLowerCase()} data and settings.</p>
+              <h1 className="adm-title" style={{ fontSize: '2rem', fontWeight: '700', color: '#111827', margin: '0 0 0.5rem 0', letterSpacing: '-0.5px' }}>{activeTab}</h1>
+              <p style={{ color: '#6b7280', margin: 0 }}>
+                {activeTab === 'Overview'
+                  ? user.role === 'ADMIN'
+                    ? "What's happening now, and how the restaurant is doing."
+                    : "What's happening in the restaurant right now."
+                  : activeTab === 'Tables'
+                    ? 'Dine-in: seat guests, answer table calls, and take payment. Guests order from the QR code on their table.'
+                    : `Manage your restaurant's ${activeTab.toLowerCase()} data and settings.`}
+              </p>
             </div>
           </div>
 
-          {activeTab === 'Overview' && <OverviewTab />}
+          {activeTab === 'Overview' && <OverviewTab isAdmin={user.role === 'ADMIN'} onNavigate={tab => navigateTo(tab)} />}
+          {activeTab === 'Orders' && <OrdersTab isAdmin={user.role === 'ADMIN'} intent={intent} />}
+          {activeTab === 'Tables' && <TablesTab isAdmin={user.role === 'ADMIN'} intent={intent} />}
+          {activeTab === 'Stamps, Offers & Points' && <OffersTab intent={intent} />}
+          {activeTab === 'Members' && <CustomersTab intent={intent} />}
           {activeTab === 'Restaurant Settings' && <SettingsTab />}
-          {activeTab === 'Menu Management' && <MenuTab />}
-          {activeTab === 'Page Settings' && <PageSettingsTab />}
+          {activeTab === 'Menu Management' && <MenuTab intent={intent} />}
+          {activeTab === 'Page Settings' && <PageSettingsTab onOpenRestaurantSettings={() => navigateTo('Restaurant Settings')} />}
           {activeTab === 'Contact Messages' && <MessagesTab />}
-          {activeTab === 'Staff Users' && <UsersTab />}
+          {activeTab === 'Staff Users' && <StaffUsersTab currentUserId={user.id} intent={intent} />}
 
         </div>
       </div>
@@ -219,52 +295,6 @@ export default function AdminDashboard() {
 }
 
 // --- SUB-COMPONENTS FOR EACH TAB ---
-
-function OverviewTab() {
-  const [statsData, setStatsData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    apiFetch('/api/v1/dashboard/stats')
-      .then(res => res.json())
-      .then(data => {
-        setStatsData(data);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error(err);
-        setLoading(false);
-      });
-  }, []);
-
-  if (loading || !statsData) {
-    return <div style={{ padding: '40px', textAlign: 'center' }}>Loading dashboard stats...</div>;
-  }
-
-  const stats = [
-    { label: 'Total Menu Items', value: statsData.menuItemsCount.toString(), change: 'Live', isPositive: true },
-    { label: 'Unread Messages', value: statsData.unreadMessagesCount.toString(), change: statsData.unreadMessagesCount > 0 ? 'Needs Attention' : 'All clear', isPositive: statsData.unreadMessagesCount === 0 },
-    { label: 'Active Carousels', value: statsData.carouselsCount.toString(), change: 'Live', isPositive: true },
-    { label: 'Total Categories', value: statsData.categoriesCount.toString(), change: 'Live', isPositive: true },
-    { label: 'Sold-out Items', value: String(statsData.soldOutItemsCount ?? 0), change: statsData.soldOutItemsCount > 0 ? 'Check stock' : 'All available', isPositive: !statsData.soldOutItemsCount },
-  ];
-
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
-      {stats.map((stat, i) => (
-        <div key={i} style={{ backgroundColor: '#fff', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' }}>
-          <div style={{ fontSize: '0.875rem', color: '#6b7280', fontWeight: '500', marginBottom: '0.5rem' }}>{stat.label}</div>
-          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-            <div style={{ fontSize: '2rem', fontWeight: '700', color: '#111827', lineHeight: '1' }}>{stat.value}</div>
-            <div style={{ fontSize: '0.875rem', fontWeight: '600', color: stat.isPositive ? '#059669' : '#ef4444', backgroundColor: stat.isPositive ? '#d1fae5' : '#fee2e2', padding: '4px 8px', borderRadius: '9999px' }}>
-              {stat.change}
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 function SettingsTab() {
   const [settings, setSettings] = useState<any>({
@@ -451,13 +481,30 @@ function SettingsTab() {
   );
 }
 
-function MenuTab() {
+/** What "Automatic" means for a category on the table QR menu (same rule as the API's lib/dining.ts). */
+function dineInByDefault(category: any, categories: any[]): boolean {
+  const looksTakeout = (c: any) => /takeout|take-out|take out/i.test(c?.nameEn ?? '') || /テイクアウト|持ち帰り/.test(c?.nameJa ?? '');
+  if (looksTakeout(category)) return false;
+  const seen = new Set<string>();
+  for (let parent = categories.find(c => c.id === category.parentId); parent && !seen.has(parent.id); parent = categories.find(c => c.id === parent.parentId)) {
+    seen.add(parent.id);
+    if (typeof parent.dineIn === 'boolean') return parent.dineIn;
+    if (looksTakeout(parent)) return false;
+  }
+  return true;
+}
+
+function MenuTab({ intent }: { intent: TabIntent | null }) {
   const [categories, setCategories] = useState<any[]>([]);
   const [items, setItems] = useState<any[]>([]);
   
   const [selectedCategory, setSelectedCategory] = useState<any>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
+  // Quick Add → "Menu item" opens the add form straight away.
+  useEffect(() => {
+    if (intent?.action === 'add-item') setIsAdding(true);
+  }, [intent]);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryParentId, setNewCategoryParentId] = useState('');
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -570,6 +617,24 @@ function MenuTab() {
     setIsAdding(true);
   };
 
+  const handleToggleSoldOut = async (item: any) => {
+    try {
+      const res = await apiFetch(`/api/v1/menu/items/${item.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isSoldOut: !item.isSoldOut })
+      });
+      if (res.ok) {
+        toast.success(item.isSoldOut ? `${item.nameEn} is back in stock.` : `${item.nameEn} marked sold out; it can no longer be ordered.`);
+        fetchData();
+      } else {
+        toast.error(await errorMessage(res, 'Failed to update stock.'));
+      }
+    } catch {
+      toast.error('Network error.');
+    }
+  };
+
   const handleDeleteItem = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this item?')) return;
     try {
@@ -621,6 +686,24 @@ function MenuTab() {
         setSelectedCategory((prev: any) => ({ ...prev, nameEn: newName }));
       }
     } catch (err) {
+      toast.error('Network error.');
+    }
+  };
+
+  // Show or hide a category on the table QR menu (null = automatic).
+  const handleCategoryDineIn = async (id: string, dineIn: boolean | null) => {
+    try {
+      const res = await apiFetch(`/api/v1/menu/categories/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dineIn })
+      });
+      if (res.ok) {
+        toast.success(dineIn === null ? 'Table menu: automatic.' : dineIn ? 'Shown on the table menu.' : 'Hidden from the table menu.');
+        fetchData();
+        setSelectedCategory((prev: any) => ({ ...prev, dineIn }));
+      } else toast.error(await errorMessage(res, 'Could not save.'));
+    } catch {
       toast.error('Network error.');
     }
   };
@@ -724,10 +807,10 @@ function MenuTab() {
   };
 
   return (
-    <div style={{ display: 'flex', gap: '2rem', height: '100%', alignItems: 'flex-start' }}>
+    <div className="adm-menu-layout" style={{ display: 'flex', gap: '2rem', height: '100%', alignItems: 'flex-start' }}>
       
       {/* Sidebar Section */}
-      <div style={{ 
+      <div className="adm-menu-categories" style={{ 
         width: '320px', 
         backgroundColor: '#fff', 
         borderRadius: '12px', 
@@ -832,9 +915,9 @@ function MenuTab() {
       </div>
 
       {/* Main Content Area - Item Details */}
-      <div style={{ flex: 1, backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb', padding: '2rem', overflowY: 'auto' }}>
+      <div className="adm-menu-items" style={{ flex: 1, backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb', padding: '2rem', overflowY: 'auto' }}>
         
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '2rem' }}>
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
             <div>
               <h2 style={{ fontSize: '1.5rem', fontWeight: '700', margin: 0, color: '#111827' }}>
@@ -857,6 +940,18 @@ function MenuTab() {
                 >
                   Rename
                 </button>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: '#374151' }} title="Whether these dishes appear on the menu guests see from the table QR code">
+                  Table QR menu
+                  <select
+                    value={selectedCategory.dineIn === true ? 'show' : selectedCategory.dineIn === false ? 'hide' : 'auto'}
+                    onChange={e => handleCategoryDineIn(selectedCategory.id, e.target.value === 'auto' ? null : e.target.value === 'show')}
+                    style={{ padding: '0.25rem 0.4rem', fontSize: '0.8rem', border: '1px solid #d1d5db', borderRadius: '4px', background: '#fff' }}
+                  >
+                    <option value="auto">Automatic ({dineInByDefault(selectedCategory, categories) ? 'shown' : 'hidden'})</option>
+                    <option value="show">Show</option>
+                    <option value="hide">Hide</option>
+                  </select>
+                </label>
                 <button 
                   onClick={() => handleDeleteCategory(selectedCategory.id)}
                   style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', backgroundColor: '#fee2e2', border: '1px solid #fca5a5', color: '#ef4444', borderRadius: '4px', cursor: 'pointer', fontWeight: '500' }}
@@ -990,6 +1085,7 @@ function MenuTab() {
                     {item.descriptionEn && <p style={{ margin: '0 0 0.75rem 0', color: '#6b7280', fontSize: '0.9rem', lineHeight: '1.4' }}>{item.descriptionEn}</p>}
                     
                     <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      {item.isSoldOut && <span style={{ padding: '2px 8px', backgroundColor: '#fee2e2', color: '#b91c1c', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: '600' }}>Sold out</span>}
                       {item.isRecommended && <span style={{ padding: '2px 8px', backgroundColor: '#fef3c7', color: '#d97706', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: '600' }}>Recommended</span>}
                       {item.isVegetarian && <span style={{ padding: '2px 8px', backgroundColor: '#d1fae5', color: '#059669', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: '600' }}>Vegetarian</span>}
                       {item.isVegan && <span style={{ padding: '2px 8px', backgroundColor: '#dcfce3', color: '#16a34a', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: '600' }}>Vegan</span>}
@@ -998,6 +1094,7 @@ function MenuTab() {
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     <button onClick={() => handleEditItem(item)} style={{ padding: '0.5rem', backgroundColor: '#fff', border: '1px solid #d1d5db', borderRadius: '6px', color: '#4b5563', cursor: 'pointer', fontWeight: '500' }}>Edit</button>
+                    <button onClick={() => handleToggleSoldOut(item)} style={{ padding: '0.5rem', backgroundColor: '#fff', border: '1px solid #d1d5db', borderRadius: '6px', color: item.isSoldOut ? '#059669' : '#b45309', cursor: 'pointer', fontWeight: '500' }}>{item.isSoldOut ? 'Back in stock' : 'Mark sold out'}</button>
                     <button onClick={() => handleDeleteItem(item.id)} style={{ padding: '0.5rem', backgroundColor: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '6px', color: '#ef4444', cursor: 'pointer', fontWeight: '500' }}>Delete</button>
                   </div>
                 </div>
@@ -1010,7 +1107,10 @@ function MenuTab() {
   );
 }
 
-function PageSettingsTab() {
+/** Settings that have their own editor elsewhere in the admin. */
+const OTHER_SCREEN_SETTINGS = /^(footer|stamp|dining|delivery|pickup|points|google|featuredReviews$|storeReviewCount$|orderingPausedUntil$|publicSiteUrl$|signupBonusPoints$|pointValueYen$|taxRatePercent$)/;
+
+function PageSettingsTab({ onOpenRestaurantSettings }: { onOpenRestaurantSettings?: () => void }) {
   const [subTab, setSubTab] = useState('Home Page');
   const [settings, setSettings] = useState<any>({});
   
@@ -1114,11 +1214,14 @@ function PageSettingsTab() {
 
   const handleSaveSettings = async (e: any) => {
     e.preventDefault();
+    // Only this page's own fields: settings edited on other screens (footer, ordering, stamps, reviews…)
+    // must not be overwritten with the copy loaded when this page opened.
+    const ownFields = Object.fromEntries(Object.entries(settings).filter(([key]) => !OTHER_SCREEN_SETTINGS.test(key)));
     try {
       const res = await apiFetch('/api/v1/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings)
+        body: JSON.stringify(ownFields)
       });
       if (res.ok) toast.success('Settings saved successfully!');
       else toast.error(await errorMessage(res, 'Failed to save settings.'));
@@ -1168,8 +1271,8 @@ function PageSettingsTab() {
 
   return (
     <div style={{ position: 'relative' }}>
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '1px solid #e5e7eb' }}>
-        {['Home Page', 'About Page', 'Carousel Slider', 'Page Banners'].map(tab => (
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '1px solid #e5e7eb', overflowX: 'auto', scrollbarWidth: 'none' }}>
+        {['Home Page', 'About Page', 'Carousel Slider', 'Page Banners', 'Footer'].map(tab => (
           <button
             key={tab}
             onClick={() => setSubTab(tab)}
@@ -1177,6 +1280,8 @@ function PageSettingsTab() {
               padding: '0.75rem 1rem',
               background: 'none',
               border: 'none',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
               borderBottom: subTab === tab ? '2px solid #000' : '2px solid transparent',
               fontWeight: subTab === tab ? '600' : '500',
               color: subTab === tab ? '#000' : '#6b7280',
@@ -1188,6 +1293,8 @@ function PageSettingsTab() {
           </button>
         ))}
       </div>
+
+      {subTab === 'Footer' && <FooterSettings onOpenRestaurantSettings={onOpenRestaurantSettings} />}
 
       {subTab === 'Page Banners' && (
         <div style={{ backgroundColor: '#fff', borderRadius: '12px', padding: '2rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
@@ -1300,6 +1407,7 @@ function PageSettingsTab() {
               <button type="submit" style={{ padding: '0.75rem 1.5rem', backgroundColor: '#000', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '500', cursor: 'pointer' }}>Save Content</button>
             </div>
           </form>
+          <GoogleReviewsSettings />
         </div>
       )}
 
@@ -1590,108 +1698,6 @@ function MessagesTab() {
   );
 }
 
-function UsersTab() {
-  const [users, setUsers] = useState<any[]>([]);
-  const [rawData, setRawData] = useState<any[]>([]);
-  const [editing, setEditing] = useState<any>(null);
-
-  const fetchUsers = () => {
-    apiFetch('/api/v1/users')
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          setRawData(data);
-          setUsers(data.map(u => [
-            u.name,
-            u.email,
-            u.role,
-            u.isActive,
-            '',
-            u.id
-          ]));
-        }
-      })
-      .catch(console.error);
-  };
-
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  const handleEdit = (row: any[]) => {
-    const id = row[row.length - 1];
-    const item = rawData.find(d => d.id === id);
-    if (item) setEditing({ ...item });
-  };
-
-  const handleSave = async (e: any) => {
-    e.preventDefault();
-    try {
-      const res = await apiFetch(`/api/v1/users/${editing.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editing)
-      });
-      if (res.ok) {
-        setEditing(null);
-        fetchUsers();
-      } else {
-        toast.error('Failed to save.');
-      }
-    } catch (err) {
-      toast.error('Network error.');
-    }
-  };
-
-  return (
-    <div style={{ position: 'relative' }}>
-      <div style={{ backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' }}>
-        <Table 
-          headers={['Name', 'Email', 'Role', 'Status', '']}
-          rows={users}
-          onEdit={handleEdit}
-        />
-      </div>
-
-      {editing && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
-          <div style={{ backgroundColor: '#fff', padding: '2rem', borderRadius: '12px', width: '100%', maxWidth: '400px' }}>
-            <h2 style={{ marginTop: 0, marginBottom: '1.5rem', fontSize: '1.25rem' }}>Edit User</h2>
-            <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={labelStyle}>Name</label>
-                <input disabled value={editing.name} type="text" style={{...inputStyle, backgroundColor: '#f3f4f6'}} />
-              </div>
-              <div>
-                <label style={labelStyle}>Email</label>
-                <input disabled value={editing.email} type="text" style={{...inputStyle, backgroundColor: '#f3f4f6'}} />
-              </div>
-              <div>
-                <label style={labelStyle}>Role</label>
-                <select value={editing.role} onChange={e => setEditing({...editing, role: e.target.value})} style={inputStyle}>
-                  <option value="ADMIN">ADMIN</option>
-                  <option value="STAFF">STAFF</option>
-                </select>
-              </div>
-              <div>
-                <label style={labelStyle}>Status</label>
-                <select value={editing.isActive ? 'true' : 'false'} onChange={e => setEditing({...editing, isActive: e.target.value === 'true'})} style={inputStyle}>
-                  <option value="true">Active</option>
-                  <option value="false">Inactive</option>
-                </select>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
-                <button type="button" onClick={() => setEditing(null)} style={{ padding: '0.5rem 1rem', border: '1px solid #d1d5db', background: '#fff', borderRadius: '8px', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" style={{ padding: '0.5rem 1rem', background: '#000', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Save</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // --- SHARED UI COMPONENTS ---
 
 const labelStyle = { display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' };
@@ -1719,8 +1725,7 @@ function Table({ headers, rows, isMessages = false, onEdit }: { headers: string[
                       <button 
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (onEdit) onEdit(row);
-                          else toast(`Editing ${row[0]}...`);
+                          onEdit?.(row);
                         }}
                         style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}
                       >

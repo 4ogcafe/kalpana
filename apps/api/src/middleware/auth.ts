@@ -7,6 +7,8 @@ import { prisma } from '../lib/prisma.js';
 
 export const SESSION_COOKIE = 'kalpana_session';
 const SESSION_TTL_SECONDS = 8 * 60 * 60;
+// The kitchen screen stays signed in for a whole day of service.
+const KITCHEN_SESSION_TTL_SECONDS = 16 * 60 * 60;
 
 export interface SessionUser {
   id: string;
@@ -41,8 +43,9 @@ export function readCookie(req: Request, name: string): string | undefined {
 }
 
 export function issueSession(res: Response, user: SessionUser) {
-  const token = jwt.sign({ role: user.role }, config.jwtSecret, { subject: user.id, expiresIn: SESSION_TTL_SECONDS });
-  res.cookie(SESSION_COOKIE, token, { ...cookieOptions(), maxAge: SESSION_TTL_SECONDS * 1000 });
+  const ttl = user.role === 'KITCHEN' ? KITCHEN_SESSION_TTL_SECONDS : SESSION_TTL_SECONDS;
+  const token = jwt.sign({ role: user.role }, config.jwtSecret, { subject: user.id, expiresIn: ttl });
+  res.cookie(SESSION_COOKIE, token, { ...cookieOptions(), maxAge: ttl * 1000 });
 }
 
 export function clearSession(res: Response) {
@@ -54,7 +57,9 @@ const unauthenticated = () => new AppError(401, 'UNAUTHENTICATED', 'Please log i
 function verifiedUserId(token: string): string {
   try {
     const payload = jwt.verify(token, config.jwtSecret, { algorithms: ['HS256'] });
-    if (typeof payload === 'object' && typeof payload.sub === 'string' && /^[a-f\d]{24}$/i.test(payload.sub)) {
+    // Customer tokens carry an audience; staff tokens never do, so one can't stand in for the other.
+    const isStaffToken = typeof payload === 'object' && payload.aud === undefined;
+    if (isStaffToken && typeof payload.sub === 'string' && /^[a-f\d]{24}$/i.test(payload.sub)) {
       return payload.sub;
     }
   } catch {
@@ -87,3 +92,5 @@ export const requireRole =
 export const requireAuth = requireRole('ADMIN', 'STAFF');
 export const requireAdmin = requireRole('ADMIN');
 export const requireStaff = requireRole('ADMIN', 'STAFF');
+/** Everyone who works with orders, including kitchen-only accounts. */
+export const requireKitchen = requireRole('ADMIN', 'STAFF', 'KITCHEN');

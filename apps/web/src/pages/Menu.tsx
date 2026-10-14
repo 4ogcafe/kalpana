@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { assetUrl, getPublic } from '../lib/api';
+import { useCart } from '../lib/cart-context';
+import { yen } from '../lib/format';
+import OrderButtons, { type OrderableItem } from '../components/order/OrderButtons';
+import RelatedItemsPanel, { type PanelItem } from '../components/order/RelatedItemsPanel';
+import { MemberOfferStrip } from '../components/MemberOffers';
 import NotFound from './NotFound';
 
 const HERO_IMAGES: Record<string, string> = {
@@ -19,6 +24,9 @@ export default function Menu() {
   const [loading, setLoading] = useState(true);
   const [carousels, setCarousels] = useState<any[]>([]);
   const [settings, setSettings] = useState<any>({});
+  const [orderingEnabled, setOrderingEnabled] = useState(false);
+  const [relatedTrigger, setRelatedTrigger] = useState<PanelItem | null>(null);
+  const cart = useCart();
 
   useEffect(() => {
     getPublic<any>('/api/v1/menu/items')
@@ -40,12 +48,18 @@ export default function Menu() {
     getPublic<any>('/api/v1/settings')
       .then(data => setSettings(data))
       .catch(console.error);
+
+    getPublic<{ enabled: boolean }>('/api/v1/orders/slots')
+      .then(data => setOrderingEnabled(Boolean(data.enabled)))
+      .catch(console.error);
   }, []);
 
   const menuType = (type ?? '').toLowerCase();
   const isValidType = ['lunch', 'takeout', 'grand'].includes(menuType);
 
   const menuTypeEnum = menuType.toUpperCase();
+  // Any menu item can be ordered for pickup while the admin has online ordering switched on.
+  const canOrder = orderingEnabled;
   
   const dynamicHeroImages: Record<string, string> = {
     lunch: assetUrl(settings.lunchMenuHeroImage) || HERO_IMAGES.lunch,
@@ -87,7 +101,12 @@ export default function Menu() {
       name: item.nameJa || item.nameEn,
       desc: item.descriptionJa || item.descriptionEn,
       price: `¥${(item.price || 0).toLocaleString()}`,
+      priceValue: item.price || 0,
+      soldOut: Boolean(item.isSoldOut),
+      recommended: Boolean(item.isRecommended),
+      vegetarian: Boolean(item.isVegetarian),
       img: assetUrl(item.imageUrl) || DEFAULT_IMAGE,
+      categoryId: catId,
       // Only show a rating the restaurant actually entered; never invent one.
       rating: typeof item.rating === 'number' ? item.rating : null,
       stars: typeof item.rating === 'number' ? '★'.repeat(Math.round(item.rating)) + '☆'.repeat(5 - Math.round(item.rating)) : ''
@@ -120,7 +139,12 @@ export default function Menu() {
   };
 
   const closeLightbox = () => setSelectedIndex(null);
-  
+
+  const handleAfterAdd = (item: OrderableItem) => {
+    const panelItem = flatItems.find(i => i.id === item.id);
+    if (panelItem) setRelatedTrigger(panelItem as PanelItem);
+  };
+
   const scrollToCategory = (id: string) => {
     const el = document.getElementById(id);
     if (el) {
@@ -161,6 +185,8 @@ export default function Menu() {
       <div className="section" style={{ backgroundColor: 'var(--cream)', paddingTop: '40px' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px' }}>
           
+          <MemberOfferStrip next={`/menu/${menuType}`} />
+
           <div className="centered" style={{ marginBottom: '40px' }}>
             <h2 className="section-title">メニューを<em>見る</em></h2>
             <div className="divider"></div>
@@ -220,36 +246,36 @@ export default function Menu() {
                 {category.items.length === 0 ? (
                   <p style={{ color: 'var(--text-muted)' }}>このカテゴリーにはまだ商品がありません。</p>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '24px' }}>
+                  <div className="menu-grid">
                     {category.items.map((item: any, itemIndex: number) => {
                       const globalIndex = startIndex + itemIndex;
                       return (
-                        <div 
-                          key={item.id} 
-                          onClick={() => setSelectedIndex(globalIndex)}
-                          style={{ backgroundColor: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', cursor: 'pointer', transition: 'transform 0.2s' }}
-                          onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
-                          onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-                        >
-                          <div style={{ height: '220px', width: '100%', backgroundColor: '#f9f6f0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-                            <img src={item.img} alt={item.name} loading="lazy" decoding="async" width={240} height={180} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }} />
-                          </div>
-                          <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', flex: '1' }}>
-                            <h3 style={{ fontSize: '1.2rem', color: 'var(--dark-bark)', margin: '0 0 10px 0' }}>{item.name}</h3>
-                            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', lineHeight: '1.5', margin: '0 0 16px 0', flex: '1' }}>{item.desc}</p>
-                            
-                            {item.rating !== null && (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
-                                <span aria-hidden="true" style={{ color: 'var(--gold)', letterSpacing: '2px', fontSize: '0.8rem' }}>{item.stars}</span>
-                                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{item.rating.toFixed(1)}</span>
-                              </div>
-                            )}
-
-                            <div style={{ color: 'var(--spice)', fontSize: '1.4rem', fontWeight: 'bold', fontFamily: 'serif' }}>
-                              {item.price} <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal', fontFamily: 'sans-serif' }}>(税抜)</span>
+                        <article key={item.id} className={`menu-card${item.soldOut ? ' is-sold-out' : ''}`} onClick={() => setSelectedIndex(globalIndex)}>
+                          <div className="menu-card-media">
+                            <img src={item.img} alt={item.name} loading="lazy" decoding="async" width={400} height={300} />
+                            <div className="menu-card-badges">
+                              {item.soldOut && <span className="menu-badge menu-badge-dark">売り切れ</span>}
+                              {!item.soldOut && item.recommended && <span className="menu-badge menu-badge-gold">おすすめ</span>}
+                              {item.vegetarian && <span className="menu-badge menu-badge-green">ベジタリアン</span>}
                             </div>
                           </div>
-                        </div>
+                          <div className="menu-card-body">
+                            <div className="menu-card-head">
+                              {/* The title is the card's keyboard entry point to the details popup. */}
+                              <h3 className="menu-card-title">
+                                <button type="button" onClick={(e) => { e.stopPropagation(); setSelectedIndex(globalIndex); }}>{item.name}</button>
+                              </h3>
+                              <div className="menu-card-price">{item.price}<small>税抜</small></div>
+                            </div>
+                            {item.desc && <p className="menu-card-desc">{item.desc}</p>}
+                            {item.rating !== null && (
+                              <div className="menu-card-rating" aria-label={`評価 ${item.rating.toFixed(1)}`}>
+                                <span aria-hidden="true">{item.stars}</span>{item.rating.toFixed(1)}
+                              </div>
+                            )}
+                            {canOrder && <OrderButtons item={item} onAfterAdd={handleAfterAdd} />}
+                          </div>
+                        </article>
                       );
                     })}
                   </div>
@@ -260,6 +286,17 @@ export default function Menu() {
         </div>
       </div>
 
+      {canOrder && cart.count > 0 && (
+        <button
+          type="button"
+          onClick={cart.openCart}
+          className="btn-warm"
+          style={{ position: 'fixed', left: '50%', bottom: '20px', transform: 'translateX(-50%)', zIndex: 900, display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.25)', whiteSpace: 'nowrap', borderRadius: '9999px' }}
+        >
+          🛒 カートを見る（{cart.count}点） {yen(cart.total)} <span style={{ fontWeight: 'normal', fontSize: '0.8rem' }}>(税抜)</span>
+        </button>
+      )}
+
       {/* Lightbox / Popup */}
       {selectedIndex !== null && (
         <div onClick={closeLightbox} style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', boxSizing: 'border-box' }}>
@@ -268,8 +305,9 @@ export default function Menu() {
           
           <button onClick={handlePrev} aria-label="前の商品" style={{ position: 'absolute', left: '20px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontSize: '2rem', cursor: 'pointer', padding: '15px 20px', borderRadius: '50%' }}>❮</button>
           
-          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: 'white', borderRadius: '12px', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxWidth: '600px', width: '100%', maxHeight: '90vh' }}>
-            <div style={{ width: '100%', height: '350px', backgroundColor: '#f9f6f0', padding: '0' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: 'white', borderRadius: '12px', overflowX: 'hidden', overflowY: 'auto', display: 'flex', flexDirection: 'column', maxWidth: '600px', width: '100%', maxHeight: '90vh' }}>
+            {/* Shorter photo on small screens so the order buttons stay in view; the panel scrolls if needed. */}
+            <div style={{ width: '100%', height: 'min(350px, 38vh)', flexShrink: 0, backgroundColor: '#f9f6f0', padding: '0' }}>
               <img src={flatItems[selectedIndex].img} alt={flatItems[selectedIndex].name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
             <div style={{ padding: '30px', textAlign: 'center' }}>
@@ -286,6 +324,8 @@ export default function Menu() {
               <div style={{ color: 'var(--spice)', fontSize: '1.8rem', fontWeight: 'bold', fontFamily: 'serif' }}>
                 {flatItems[selectedIndex].price} <span style={{ fontSize: '1rem', color: 'var(--text-muted)', fontWeight: 'normal', fontFamily: 'sans-serif' }}>(税抜)</span>
               </div>
+
+              {canOrder && <OrderButtons item={flatItems[selectedIndex]} size="popup" onAfterAdd={handleAfterAdd} />}
               
               {/* Share Options */}
               <div style={{ marginTop: '25px', paddingTop: '20px', borderTop: '1px solid #eee' }}>
@@ -323,8 +363,17 @@ export default function Menu() {
           </div>
 
           <button onClick={handleNext} aria-label="次の商品" style={{ position: 'absolute', right: '20px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontSize: '2rem', cursor: 'pointer', padding: '15px 20px', borderRadius: '50%' }}>❯</button>
-          
+
         </div>
+      )}
+
+      {relatedTrigger && (
+        <RelatedItemsPanel
+          trigger={relatedTrigger}
+          allItems={flatItems as PanelItem[]}
+          onClose={() => setRelatedTrigger(null)}
+          onOpenCart={() => { setRelatedTrigger(null); cart.openCart(); }}
+        />
       )}
     </main>
   );

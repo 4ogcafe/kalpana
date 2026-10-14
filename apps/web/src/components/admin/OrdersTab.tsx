@@ -1,0 +1,251 @@
+import { useCallback, useEffect, useState, type CSSProperties } from 'react';
+import type { TabIntent } from './TopBar';
+import { toast } from 'react-hot-toast';
+import { apiFetch, errorMessage } from '../../lib/api';
+import { amountDue, formatOrderNumber, yen } from '../../lib/format';
+import DeliverySettings from './DeliverySettings';
+import OrderingSwitches from './OrderingSwitches';
+import PickupSettings from './PickupSettings';
+import StampCounter from './StampCounter';
+import { alertText, type DietaryAlert } from './dietary';
+
+type Status = 'NEW' | 'CONFIRMED' | 'READY' | 'COMPLETED' | 'CANCELLED';
+
+interface AdminOrder {
+  id: string;
+  number: number;
+  status: Status;
+  customerName: string;
+  phone: string;
+  email: string | null;
+  note: string | null;
+  pickupAt: string;
+  items: { itemId: string; nameEn: string; nameJa: string | null; quantity: number; lineTotal: number }[];
+  total: number;
+  taxRate?: number | null;
+  tax?: number;
+  grandTotal?: number;
+  createdAt: string;
+  customerId?: string | null;
+  subtotal?: number;
+  offer?: { titleJa: string; discount: number } | null;
+  reward?: { titleJa: string; kind: 'AMOUNT_OFF' | 'PERK'; discount: number } | null;
+  stampAwarded?: boolean;
+  pointsUsed?: number;
+  pointsDiscount?: number;
+  pointsEarned?: number;
+  dietaryAlert?: DietaryAlert | null;
+  fulfillment?: 'PICKUP' | 'DELIVERY' | 'DINE_IN';
+  tableNumber?: string | null;
+  deliveryFee?: number;
+  deliveryAddress?: { postalCode: string; prefecture: string; city: string; line1: string; building?: string } | null;
+}
+
+const POLL_MS = 15_000;
+const TIMEZONE = 'Asia/Tokyo';
+
+const STATUS_STYLE: Record<Status, { label: string; color: string; background: string }> = {
+  NEW: { label: 'New', color: '#b45309', background: '#fef3c7' },
+  CONFIRMED: { label: 'Preparing', color: '#1d4ed8', background: '#dbeafe' },
+  READY: { label: 'Ready', color: '#047857', background: '#d1fae5' },
+  COMPLETED: { label: 'Picked up', color: '#4b5563', background: '#f3f4f6' },
+  CANCELLED: { label: 'Cancelled', color: '#b91c1c', background: '#fee2e2' },
+};
+
+/** The one forward step staff take next for each active status; delivery words the last two differently. */
+const NEXT_ACTION: Record<'PICKUP' | 'DELIVERY' | 'DINE_IN', Partial<Record<Status, { status: Status; label: string }>>> = {
+  PICKUP: {
+    NEW: { status: 'CONFIRMED', label: 'Accept order' },
+    CONFIRMED: { status: 'READY', label: 'Mark ready' },
+    READY: { status: 'COMPLETED', label: 'Picked up' },
+  },
+  DELIVERY: {
+    NEW: { status: 'CONFIRMED', label: 'Accept order' },
+    CONFIRMED: { status: 'READY', label: 'Out for delivery' },
+    READY: { status: 'COMPLETED', label: 'Delivered' },
+  },
+  DINE_IN: {
+    NEW: { status: 'CONFIRMED', label: 'Accept order' },
+    CONFIRMED: { status: 'READY', label: 'Ready to serve' },
+    READY: { status: 'COMPLETED', label: 'Served' },
+  },
+};
+
+const statusText = (status: Status, fulfillment: 'PICKUP' | 'DELIVERY' | 'DINE_IN') => {
+  if (fulfillment === 'DELIVERY' && status === 'READY') return 'Out for delivery';
+  if (fulfillment === 'DELIVERY' && status === 'COMPLETED') return 'Delivered';
+  if (fulfillment === 'DINE_IN' && status === 'READY') return 'Ready to serve';
+  if (fulfillment === 'DINE_IN' && status === 'COMPLETED') return 'Served';
+  return STATUS_STYLE[status].label;
+};
+
+const pickupLabel = (iso: string) =>
+  new Date(iso).toLocaleString('ja-JP', { timeZone: TIMEZONE, month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' });
+
+export default function OrdersTab({ isAdmin, intent }: { isAdmin: boolean; intent?: TabIntent | null }) {
+  const [scope, setScope] = useState<'active' | 'history'>('active');
+  // Bumped when hours are saved below, so the on/off switches re-read them.
+  const [settingsVersion, setSettingsVersion] = useState(0);
+  const [orders, setOrders] = useState<AdminOrder[] | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    apiFetch(`/api/v1/orders?scope=${scope}`)
+      .then(res => (res.ok ? res.json() : Promise.reject(new Error(`Orders failed with ${res.status}`))))
+      .then((data: AdminOrder[]) => setOrders(data))
+      .catch(console.error);
+  }, [scope]);
+
+  useEffect(() => {
+    load();
+    const intervalId = setInterval(load, POLL_MS);
+    return () => clearInterval(intervalId);
+  }, [load]);
+
+  const changeStatus = async (order: AdminOrder, status: Status) => {
+    if (status === 'CANCELLED' && !window.confirm(`Cancel order ${formatOrderNumber(order.number)} for ${order.customerName}? Call the customer to let them know.`)) return;
+    setBusyId(order.id);
+    try {
+      const res = await apiFetch(`/api/v1/orders/${order.id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) toast.error(await errorMessage(res, 'Could not update the order.'));
+      else {
+        const { stamp } = await res.json();
+        if (stamp?.status === 'AWARDED') {
+          toast.success(`Stamp ${stamp.position}/${stamp.perCard} given to ${order.customerName}.`);
+          for (const reward of stamp.rewards) toast.success(`🎁 ${order.customerName} earned: ${reward.titleJa}`, { duration: 6000 });
+        }
+      }
+      load();
+    } catch {
+      toast.error('Network error while updating the order.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      {isAdmin && <OrderingSwitches key={settingsVersion} />}
+      <StampCounter focus={intent?.action === 'stamp' ? intent.nonce : undefined} />
+      <div style={{ display: 'flex', gap: '8px' }}>
+        {(['active', 'history'] as const).map(value => (
+          <button key={value} type="button" onClick={() => { setOrders(null); setScope(value); }} style={{ ...pillStyle, backgroundColor: scope === value ? '#000' : '#fff', color: scope === value ? '#fff' : '#374151' }}>
+            {value === 'active' ? 'Active orders' : 'History'}
+          </button>
+        ))}
+      </div>
+
+      {!orders ? (
+        <div style={{ padding: '40px', textAlign: 'center' }}>Loading orders…</div>
+      ) : orders.length === 0 ? (
+        <div style={{ ...panelStyle, textAlign: 'center', color: '#6b7280' }}>
+          {scope === 'active' ? 'No open pickup orders. New orders appear here automatically.' : 'No completed or cancelled orders yet.'}
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))', gap: '1rem' }}>
+          {orders.map(order => {
+            const badge = STATUS_STYLE[order.status];
+            const isDelivery = order.fulfillment === 'DELIVERY';
+            const type = order.fulfillment ?? 'PICKUP';
+            const isTable = type === 'DINE_IN';
+            const next = NEXT_ACTION[type][order.status];
+            const address = order.deliveryAddress;
+            const addressText = address ? [`〒${address.postalCode}`, address.prefecture, address.city, address.line1, address.building].filter(Boolean).join(' ') : '';
+            return (
+              <article key={order.id} style={{ ...panelStyle, borderLeft: `4px solid ${badge.color}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                  <div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>No. {formatOrderNumber(order.number)}</div>
+                    <div style={{ fontWeight: 600, color: '#111827' }}>
+                      <span className={`fulfill-badge${isDelivery ? ' is-delivery' : ''}${isTable ? ' is-table' : ''}`}>{isTable ? `🍽 Table ${order.tableNumber}` : isDelivery ? '🛵 Delivery' : '🛍 Pickup'}</span> {isTable ? `ordered ${pickupLabel(order.createdAt)}` : pickupLabel(order.pickupAt)}
+                    </div>
+                  </div>
+                  <span style={{ padding: '4px 10px', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: 600, color: badge.color, backgroundColor: badge.background }}>{statusText(order.status, type)}</span>
+                </div>
+
+                <div style={{ marginTop: '12px', fontSize: '0.9rem', color: '#374151' }}>
+                  <div>
+                    {order.customerName}
+                    {order.customerId && <span style={{ marginLeft: '8px', padding: '2px 8px', borderRadius: '9999px', backgroundColor: '#ede9fe', color: '#6d28d9', fontSize: '0.75rem', fontWeight: 600 }}>Member</span>}
+                  </div>
+                  {order.phone && <a href={`tel:${order.phone}`} style={{ color: '#1d4ed8' }}>{order.phone}</a>}
+                  {order.email && <div style={{ color: '#6b7280' }}>{order.email}</div>}
+                  {address && (
+                    <div style={{ marginTop: '8px', padding: '8px 10px', borderRadius: '8px', backgroundColor: '#eff6ff', color: '#1e3a8a' }}>
+                      📍 {addressText}{' '}
+                      <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressText)}`} target="_blank" rel="noopener noreferrer" style={{ color: '#1d4ed8', fontWeight: 600, whiteSpace: 'nowrap' }}>Open map ↗</a>
+                    </div>
+                  )}
+                </div>
+
+                <ul style={{ listStyle: 'none', padding: 0, margin: '12px 0', borderTop: '1px solid #e5e7eb' }}>
+                  {order.items.map(line => (
+                    <li key={line.itemId} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f3f4f6', fontSize: '0.9rem' }}>
+                      <span><strong>{line.quantity} ×</strong> {line.nameJa || line.nameEn}</span>
+                      <span>{yen(line.lineTotal)}</span>
+                    </li>
+                  ))}
+                </ul>
+                {order.offer && order.offer.discount > 0 && (
+                  <div style={discountStyle}><span>Offer: {order.offer.titleJa}</span><span>−{yen(order.offer.discount)}</span></div>
+                )}
+                {order.reward && (
+                  <div style={order.reward.kind === 'PERK' ? perkStyle : discountStyle}>
+                    <span>🎁 Stamp reward: {order.reward.titleJa}</span>
+                    <span>{order.reward.discount > 0 ? `−${yen(order.reward.discount)}` : 'Give with order'}</span>
+                  </div>
+                )}
+                {(order.pointsDiscount ?? 0) > 0 && (
+                  <div style={discountStyle}><span>Points used ({order.pointsUsed}pt)</span><span>−{yen(order.pointsDiscount ?? 0)}</span></div>
+                )}
+                {(order.deliveryFee ?? 0) > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginBottom: '4px' }}><span>Delivery fee (incl. tax)</span><span>{yen(order.deliveryFee ?? 0)}</span></div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                  <span>To collect ({amountDue(order).taxIncluded ? `incl. ${order.taxRate}% tax ${yen(order.tax ?? 0)}` : 'excl. tax'})</span>
+                  <span>{yen(amountDue(order).amount)}</span>
+                </div>
+                {order.stampAwarded && <div style={{ marginTop: '6px', fontSize: '0.8rem', color: '#b3261e', fontWeight: 600 }}>Stamp given</div>}
+
+                {order.dietaryAlert && (
+                  <div role="note" style={{ marginTop: '12px', padding: '8px 12px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '0.88rem', color: '#b91c1c', fontWeight: 600 }}>
+                    ⚠ {alertText(order.dietaryAlert)}
+                  </div>
+                )}
+                {order.note && (
+                  <div style={{ marginTop: '12px', padding: '8px 12px', backgroundColor: '#fffbeb', borderRadius: '8px', fontSize: '0.9rem', whiteSpace: 'pre-wrap' }}>
+                    📝 {order.note}
+                  </div>
+                )}
+
+                {next && (
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+                    <button type="button" disabled={busyId === order.id} onClick={() => changeStatus(order, next.status)} style={{ ...actionStyle, flex: 1, backgroundColor: '#000', color: '#fff', border: 'none' }}>
+                      {next.label}
+                    </button>
+                    <button type="button" disabled={busyId === order.id} onClick={() => changeStatus(order, 'CANCELLED')} style={{ ...actionStyle, backgroundColor: '#fff', color: '#b91c1c', border: '1px solid #fca5a5' }}>
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      )}
+
+      {isAdmin && <PickupSettings onSaved={() => setSettingsVersion(v => v + 1)} />}
+      {isAdmin && <DeliverySettings onSaved={() => setSettingsVersion(v => v + 1)} />}
+    </div>
+  );
+}
+
+const panelStyle: CSSProperties = { backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb', padding: '1.25rem' };
+const pillStyle: CSSProperties = { padding: '0.5rem 1rem', borderRadius: '9999px', border: '1px solid #e5e7eb', fontWeight: 500, cursor: 'pointer' };
+const actionStyle: CSSProperties = { padding: '0.65rem 1rem', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' };
+const discountStyle: CSSProperties = { display: 'flex', justifyContent: 'space-between', color: '#047857', fontSize: '0.9rem', marginBottom: '4px' };
+const perkStyle: CSSProperties = { display: 'flex', justifyContent: 'space-between', gap: '8px', color: '#92400e', backgroundColor: '#fef3c7', padding: '6px 8px', borderRadius: '6px', fontSize: '0.9rem', fontWeight: 600, marginBottom: '4px' };

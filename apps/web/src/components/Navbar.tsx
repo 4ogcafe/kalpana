@@ -1,7 +1,19 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { apiFetch } from '../lib/api';
+import { useCustomer } from '../lib/customer-context';
+import { useCart } from '../lib/cart-context';
+import { Menu, ShoppingCart, UserRound, X } from 'lucide-react';
+
+const NAV_LINKS = [
+  { to: '/', label: 'ホーム' },
+  { to: '/about', label: '私たちについて' },
+  { to: '/menu/lunch', label: 'ランチメニュー' },
+  { to: '/menu/takeout', label: 'テイクアウト' },
+  { to: '/menu/grand', label: 'グランドメニュー' },
+  { to: '/contact', label: 'お問い合わせ' },
+];
 
 export default function Navbar() {
   const [isPopupOpen, setIsPopupOpen] = useState(false);
@@ -16,6 +28,8 @@ export default function Navbar() {
     message: ''
   });
   const location = useLocation();
+  const { customer } = useCustomer();
+  const cart = useCart();
 
   const handleOpen = () => setIsPopupOpen(true);
   const handleClose = () => {
@@ -52,6 +66,20 @@ export default function Navbar() {
     }
   };
 
+  // Small screens: the links live in a menu opened from the ☰ button.
+  const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => setMenuOpen(false), [location.pathname]);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMenuOpen(false);
+    window.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
+  }, [menuOpen]);
+
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
@@ -72,25 +100,61 @@ export default function Navbar() {
           </Link>
 
           <ul className="nav-links">
-            <li><Link to="/" className={isActive('/') ? 'active' : ''}>ホーム</Link></li>
-            <li><Link to="/about" className={isActive('/about') ? 'active' : ''}>私たちについて</Link></li>
-            <li><Link to="/menu/lunch" className={isActive('/menu/lunch') ? 'active' : ''}>ランチメニュー</Link></li>
-            <li><Link to="/menu/takeout" className={isActive('/menu/takeout') ? 'active' : ''}>テイクアウト</Link></li>
-            <li><Link to="/menu/grand" className={isActive('/menu/grand') ? 'active' : ''}>グランドメニュー</Link></li>
-            <li><Link to="/contact" className={isActive('/contact') ? 'active' : ''}>お問い合わせ</Link></li>
+            {NAV_LINKS.map(link => (
+              <li key={link.to}><Link to={link.to} className={isActive(link.to) ? 'active' : ''}>{link.label}</Link></li>
+            ))}
           </ul>
 
-          <div style={{ display: 'flex', alignItems: 'center' }}>
+          <div className="nav-actions">
+            <Link to={customer ? '/account' : '/account/login'} className="nav-account" aria-label={customer ? 'マイページ' : 'ログイン・会員登録'}>
+              <UserRound size={22} aria-hidden="true" />
+              <span className="nav-account-label">{customer ? 'マイページ' : 'ログイン'}</span>
+            </Link>
+            <button type="button" onClick={cart.openCart} aria-label={`カートを開く（${cart.count}点）`} className="nav-icon-btn">
+              <ShoppingCart size={24} aria-hidden="true" />
+              {cart.count > 0 && <span aria-hidden="true" className="nav-cart-badge">{cart.count}</span>}
+            </button>
             <button className="nav-cta" onClick={handleOpen}>席を予約する</button>
+            <button
+              type="button"
+              className="nav-icon-btn nav-menu-toggle"
+              aria-expanded={menuOpen}
+              aria-controls="mobile-menu"
+              aria-label={menuOpen ? 'メニューを閉じる' : 'メニューを開く'}
+              onClick={() => setMenuOpen(open => !open)}
+            >
+              {menuOpen ? <X size={26} aria-hidden="true" /> : <Menu size={26} aria-hidden="true" />}
+            </button>
           </div>
         </div>
+
+        {menuOpen && (
+          <>
+            <div className="nav-backdrop" onClick={() => setMenuOpen(false)} aria-hidden="true" />
+            <div id="mobile-menu" className="nav-mobile">
+              <ul>
+                {NAV_LINKS.map(link => (
+                  <li key={link.to}>
+                    <Link to={link.to} className={isActive(link.to) ? 'active' : ''} aria-current={isActive(link.to) ? 'page' : undefined}>{link.label}</Link>
+                  </li>
+                ))}
+              </ul>
+              <div className="nav-mobile-actions">
+                <Link to={customer ? '/account' : '/account/login'} className="order-btn order-btn-outline order-btn-lg" style={{ textDecoration: 'none' }}>
+                  <UserRound size={18} aria-hidden="true" />{customer ? 'マイページ' : 'ログイン・会員登録'}
+                </Link>
+                <button type="button" className="order-btn order-btn-solid order-btn-lg" onClick={() => { setMenuOpen(false); handleOpen(); }}>席を予約する</button>
+              </div>
+            </div>
+          </>
+        )}
       </nav>
 
       {/* Reservation Popup Modal */}
       {isPopupOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', boxSizing: 'border-box' }} onClick={handleClose}>
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', boxSizing: 'border-box', overflowY: 'auto' }} onClick={handleClose}>
           
-          <div style={{ backgroundColor: 'white', borderRadius: '16px', overflow: 'hidden', maxWidth: '500px', width: '100%', position: 'relative', boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }} onClick={(e) => e.stopPropagation()}>
+          <div style={{ backgroundColor: 'white', borderRadius: '16px', overflow: 'hidden', maxWidth: '500px', width: '100%', position: 'relative', margin: 'auto', boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }} onClick={(e) => e.stopPropagation()}>
             
             <button onClick={handleClose} aria-label="閉じる" style={{ position: 'absolute', top: '15px', right: '15px', background: 'white', border: 'none', color: 'var(--text-muted)', fontSize: '1.5rem', cursor: 'pointer', width: '30px', height: '30px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 10px rgba(0,0,0,0.1)', zIndex: 10 }}>×</button>
             
@@ -102,7 +166,7 @@ export default function Navbar() {
               </div>
             </div>
 
-            <div style={{ padding: '30px' }}>
+            <div className="reserve-body" style={{ padding: '30px' }}>
               {isSubmitted ? (
                 <div style={{ textAlign: 'center', padding: '40px 20px' }}>
                   <div style={{ fontSize: '3rem', marginBottom: '20px' }}>✅</div>
@@ -113,7 +177,7 @@ export default function Navbar() {
               ) : (
                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                   
-                  <div style={{ display: 'flex', gap: '15px' }}>
+                  <div className="reserve-row" style={{ display: 'flex', gap: '15px' }}>
                     <div style={{ flex: 1 }}>
                       <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--dark-bark)' }}>日付 <span style={{color: 'var(--spice)'}}>*</span></label>
                       <input required type="date" name="date" value={formData.date} onChange={handleChange} style={{ width: '100%', padding: '12px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box', fontFamily: 'inherit' }} />
@@ -124,7 +188,7 @@ export default function Navbar() {
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '15px' }}>
+                  <div className="reserve-row" style={{ display: 'flex', gap: '15px' }}>
                     <div style={{ flex: 1 }}>
                       <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--dark-bark)' }}>人数 <span style={{color: 'var(--spice)'}}>*</span></label>
                       <select required name="guests" value={formData.guests} onChange={handleChange} style={{ width: '100%', padding: '12px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box', fontFamily: 'inherit', backgroundColor: 'white' }}>

@@ -4,10 +4,14 @@ import { config } from './config.js';
 import { logger } from './lib/logger.js';
 import { closeMongo } from './lib/mongo.js';
 import { prisma } from './lib/prisma.js';
+import { scheduleReviewRefresh } from './services/google-reviews.js';
 
 const server = createApp().listen(config.port, () => {
   logger.info(`API server running on http://localhost:${config.port}`);
 });
+
+// Google reviews: refreshed automatically about once a month.
+scheduleReviewRefresh();
 
 function shutdown(signal: string) {
   logger.info({ signal }, 'Shutting down');

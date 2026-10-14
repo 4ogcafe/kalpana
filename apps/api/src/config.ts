@@ -32,5 +32,13 @@ export const config = {
     .map((origin) => origin.trim())
     .filter(Boolean),
   trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
+  // New member accounts allowed per IP per hour (spam protection).
+  registerMaxPerHour: Number(process.env.REGISTER_MAX_PER_HOUR) || 10,
+  // Orders allowed per IP per hour (spam protection).
+  orderMaxPerHour: Number(process.env.ORDER_MAX_PER_HOUR) || 10,
+  // Google Places API key (server only) for showing the restaurant's Google rating and reviews.
+  googlePlacesApiKey: process.env.GOOGLE_PLACES_API_KEY?.trim() || '',
   uploadDir: path.join(process.cwd(), 'public', 'uploads'),
+  // Built web app (`pnpm --filter web build`). When present, the API serves the site too.
+  webDistDir: path.resolve(process.env.WEB_DIST_DIR || path.join(process.cwd(), '..', 'web', 'dist')),
 };

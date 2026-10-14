@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -11,6 +13,13 @@ import contactRoutes from './routes/contact.js';
 import usersRoutes from './routes/users.js';
 import uploadRoutes from './routes/upload.js';
 import dashboardRoutes from './routes/dashboard.js';
+import orderRoutes from './routes/orders.js';
+import customerRoutes from './routes/customers.js';
+import offerRoutes from './routes/offers.js';
+import stampRoutes from './routes/stamps.js';
+import diningRoutes from './routes/dining.js';
+import reviewRoutes from './routes/reviews.js';
+import pushRoutes from './routes/push.js';
 
 const JSON_BODY_LIMIT = '100kb';
 const UPLOAD_MAX_AGE = '30d';
@@ -22,8 +31,24 @@ export function createApp() {
   app.disable('x-powered-by');
 
   app.use(cors({ origin: config.corsOrigins, credentials: true }));
-  // Images are loaded by the web app, which may run on another origin.
-  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+  // Images are loaded by the web app, which may run on another origin. The CSP also covers the
+  // web app when it is served from here: Google Fonts, the Google Maps embed, the inline font
+  // `onload` swap in index.html, and menu/carousel images hosted elsewhere.
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+      contentSecurityPolicy: {
+        directives: {
+          'script-src-attr': ["'unsafe-inline'"],
+          'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+          'font-src': ["'self'", 'data:', 'https://fonts.gstatic.com'],
+          'img-src': ["'self'", 'data:', 'blob:', 'https:'],
+          'frame-src': ['https://www.google.com', 'https://maps.google.com'],
+          'connect-src': ["'self'", ...config.corsOrigins],
+        },
+      },
+    }),
+  );
   app.use(express.json({ limit: JSON_BODY_LIMIT }));
 
   // Upload names are unique, so files can be cached for a long time. The sandbox CSP stops any
@@ -49,6 +74,25 @@ export function createApp() {
   app.use('/api/v1/users', usersRoutes);
   app.use('/api/v1/upload', uploadRoutes);
   app.use('/api/v1/dashboard', dashboardRoutes);
+  app.use('/api/v1/orders', orderRoutes);
+  app.use('/api/v1/customers', customerRoutes);
+  app.use('/api/v1/offers', offerRoutes);
+  app.use('/api/v1/stamps', stampRoutes);
+  app.use('/api/v1/dining', diningRoutes);
+  app.use('/api/v1/reviews', reviewRoutes);
+  app.use('/api/v1/push', pushRoutes);
+
+  if (fs.existsSync(path.join(config.webDistDir, 'index.html'))) {
+    // Serve the built site; any other GET outside /api and /uploads is a client-side route.
+    app.use(express.static(config.webDistDir, { index: false, maxAge: '1h' }));
+    app.get(/^\/(?!api\/|uploads\/).*/, (_req, res) => {
+      res.setHeader('Cache-Control', 'no-cache');
+      res.sendFile(path.join(config.webDistDir, 'index.html'));
+    });
+  } else {
+    // No build here (e.g. development): send visitors to the web app instead of a JSON 404.
+    app.get('/', (_req, res) => res.redirect(config.corsOrigins[0] ?? '/api/v1/health'));
+  }
 
   app.use(notFoundHandler);
   app.use(errorHandler);

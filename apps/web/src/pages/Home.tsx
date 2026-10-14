@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { apiFetch, assetUrl, getPublic } from '../lib/api';
+import OfferSticker from '../components/MemberOffers';
+import GoogleReviews from '../components/GoogleReviews';
+import { loadReviews } from '../lib/reviews';
 import EmphasisText from '../components/EmphasisText';
 
 const DEFAULT_HERO_IMAGES = [
@@ -19,6 +22,17 @@ const responsiveSrcSet = (url: string) =>
 const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 export default function Home() {
+  // The store card shows the live Google rating when Google reviews are connected.
+  const [liveRating, setLiveRating] = useState<string | null>(null);
+  const [liveCount, setLiveCount] = useState<number | null>(null);
+  useEffect(() => {
+    loadReviews().then(data => {
+      if (data?.source === 'google' && data.rating) {
+        setLiveRating(data.rating.toFixed(1));
+        setLiveCount(data.userRatingCount);
+      }
+    });
+  }, []);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [carousels, setCarousels] = useState<any[]>([]);
   const [menuItems, setMenuItems] = useState<any[]>([]);
@@ -125,6 +139,9 @@ export default function Home() {
           />
         ))}
         
+        {/* Member offers (Admin → Stamps, Offers & Points): a bouncing gift on the banner */}
+        <OfferSticker />
+
         <div className="hero-content">
           <div className="hero-tag">埼玉・熊谷で味わう、本場のインド料理</div>
           <h1 className="hero-title">{carousels[currentSlide]?.titleJa || 'インドの香りを、そのままに'}</h1>
@@ -237,7 +254,7 @@ export default function Home() {
           </div>
 
           <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))', gap: '24px' }}>
               {recommendedItems.map(item => (
                 <div key={item.id} style={{ backgroundColor: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column' }}>
                   <div style={{ height: '220px', width: '100%', backgroundColor: '#f9f6f0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
@@ -334,10 +351,11 @@ export default function Home() {
 
               {/* Reviews Pill */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: 'var(--cream)', padding: '10px 16px', borderRadius: '4px', border: '1px solid #e5dbcd', marginBottom: '20px', width: 'fit-content', position: 'relative', zIndex: 1 }}>
-                {settings.storeReviewScore && (
+                {(liveRating ?? settings.storeReviewScore) && (
                   <>
                     <span aria-hidden="true" style={{ color: 'var(--gold)', letterSpacing: '2px', fontSize: '0.9rem' }}>★</span>
-                    <span style={{ fontWeight: 'bold', color: 'var(--dark-bark)' }}>{settings.storeReviewScore}</span>
+                    <span style={{ fontWeight: 'bold', color: 'var(--dark-bark)' }}>{liveRating ?? settings.storeReviewScore}</span>
+                    {liveCount ? <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>({liveCount.toLocaleString('ja-JP')})</span> : null}
                   </>
                 )}
                 {settings.storeReviewLink ? (
@@ -374,27 +392,8 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Google Reviews Section */}
-      <div className="section" style={{ backgroundColor: 'white' }}>
-        <div className="centered" style={{ marginBottom: '2rem' }}>
-          <div className="section-label">お客様の声</div>
-          <h2 className="section-title">Google <em>Reviews</em></h2>
-          <div className="divider"></div>
-          <p className="section-sub">お客様の声はGoogleマップでご覧いただけます。</p>
-        </div>
-        
-        <div className="centered">
-          <a
-            href={settings.storeReviewLink || settings.googleMapsLink || 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(settings.name || 'Kalpana Indian Cuisine')}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-warm"
-            style={{ display: 'inline-block', textDecoration: 'none' }}
-          >
-            Googleでレビューを読む
-          </a>
-        </div>
-      </div>
+      {/* Google Reviews Section: live from Google, refreshed monthly */}
+      <GoogleReviews fallbackLink={settings.storeReviewLink || settings.googleMapsLink || 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(settings.name || 'Kalpana Indian Cuisine')} />
       
       {/* Subscription Section */}
       <div className="section" style={{ position: 'relative', padding: '100px 20px', backgroundColor: 'var(--dark-bark)', color: 'white', overflow: 'hidden' }}>
