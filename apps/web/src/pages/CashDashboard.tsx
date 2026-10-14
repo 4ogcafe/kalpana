@@ -245,7 +245,8 @@ export default function CashDashboard() {
   }, []);
 
   // Refresh detail whenever the table list re-polls (order statuses may have changed).
-  const tablesKey = tables.map(t => `${t.session?.id}:${t.session?.status}:${t.session?.total}`).join('|');
+  // Include inProgress/ready so the blocked flag stays accurate when the kitchen updates orders.
+  const tablesKey = tables.map(t => `${t.session?.id}:${t.session?.status}:${t.session?.total}:${t.session?.inProgress}:${t.session?.ready}`).join('|');
   useEffect(() => {
     if (selectedId && !paying) loadDetail(selectedId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -296,7 +297,7 @@ export default function CashDashboard() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.message ?? '会計処理に失敗しました');
+        throw new Error(err.error?.message ?? err.message ?? '会計処理に失敗しました');
       }
       const { total } = await res.json();
       toast.success(`Table ${detail.tableNumber} — ${yen(total)} Square決済完了`);
@@ -358,7 +359,7 @@ export default function CashDashboard() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.message ?? 'Square決済リンクの作成に失敗しました');
+        throw new Error(err.error?.message ?? err.message ?? 'Square決済リンクの作成に失敗しました');
       }
       const data = await res.json();
       setSquareActive({ mode: 'qr', linkId: data.linkId, url: data.url, orderId: data.orderId, qrDataUrl: data.qrDataUrl });
@@ -386,7 +387,7 @@ export default function CashDashboard() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.message ?? 'Square端末への送信に失敗しました');
+        throw new Error(err.error?.message ?? err.message ?? 'Square端末への送信に失敗しました');
       }
       const data = await res.json();
       setSquareActive({ mode: 'terminal', checkoutId: data.checkoutId, status: data.status });
@@ -416,7 +417,7 @@ export default function CashDashboard() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.message ?? '会計処理に失敗しました');
+        throw new Error(err.error?.message ?? err.message ?? '会計処理に失敗しました');
       }
       const { total } = await res.json();
       toast.success(`Table ${detail.tableNumber} — ${yen(total)} 会計完了`);
