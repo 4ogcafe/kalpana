@@ -562,6 +562,39 @@ router.post('/sessions/:id/calls/resolve', requireStaff, async (req, res) => {
   res.json({ success: true });
 });
 
+/** Cash-counter stats for today: total revenue and per-payment-method breakdown. */
+router.get('/cash/today', requireStaff, async (_req, res) => {
+  const settings = await loadSettings();
+  const todayStart = localDayStart(localDateKey(new Date(), settings.timezone), settings.timezone);
+  const closed = await sessions()
+    .find({ status: 'CLOSED', closedAt: { $gte: todayStart } }, { projection: { total: 1, paymentMethod: 1 } })
+    .toArray();
+
+  const breakdown: Record<string, { count: number; total: number }> = {
+    CASH: { count: 0, total: 0 },
+    CARD: { count: 0, total: 0 },
+    QR: { count: 0, total: 0 },
+    OTHER: { count: 0, total: 0 },
+  };
+  let totalRevenue = 0;
+  for (const s of closed) {
+    const method = (s.paymentMethod as string) || 'OTHER';
+    const t = Number(s.total) || 0;
+    breakdown[method] = breakdown[method] ?? { count: 0, total: 0 };
+    breakdown[method].count += 1;
+    breakdown[method].total += t;
+    totalRevenue += t;
+  }
+  const sessionCount = closed.length;
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({
+    totalRevenue,
+    sessionCount,
+    avgPerSession: sessionCount > 0 ? Math.round(totalRevenue / sessionCount) : 0,
+    breakdown,
+  });
+});
+
 /** Payment taken at the register: the visit ends and the table is free for the next guests. */
 router.post('/sessions/:id/close', requireStaff, async (req, res) => {
   const id = idParam(req.params);

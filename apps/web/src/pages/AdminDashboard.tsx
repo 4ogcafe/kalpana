@@ -212,6 +212,15 @@ export default function AdminDashboard() {
             <ChefHat size={20} style={{ color: '#d97706' }} aria-hidden="true" />
             Kitchen display ↗
           </a>
+          <a
+            href="/cash"
+            target="_blank"
+            rel="noopener"
+            style={{ marginTop: '4px', padding: '0.875rem 1rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '12px', fontWeight: 600, color: '#111827', textDecoration: 'none', border: '1px dashed #d1d5db' }}
+          >
+            <span style={{ fontSize: '1.1rem' }} aria-hidden="true">💴</span>
+            Cash register ↗
+          </a>
         </nav>
 
         <div style={{ padding: '1.5rem', borderTop: '1px solid #e5e7eb' }}>
