@@ -177,7 +177,9 @@ export default function CashDashboard() {
   const [cashReceived, setCashReceived] = useState('');
   const [paying, setPaying] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [lastPaid, setLastPaid] = useState<{ tableNumber: string; total: number; method: string } | null>(null);
   const prevTables = useRef<TableRow[]>([]);
+  const lastPaidTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Square state
   const [squareCfg, setSquareCfg] = useState<SquareConfig | null>(null);
@@ -249,10 +251,19 @@ export default function CashDashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tablesKey]);
 
+  const showPaidConfirmation = useCallback((tableNumber: string, total: number, method: string) => {
+    if (lastPaidTimer.current) clearTimeout(lastPaidTimer.current);
+    setLastPaid({ tableNumber, total, method });
+    // Auto-clear after 8 seconds
+    lastPaidTimer.current = setTimeout(() => setLastPaid(null), 8_000);
+  }, []);
+
   const selectTable = (sessionId: string) => {
     if (sessionId === selectedId) return;
     stopSquarePoll();
     setSquareActive(null);
+    setLastPaid(null);
+    if (lastPaidTimer.current) clearTimeout(lastPaidTimer.current);
     setSelectedId(sessionId);
     setDetail(null);
     setPaymentMethod('CASH');
@@ -292,11 +303,12 @@ export default function CashDashboard() {
       setSquareActive(null);
       setSelectedId(null);
       setDetail(null);
+      showPaidConfirmation(detail.tableNumber, total, `Square (${squarePaymentMethod === 'CARD' ? 'カード' : 'QR'})`);
       await Promise.all([loadTables(), loadStats()]);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : '会計処理に失敗しました');
     }
-  }, [detail, loadTables, loadStats, stopSquarePoll]);
+  }, [detail, loadTables, loadStats, stopSquarePoll, showPaidConfirmation]);
 
   // Start polling a Square QR order
   const startQRPoll = useCallback((orderId: string) => {
@@ -408,6 +420,7 @@ export default function CashDashboard() {
       }
       const { total } = await res.json();
       toast.success(`Table ${detail.tableNumber} — ${yen(total)} 会計完了`);
+      showPaidConfirmation(detail.tableNumber, total, PM_LABEL[paymentMethod]);
       setSelectedId(null);
       setDetail(null);
       await Promise.all([loadTables(), loadStats()]);
@@ -519,7 +532,16 @@ export default function CashDashboard() {
 
         {/* ── Right: detail ── */}
         <div className="ca-detail">
-          {!selectedId ? (
+          {!selectedId && lastPaid ? (
+            <div className="ca-paid-confirm">
+              <div className="ca-paid-icon">✓</div>
+              <div className="ca-paid-label">会計完了</div>
+              <div className="ca-paid-table">Table {lastPaid.tableNumber}</div>
+              <div className="ca-paid-total">{yen(lastPaid.total)}</div>
+              <div className="ca-paid-method">{lastPaid.method}</div>
+              <button className="ca-paid-clear" onClick={() => setLastPaid(null)}>閉じる</button>
+            </div>
+          ) : !selectedId ? (
             <div className="ca-detail-empty">
               <div className="ca-detail-empty-ico">💴</div>
               <p>左のテーブルを選択してください</p>

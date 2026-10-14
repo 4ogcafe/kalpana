@@ -266,6 +266,79 @@
   background: var(--ca-bg);
 }
 
+/* Payment confirmed state */
+.ca-paid-confirm {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 32px;
+  animation: ca-paid-in 0.35s ease;
+}
+
+@keyframes ca-paid-in {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.ca-paid-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--ca-accent);
+  color: #fff;
+  font-size: 2.4rem;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.ca-paid-label {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--ca-accent);
+}
+
+.ca-paid-table {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ca-ink);
+}
+
+.ca-paid-total {
+  font-size: 2rem;
+  font-weight: 900;
+  color: var(--ca-ink);
+  letter-spacing: -1px;
+}
+
+.ca-paid-method {
+  font-size: 0.85rem;
+  color: var(--ca-muted);
+  font-weight: 600;
+  padding: 4px 12px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 9999px;
+}
+
+.ca-paid-clear {
+  margin-top: 8px;
+  padding: 8px 24px;
+  border-radius: 8px;
+  border: 1px solid var(--ca-line);
+  background: var(--ca-card);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ca-muted);
+  cursor: pointer;
+}
+.ca-paid-clear:hover { background: #f5f5f3; }
+
 .ca-detail-empty {
   flex: 1;
   display: flex;
