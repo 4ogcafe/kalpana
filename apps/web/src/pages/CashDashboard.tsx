@@ -3,13 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import {
   AlertCircle, Banknote, CheckCircle, ChefHat, ChevronRight,
-  Clock, CreditCard, LogOut, MoreHorizontal, QrCode, RefreshCw, Users,
+  Clock, CreditCard, LogOut, Monitor, MoreHorizontal, QrCode, RefreshCw, ScanLine, Users, X,
 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import './cash.css';
 
 const POLL_MS = 8_000;
 const STATS_POLL_MS = 30_000;
+const SQUARE_POLL_MS = 3_000;
 const TZ = 'Asia/Tokyo';
 
 const PAYMENT_METHODS = ['CASH', 'CARD', 'QR', 'OTHER'] as const;
@@ -17,6 +18,39 @@ type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
 const PM_LABEL: Record<PaymentMethod, string> = { CASH: '現金', CARD: 'カード', QR: 'QR払い', OTHER: 'その他' };
 const PM_ICONS = { CASH: Banknote, CARD: CreditCard, QR: QrCode, OTHER: MoreHorizontal };
+
+// ---- Square types ----
+
+interface SquareConfig {
+  configured: boolean;
+  environment: 'sandbox' | 'production';
+  locationId: string | null;
+}
+
+interface SquareDevice {
+  id: string;
+  name: string;
+  status: string;
+  model: string | null;
+}
+
+type SquareMode = 'qr' | 'terminal';
+
+interface SquareQRState {
+  mode: 'qr';
+  linkId: string;
+  url: string;
+  orderId: string | null;
+  qrDataUrl: string | null;
+}
+
+interface SquareTerminalState {
+  mode: 'terminal';
+  checkoutId: string;
+  status: string;
+}
+
+type SquareActiveState = SquareQRState | SquareTerminalState | null;
 
 const ORDER_STATUS_JA: Record<string, string> = {
   NEW: '受付',
@@ -145,6 +179,15 @@ export default function CashDashboard() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const prevTables = useRef<TableRow[]>([]);
 
+  // Square state
+  const [squareCfg, setSquareCfg] = useState<SquareConfig | null>(null);
+  const [squareDevices, setSquareDevices] = useState<SquareDevice[]>([]);
+  const [squareMode, setSquareMode] = useState<SquareMode>('qr');
+  const [selectedDevice, setSelectedDevice] = useState<string>('');
+  const [squareActive, setSquareActive] = useState<SquareActiveState>(null);
+  const [squarePaying, setSquarePaying] = useState(false);
+  const squarePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   useEffect(() => {
     apiFetch('/api/v1/auth/me')
       .then(r => (r.ok ? r.json() : Promise.reject()))
@@ -191,6 +234,14 @@ export default function CashDashboard() {
     return () => { clearInterval(t1); clearInterval(t2); };
   }, [loadTables, loadStats]);
 
+  // Load Square config once on mount
+  useEffect(() => {
+    apiFetch('/api/v1/square/config')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d) setSquareCfg(d); })
+      .catch(() => null);
+  }, []);
+
   // Refresh detail whenever the table list re-polls (order statuses may have changed).
   const tablesKey = tables.map(t => `${t.session?.id}:${t.session?.status}:${t.session?.total}`).join('|');
   useEffect(() => {
@@ -200,11 +251,147 @@ export default function CashDashboard() {
 
   const selectTable = (sessionId: string) => {
     if (sessionId === selectedId) return;
+    stopSquarePoll();
+    setSquareActive(null);
     setSelectedId(sessionId);
     setDetail(null);
     setPaymentMethod('CASH');
     setCashReceived('');
     loadDetail(sessionId);
+  };
+
+  // Load terminal devices when user switches to terminal mode on CARD payment
+  const loadDevices = useCallback(async () => {
+    const res = await apiFetch('/api/v1/square/terminal/devices').catch(() => null);
+    if (!res?.ok) return;
+    const d = await res.json();
+    setSquareDevices(d.devices ?? []);
+    if (d.devices?.length > 0 && !selectedDevice) setSelectedDevice(d.devices[0].id);
+  }, [selectedDevice]);
+
+  // Stop any active Square polling
+  const stopSquarePoll = useCallback(() => {
+    if (squarePollRef.current) { clearInterval(squarePollRef.current); squarePollRef.current = null; }
+  }, []);
+
+  // Called when Square detects a completed payment — close the session
+  const onSquarePaid = useCallback(async (squarePaymentMethod: PaymentMethod) => {
+    if (!detail) return;
+    stopSquarePoll();
+    try {
+      const res = await apiFetch(`/api/v1/dining/sessions/${detail.id}/close`, {
+        method: 'POST',
+        body: JSON.stringify({ paymentMethod: squarePaymentMethod, note: 'Square' }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message ?? '会計処理に失敗しました');
+      }
+      const { total } = await res.json();
+      toast.success(`Table ${detail.tableNumber} — ${yen(total)} Square決済完了`);
+      setSquareActive(null);
+      setSelectedId(null);
+      setDetail(null);
+      await Promise.all([loadTables(), loadStats()]);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : '会計処理に失敗しました');
+    }
+  }, [detail, loadTables, loadStats, stopSquarePoll]);
+
+  // Start polling a Square QR order
+  const startQRPoll = useCallback((orderId: string) => {
+    stopSquarePoll();
+    squarePollRef.current = setInterval(async () => {
+      const res = await apiFetch(`/api/v1/square/payment-link/${orderId}/status`).catch(() => null);
+      if (!res?.ok) return;
+      const d = await res.json();
+      if (d.paid) { onSquarePaid('QR'); }
+    }, SQUARE_POLL_MS);
+  }, [stopSquarePoll, onSquarePaid]);
+
+  // Start polling a Square Terminal checkout
+  const startTerminalPoll = useCallback((checkoutId: string) => {
+    stopSquarePoll();
+    squarePollRef.current = setInterval(async () => {
+      const res = await apiFetch(`/api/v1/square/terminal/checkout/${checkoutId}/status`).catch(() => null);
+      if (!res?.ok) return;
+      const d = await res.json();
+      if (d.paid) {
+        onSquarePaid('CARD');
+      } else if (d.cancelled) {
+        stopSquarePoll();
+        setSquareActive(null);
+        toast.error('Square端末でキャンセルされました');
+      } else {
+        setSquareActive(prev => prev?.mode === 'terminal' ? { ...prev, status: d.status } : prev);
+      }
+    }, SQUARE_POLL_MS);
+  }, [stopSquarePoll, onSquarePaid]);
+
+  // Clean up polling when switching away
+  useEffect(() => () => stopSquarePoll(), [stopSquarePoll]);
+
+  // Square QR: generate payment link
+  const handleSquareQR = async () => {
+    if (!detail || !squareCfg?.configured) return;
+    setSquarePaying(true);
+    try {
+      const res = await apiFetch('/api/v1/square/payment-link', {
+        method: 'POST',
+        body: JSON.stringify({
+          sessionId: detail.id,
+          amount: detail.bill.total,
+          label: `Table ${detail.tableNumber} – Kalpana`,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message ?? 'Square決済リンクの作成に失敗しました');
+      }
+      const data = await res.json();
+      setSquareActive({ mode: 'qr', linkId: data.linkId, url: data.url, orderId: data.orderId, qrDataUrl: data.qrDataUrl });
+      if (data.orderId) startQRPoll(data.orderId);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Square QRの生成に失敗しました');
+    } finally {
+      setSquarePaying(false);
+    }
+  };
+
+  // Square Terminal: push to card reader
+  const handleSquareTerminal = async () => {
+    if (!detail || !squareCfg?.configured || !selectedDevice) return;
+    setSquarePaying(true);
+    try {
+      const res = await apiFetch('/api/v1/square/terminal/checkout', {
+        method: 'POST',
+        body: JSON.stringify({
+          sessionId: detail.id,
+          amount: detail.bill.total,
+          deviceId: selectedDevice,
+          label: `Table ${detail.tableNumber} – Kalpana`,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message ?? 'Square端末への送信に失敗しました');
+      }
+      const data = await res.json();
+      setSquareActive({ mode: 'terminal', checkoutId: data.checkoutId, status: data.status });
+      startTerminalPoll(data.checkoutId);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Square端末への送信に失敗しました');
+    } finally {
+      setSquarePaying(false);
+    }
+  };
+
+  // Cancel an active Square terminal checkout
+  const handleSquareCancel = async () => {
+    if (squareActive?.mode !== 'terminal') return;
+    stopSquarePoll();
+    await apiFetch(`/api/v1/square/terminal/checkout/${squareActive.checkoutId}/cancel`, { method: 'POST' }).catch(() => null);
+    setSquareActive(null);
   };
 
   const handlePay = async () => {
@@ -430,13 +617,132 @@ export default function CashDashboard() {
                       <button
                         key={pm}
                         className={`ca-pm-btn${paymentMethod === pm ? ' is-active' : ''}`}
-                        onClick={() => { setPaymentMethod(pm); setCashReceived(''); }}
+                        onClick={() => { setPaymentMethod(pm); setCashReceived(''); setSquareActive(null); stopSquarePoll(); }}
                       >
                         <Icon size={16} /> {PM_LABEL[pm]}
                       </button>
                     );
                   })}
                 </div>
+
+                {/* Square integration for CARD and QR methods */}
+                {squareCfg?.configured && (paymentMethod === 'CARD' || paymentMethod === 'QR') && !squareActive && (
+                  <div className="ca-square-panel">
+                    <div className="ca-square-header">
+                      <svg className="ca-square-logo" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                        <path d="M19 2H5C3.346 2 2 3.346 2 5v14c0 1.654 1.346 3 3 3h14c1.654 0 3-1.346 3-3V5c0-1.654-1.346-3-3-3zM8 16H8a1 1 0 01-1-1V9a1 1 0 011-1h8a1 1 0 011 1v6a1 1 0 01-1 1H8z"/>
+                      </svg>
+                      Square で決済
+                      <span className="ca-square-env">{squareCfg.environment}</span>
+                    </div>
+
+                    {paymentMethod === 'QR' ? (
+                      <button className="ca-square-btn" disabled={squarePaying || blocked} onClick={handleSquareQR}>
+                        {squarePaying ? <RefreshCw size={15} className="ca-spin" /> : <ScanLine size={15} />}
+                        QRコードを生成
+                      </button>
+                    ) : (
+                      <div className="ca-square-terminal">
+                        <div className="ca-square-mode-row">
+                          <button
+                            className={`ca-square-mode-btn${squareMode === 'terminal' ? ' is-active' : ''}`}
+                            onClick={() => { setSquareMode('terminal'); loadDevices(); }}
+                          >
+                            <Monitor size={14} /> カードリーダー
+                          </button>
+                          <button
+                            className={`ca-square-mode-btn${squareMode === 'qr' ? ' is-active' : ''}`}
+                            onClick={() => setSquareMode('qr')}
+                          >
+                            <ScanLine size={14} /> QRコード
+                          </button>
+                        </div>
+
+                        {squareMode === 'terminal' ? (
+                          squareDevices.length === 0 ? (
+                            <p className="ca-square-no-dev">
+                              ペアリング済みのSquare端末が見つかりません。Square ダッシュボードで端末を登録してください。
+                            </p>
+                          ) : (
+                            <>
+                              <select
+                                className="ca-square-device-sel"
+                                value={selectedDevice}
+                                onChange={e => setSelectedDevice(e.target.value)}
+                              >
+                                {squareDevices.map(d => (
+                                  <option key={d.id} value={d.id}>
+                                    {d.name}{d.model ? ` (${d.model})` : ''} — {d.status}
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                className="ca-square-btn"
+                                disabled={squarePaying || blocked || !selectedDevice}
+                                onClick={handleSquareTerminal}
+                              >
+                                {squarePaying ? <RefreshCw size={15} className="ca-spin" /> : <CreditCard size={15} />}
+                                端末に送信
+                              </button>
+                            </>
+                          )
+                        ) : (
+                          <button className="ca-square-btn" disabled={squarePaying || blocked} onClick={handleSquareQR}>
+                            {squarePaying ? <RefreshCw size={15} className="ca-spin" /> : <ScanLine size={15} />}
+                            QRコードを生成
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Square QR active: show QR code + polling */}
+                {squareActive?.mode === 'qr' && (
+                  <div className="ca-sq-active">
+                    <div className="ca-sq-active-head">
+                      <span>Square QR — お客様にスキャンしていただいてください</span>
+                      <button className="ca-sq-close" onClick={() => { stopSquarePoll(); setSquareActive(null); }} title="閉じる">
+                        <X size={16} />
+                      </button>
+                    </div>
+                    {squareActive.qrDataUrl ? (
+                      <img src={squareActive.qrDataUrl} alt="Square 決済QRコード" className="ca-sq-qr" />
+                    ) : (
+                      <div className="ca-sq-qr-placeholder">
+                        <RefreshCw size={24} className="ca-spin" />
+                      </div>
+                    )}
+                    <div className="ca-sq-url">
+                      <a href={squareActive.url} target="_blank" rel="noopener">{squareActive.url}</a>
+                    </div>
+                    <div className="ca-sq-waiting">
+                      <RefreshCw size={14} className="ca-spin" />
+                      お支払い待ち… (自動確認中)
+                    </div>
+                  </div>
+                )}
+
+                {/* Square Terminal active: waiting for reader */}
+                {squareActive?.mode === 'terminal' && (
+                  <div className="ca-sq-active">
+                    <div className="ca-sq-active-head">
+                      <span>Square 端末 — お客様のカードをタップしてください</span>
+                      <button className="ca-sq-close" onClick={handleSquareCancel} title="キャンセル">
+                        <X size={16} />
+                      </button>
+                    </div>
+                    <div className="ca-sq-terminal-wait">
+                      <CreditCard size={48} />
+                      <p>{squareActive.status === 'COMPLETED' ? '決済完了' : squareActive.status === 'IN_PROGRESS' ? 'カードを処理中…' : '端末で決済をお待ちください'}</p>
+                      <p className="ca-sq-status-badge is-{squareActive.status.toLowerCase()}">{squareActive.status}</p>
+                    </div>
+                    <div className="ca-sq-waiting">
+                      <RefreshCw size={14} className="ca-spin" />
+                      端末の応答を待っています…
+                    </div>
+                  </div>
+                )}
 
                 {paymentMethod === 'CASH' && (
                   <>
@@ -483,15 +789,18 @@ export default function CashDashboard() {
                   </>
                 )}
 
-                <button
-                  className="ca-confirm-btn"
-                  disabled={paying || !canPay}
-                  onClick={handlePay}
-                >
-                  {paying
-                    ? <><RefreshCw size={18} className="ca-spin" /> 処理中…</>
-                    : <><CheckCircle size={18} /> 会計完了</>}
-                </button>
+                {/* Manual confirm — hidden while Square is processing */}
+                {!squareActive && (
+                  <button
+                    className="ca-confirm-btn"
+                    disabled={paying || !canPay}
+                    onClick={handlePay}
+                  >
+                    {paying
+                      ? <><RefreshCw size={18} className="ca-spin" /> 処理中…</>
+                      : <><CheckCircle size={18} /> 会計完了</>}
+                  </button>
+                )}
 
                 {blocked && (
                   <p className="ca-pay-warn">

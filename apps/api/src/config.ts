@@ -41,4 +41,10 @@ export const config = {
   uploadDir: path.join(process.cwd(), 'public', 'uploads'),
   // Built web app (`pnpm --filter web build`). When present, the API serves the site too.
   webDistDir: path.resolve(process.env.WEB_DIST_DIR || path.join(process.cwd(), '..', 'web', 'dist')),
+  square: {
+    accessToken: process.env.SQUARE_ACCESS_TOKEN?.trim() || '',
+    locationId: process.env.SQUARE_LOCATION_ID?.trim() || '',
+    environment: (process.env.SQUARE_ENVIRONMENT?.trim() || 'sandbox') as 'sandbox' | 'production',
+    webhookSignatureKey: process.env.SQUARE_WEBHOOK_SIGNATURE_KEY?.trim() || '',
+  },
 };
