@@ -1,8 +1,6 @@
 import express from 'express';
-import { ObjectId } from 'mongodb';
 import { z } from 'zod';
 import { notFound } from '../lib/errors.js';
-import { db } from '../lib/mongo.js';
 import { prisma } from '../lib/prisma.js';
 import { idParam, optionalNumber, optionalText } from '../lib/schemas.js';
 import { requireAdmin } from '../middleware/auth.js';
@@ -24,7 +22,6 @@ const messageSchema = z.object({
     z.coerce.date().optional(),
   ),
   guests: optionalNumber(z.number().int().min(1).max(100)),
-  // Honeypot: hidden from people, filled in by bots.
   website: z.string().optional(),
 });
 
@@ -43,36 +40,34 @@ router.get('/', requireAdmin, async (_req, res) => {
 router.post('/', contactLimiter, async (req, res) => {
   const { website, ...input } = messageSchema.parse(req.body);
   if (website) {
-    // Pretend success so bots don't learn they were filtered.
     res.status(201).json({ success: true });
     return;
   }
 
-  const now = new Date();
-  const message = {
-    _id: new ObjectId(),
-    name: input.name,
-    email: input.email,
-    phone: input.phone ?? '',
-    type: input.type,
-    message: input.message,
-    date: input.date ?? null,
-    guests: input.guests ?? null,
-    isRead: false,
-    ip: req.ip ?? null,
-    createdAt: now,
-    updatedAt: now,
-  };
-  await db().collection('ContactMessage').insertOne(message);
-  res.status(201).json({ success: true, id: message._id.toHexString() });
+  const message = await prisma.contactMessage.create({
+    data: {
+      name: input.name,
+      email: input.email,
+      phone: input.phone ?? '',
+      type: input.type as 'GENERAL' | 'RESERVATION' | 'CATERING' | 'FEEDBACK',
+      message: input.message,
+      date: input.date ?? null,
+      guests: input.guests ?? null,
+      isRead: false,
+      ip: req.ip ?? null,
+    },
+  });
+  res.status(201).json({ success: true, id: message.id });
 });
 
 router.put('/:id', requireAdmin, async (req, res) => {
+  const id = idParam(req.params);
   const { isRead } = z.object({ isRead: z.boolean() }).parse(req.body);
-  const result = await db()
-    .collection('ContactMessage')
-    .updateOne({ _id: idParam(req.params) }, { $set: { isRead, updatedAt: new Date() } });
-  if (result.matchedCount === 0) throw notFound('Message');
+  try {
+    await prisma.contactMessage.update({ where: { id }, data: { isRead } });
+  } catch {
+    throw notFound('Message');
+  }
   res.json({ success: true });
 });
 

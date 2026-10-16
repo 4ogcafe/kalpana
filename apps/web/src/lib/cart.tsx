@@ -3,11 +3,20 @@ import { CartContext, MAX_QUANTITY, type CartLine, type CartValue } from './cart
 
 const STORAGE_KEY = 'kalpana_cart';
 
-// Storage can be unavailable (private mode, blocked cookies); the cart then just lasts for the visit.
+function cartKeyFor(id: string, options?: CartLine['options']): string {
+  if (!options?.length) return id;
+  const sorted = [...options].sort((a, b) => a.groupId.localeCompare(b.groupId));
+  return id + '|' + sorted.map(o => `${o.groupId}:${o.optionId}`).join(',');
+}
+
 function loadLines(): CartLine[] {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]');
-    return Array.isArray(stored) ? stored.filter((line) => typeof line?.id === 'string' && line.quantity > 0) : [];
+    if (!Array.isArray(stored)) return [];
+    return stored.filter((line) => typeof line?.id === 'string' && line.quantity > 0).map(line => ({
+      ...line,
+      cartKey: line.cartKey ?? line.id,
+    }));
   } catch {
     return [];
   }
@@ -26,27 +35,28 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const [isOpen, setIsOpen] = useState(false);
 
-  const add = useCallback((line: Omit<CartLine, 'quantity'>, quantity = 1) => {
+  const add = useCallback((line: Omit<CartLine, 'quantity' | 'cartKey'>, quantity = 1) => {
+    const cartKey = cartKeyFor(line.id, line.options);
     setLines((prev) => {
-      const existing = prev.find((candidate) => candidate.id === line.id);
-      if (!existing) return [...prev, { ...line, quantity: Math.min(quantity, MAX_QUANTITY) }];
-      return prev.map((candidate) =>
-        candidate.id === line.id ? { ...candidate, quantity: Math.min(candidate.quantity + quantity, MAX_QUANTITY) } : candidate,
+      const existing = prev.find((c) => c.cartKey === cartKey);
+      if (!existing) return [...prev, { ...line, cartKey, quantity: Math.min(quantity, MAX_QUANTITY) }];
+      return prev.map((c) =>
+        c.cartKey === cartKey ? { ...c, quantity: Math.min(c.quantity + quantity, MAX_QUANTITY) } : c,
       );
     });
   }, []);
 
-  const setQuantity = useCallback((id: string, quantity: number) => {
+  const setQuantity = useCallback((cartKey: string, quantity: number) => {
     setLines((prev) =>
       quantity <= 0
-        ? prev.filter((line) => line.id !== id)
-        : prev.map((line) => (line.id === id ? { ...line, quantity: Math.min(quantity, MAX_QUANTITY) } : line)),
+        ? prev.filter((line) => line.cartKey !== cartKey)
+        : prev.map((line) => (line.cartKey === cartKey ? { ...line, quantity: Math.min(quantity, MAX_QUANTITY) } : line)),
     );
   }, []);
 
-  const remove = useCallback((id: string) => setLines((prev) => prev.filter((line) => line.id !== id)), []);
+  const remove = useCallback((cartKey: string) => setLines((prev) => prev.filter((line) => line.cartKey !== cartKey)), []);
   const clear = useCallback(() => setLines([]), []);
-  const removeMany = useCallback((ids: string[]) => setLines((prev) => prev.filter((line) => !ids.includes(line.id))), []);
+  const removeMany = useCallback((itemIds: string[]) => setLines((prev) => prev.filter((line) => !itemIds.includes(line.id))), []);
   const openCart = useCallback(() => setIsOpen(true), []);
   const closeCart = useCallback(() => setIsOpen(false), []);
 

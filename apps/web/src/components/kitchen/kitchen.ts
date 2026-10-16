@@ -23,8 +23,7 @@ export interface KitchenOrder {
   id: string;
   number: number;
   status: KitchenStatus;
-  fulfillment?: 'PICKUP' | 'DELIVERY' | 'DINE_IN';
-  tableNumber?: string | null;
+  fulfillment?: 'PICKUP' | 'DELIVERY';
   customerName: string;
   phone: string;
   note: string | null;
@@ -65,10 +64,9 @@ export const COLUMNS: { status: ActiveStatus; title: string; sub: string }[] = [
 export const SOON_MINUTES = 15;
 
 export const isDelivery = (order: KitchenOrder) => order.fulfillment === 'DELIVERY';
-export const isDineIn = (order: KitchenOrder) => order.fulfillment === 'DINE_IN';
 
-/** "🍽 Table 5", "🛵 Delivery" or "🛍 Pickup". */
-export const typeLabel = (order: KitchenOrder) => (isDineIn(order) ? `🍽 Table ${order.tableNumber ?? '?'}` : isDelivery(order) ? '🛵 Delivery' : '🛍 Pickup');
+/** "🛵 Delivery" or "🛍 Pickup". */
+export const typeLabel = (order: KitchenOrder) => (isDelivery(order) ? '🛵 Delivery' : '🛍 Pickup');
 
 export const clockTime = (iso: string | Date) =>
   new Date(iso).toLocaleTimeString('ja-JP', { timeZone: TIMEZONE, hour: '2-digit', minute: '2-digit' });
@@ -105,8 +103,8 @@ export function countdown(order: KitchenOrder, now: number): string {
 /** The one forward step for each column, worded for pickup or delivery. */
 export function nextAction(order: KitchenOrder): { status: KitchenStatus; label: string } | null {
   if (order.status === 'NEW') return { status: 'CONFIRMED', label: 'Start cooking' };
-  if (order.status === 'CONFIRMED') return { status: 'READY', label: isDineIn(order) ? 'Ready to serve' : isDelivery(order) ? 'Ready for rider' : 'Ready' };
-  if (order.status === 'READY') return { status: 'COMPLETED', label: isDineIn(order) ? 'Served' : isDelivery(order) ? 'Delivered' : 'Picked up' };
+  if (order.status === 'CONFIRMED') return { status: 'READY', label: isDelivery(order) ? 'Ready for rider' : 'Ready' };
+  if (order.status === 'READY') return { status: 'COMPLETED', label: isDelivery(order) ? 'Delivered' : 'Picked up' };
   return null;
 }
 
@@ -145,7 +143,7 @@ export function ticketHtml(order: KitchenOrder, allergyLine: string | null): str
     .box { border: 2px solid #000; padding: 4px 6px; margin: 6px 0; font-weight: 700; } small { font-size: 12px; } p { margin: 2px 0; font-size: 14px; }
   </style></head><body>
     <h1>#${String(order.number).padStart(3, '0')}</h1>
-    <div class="type">${isDineIn(order) ? `TABLE ${escapeHtml(order.tableNumber ?? '?')} 店内` : isDelivery(order) ? 'DELIVERY デリバリー' : 'PICKUP お持ち帰り'}</div>
+    <div class="type">${isDelivery(order) ? 'DELIVERY デリバリー' : 'PICKUP お持ち帰り'}</div>
     <p><b>Due: ${escapeHtml(due)}</b></p>
     <p>${escapeHtml(order.customerName)} · ${escapeHtml(order.phone)}</p>
     ${address ? `<p>${escapeHtml(address)}</p>` : ''}

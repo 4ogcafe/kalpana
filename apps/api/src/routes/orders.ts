@@ -1,12 +1,10 @@
 import crypto from 'node:crypto';
 import express from 'express';
-import { ObjectId } from 'mongodb';
 import { z } from 'zod';
 import { config } from '../config.js';
 import { AppError, notFound } from '../lib/errors.js';
 import { dietaryAlert } from '../lib/customer-profile.js';
 import { earnedPoints, loyaltyConfig } from '../lib/loyalty.js';
-import { db } from '../lib/mongo.js';
 import { FULFILLMENTS, deliveryAddressSchema, fulfillmentOptions, isEnabled, isInDeliveryArea, pausedUntil, slotsFor } from '../lib/fulfillment.js';
 import { localDateKey } from '../lib/pickup.js';
 import { idParam, objectIdString, optionalText } from '../lib/schemas.js';
@@ -19,6 +17,10 @@ import { loadSettings } from '../services/settings-store.js';
 import { awardStamp, releaseReward, useReward } from '../services/stamps.js';
 import { notifyOrderReady } from '../services/push.js';
 import { stampAmount } from '../lib/stamps.js';
+import { prisma } from '../lib/prisma.js';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = prisma as any;
 
 const router = express.Router();
 
@@ -72,13 +74,6 @@ const orderSchema = z.object({
 });
 
 const statusSchema = z.object({ status: z.enum(ORDER_STATUSES) });
-// NEW is never a target status (nothing moves back to it), so it has no time field.
-const STATUS_TIME_FIELD: Record<Exclude<OrderStatus, 'NEW'>, string> = {
-  CONFIRMED: 'confirmedAt',
-  READY: 'readyAt',
-  COMPLETED: 'completedAt',
-  CANCELLED: 'cancelledAt',
-};
 const listQuerySchema = z.object({ scope: z.enum(['active', 'history']).default('active') });
 
 const orderLimiter = rateLimit({
@@ -89,10 +84,13 @@ const orderLimiter = rateLimit({
 
 /** Short daily order numbers (1, 2, 3…) that staff can call out at the counter. */
 async function nextOrderNumber(dateKey: string): Promise<number> {
-  const counter = await db()
-    .collection<{ _id: string; seq: number }>('OrderCounter')
-    .findOneAndUpdate({ _id: dateKey }, { $inc: { seq: 1 } }, { upsert: true, returnDocument: 'after' });
-  return counter?.seq ?? 1;
+  // Atomic upsert: creates the counter row if missing (seq=1) or increments it.
+  const result = await prisma.orderCounter.upsert({
+    where: { id: dateKey },
+    update: { seq: { increment: 1 } },
+    create: { id: dateKey, seq: 1 },
+  });
+  return (result as { seq: number }).seq;
 }
 
 // ---- Public --------------------------------------------------------------
@@ -107,7 +105,6 @@ router.get('/slots', async (req, res) => {
   const fulfillment = type === 'delivery' ? 'DELIVERY' : 'PICKUP';
   res.setHeader('Cache-Control', 'no-store');
   res.json({
-    // `enabled` is true when customers can order online at all (pickup, delivery or both).
     enabled: options.pickup.enabled || options.delivery.enabled,
     note: options.pickup.note,
     ...options,
@@ -122,8 +119,8 @@ router.post('/quote', optionalCustomer, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.json({
     ...quote.breakdown,
-    offer: quote.offer && { id: quote.offer.id.toHexString(), titleJa: quote.offer.titleJa },
-    reward: quote.reward && { id: quote.reward.id.toHexString(), titleJa: quote.reward.titleJa, kind: quote.reward.kind },
+    offer: quote.offer && { id: quote.offer.id, titleJa: quote.offer.titleJa },
+    reward: quote.reward && { id: quote.reward.id, titleJa: quote.reward.titleJa, kind: quote.reward.kind },
   });
 });
 
@@ -131,7 +128,6 @@ router.post('/quote', optionalCustomer, async (req, res) => {
 router.post('/', orderLimiter, requireCustomer, async (req, res) => {
   const { website, ...input } = orderSchema.parse(req.body);
   if (website) {
-    // Pretend success so bots don't learn they were filtered.
     res.status(201).json({ token: crypto.randomBytes(TOKEN_BYTES).toString('base64url') });
     return;
   }
@@ -162,12 +158,11 @@ router.post('/', orderLimiter, requireCustomer, async (req, res) => {
   if (breakdown.minOrderShortfall > 0) {
     throw new AppError(409, 'BELOW_MINIMUM', `デリバリーは¥${(settings.deliveryMinOrder ?? 0).toLocaleString('ja-JP')}以上のご注文で承ります。`);
   }
-  const orderId = new ObjectId();
+
+  const orderId = crypto.randomUUID();
   const dateKey = localDateKey(pickupAt, settings.timezone);
   const number = await nextOrderNumber(dateKey);
 
-  // A stamp reward and points are taken when the order is placed (and given back if it is cancelled),
-  // so they can't be used twice.
   if (customerId && reward && !(await useReward(reward.id, customerId, { orderId, orderNumber: number }))) {
     throw new AppError(409, 'REWARD_UNAVAILABLE', 'このスタンプ特典はすでにご利用済みです。');
   }
@@ -179,40 +174,39 @@ router.post('/', orderLimiter, requireCustomer, async (req, res) => {
     }
   }
 
-  const now = new Date();
-  const order = {
-    _id: orderId,
-    number,
-    dateKey,
-    token: crypto.randomBytes(TOKEN_BYTES).toString('base64url'),
-    status: 'NEW' as OrderStatus,
-    fulfillment: input.fulfillment,
-    deliveryAddress: isDelivery ? input.deliveryAddress : null,
-    deliveryFee: breakdown.deliveryFee,
-    customerName: input.name,
-    phone: input.phone,
-    email: input.email || null,
-    note: input.note || null,
-    pickupAt,
-    items: lines,
-    customerId: customerId ?? null,
-    subtotal: breakdown.subtotal,
-    offer,
-    reward,
-    pointsUsed: breakdown.pointsUsed,
-    pointsDiscount: breakdown.pointsDiscount,
-    total: breakdown.total,
-    taxRate: breakdown.taxRate,
-    tax: breakdown.tax,
-    grandTotal: breakdown.grandTotal,
-    pointsEarned: 0,
-    stampAwarded: false,
-    ip: req.ip ?? null,
-    createdAt: now,
-    updatedAt: now,
-  };
+  const token = crypto.randomBytes(TOKEN_BYTES).toString('base64url');
   try {
-    await db().collection('PickupOrder').insertOne(order);
+    await db.pickupOrder.create({
+      data: {
+        id: orderId,
+        number,
+        dateKey,
+        token,
+        status: 'NEW',
+        fulfillment: input.fulfillment,
+        deliveryAddress: isDelivery ? input.deliveryAddress : null,
+        deliveryFee: breakdown.deliveryFee,
+        customerName: input.name,
+        phone: input.phone,
+        email: input.email || null,
+        note: input.note || null,
+        pickupAt,
+        items: lines,
+        customerId: customerId ?? null,
+        subtotal: breakdown.subtotal,
+        offer: offer ?? null,
+        reward: reward ?? null,
+        pointsUsed: breakdown.pointsUsed,
+        pointsDiscount: breakdown.pointsDiscount,
+        total: breakdown.total,
+        taxRate: breakdown.taxRate,
+        tax: breakdown.tax,
+        grandTotal: breakdown.grandTotal,
+        pointsEarned: 0,
+        stampAwarded: false,
+        ip: req.ip ?? null,
+      },
+    });
   } catch (err) {
     if (customerId && breakdown.pointsUsed > 0) {
       await changePoints(customerId, breakdown.pointsUsed, 'REFUND', { orderId, orderNumber: number, note: 'Order could not be saved' });
@@ -220,14 +214,14 @@ router.post('/', orderLimiter, requireCustomer, async (req, res) => {
     if (reward) await releaseReward(orderId);
     throw err;
   }
-  res.status(201).json({ token: order.token, number: order.number, total: order.total, tax: order.tax, grandTotal: order.grandTotal, pickupAt: order.pickupAt });
+  res.status(201).json({ token, number, total: breakdown.total, tax: breakdown.tax, grandTotal: breakdown.grandTotal, pickupAt });
 });
 
 /** The customer's status page. The unguessable token is the only key, so order ids can't be enumerated. */
 router.get('/track/:token', async (req, res) => {
   const token = req.params.token;
   if (!TOKEN_PATTERN.test(token)) throw notFound('Order');
-  const order = await db().collection('PickupOrder').findOne({ token });
+  const order = await db.pickupOrder.findFirst({ where: { token } });
   if (!order) throw notFound('Order');
 
   res.setHeader('Cache-Control', 'no-store');
@@ -236,8 +230,8 @@ router.get('/track/:token', async (req, res) => {
     status: order.status,
     customerName: order.customerName,
     pickupAt: order.pickupAt,
-    items: order.items.map((line: OrderLine) => ({ nameEn: line.nameEn, nameJa: line.nameJa, quantity: line.quantity, lineTotal: line.lineTotal })),
-    ...pricingSummary(order),
+    items: (order.items as OrderLine[]).map((line) => ({ nameEn: line.nameEn, nameJa: line.nameJa, quantity: line.quantity, lineTotal: line.lineTotal })),
+    ...pricingSummary(order as unknown as Record<string, unknown>),
     isMember: Boolean(order.customerId),
     createdAt: order.createdAt,
   });
@@ -248,29 +242,26 @@ router.get('/track/:token', async (req, res) => {
 router.get('/', requireKitchen, async (req, res) => {
   const { scope } = listQuerySchema.parse(req.query);
   const active = scope === 'active';
-  const orders = await db()
-    .collection('PickupOrder')
-    .find(
-      { status: active ? { $in: ACTIVE_STATUSES } : { $nin: ACTIVE_STATUSES } },
-      { projection: { token: 0, ip: 0 } },
-    )
-    .sort({ pickupAt: active ? 1 : -1 })
-    .limit(active ? 0 : HISTORY_LIMIT)
-    .toArray();
+  const orders = await db.pickupOrder.findMany({
+    where: { status: active ? { in: ACTIVE_STATUSES } : { notIn: ACTIVE_STATUSES } },
+    orderBy: { pickupAt: active ? 'asc' : 'desc' },
+    ...(active ? {} : { take: HISTORY_LIMIT }),
+  });
 
   res.setHeader('Cache-Control', 'no-store');
-  res.json(await withDietaryAlerts(orders));
+  res.json(await withDietaryAlerts((orders as Record<string, unknown>[]).map(({ token: _t, ip: _ip, ...o }) => o)));
 });
 
 /** The kitchen sees each member's allergies and dietary needs on their orders. */
 async function withDietaryAlerts(orders: Record<string, unknown>[]) {
-  const memberIds = [...new Set(orders.map((order) => order.customerId).filter((id): id is ObjectId => id instanceof ObjectId))];
-  const members = await db().collection('Customer').find({ _id: { $in: memberIds } }, { projection: { preferences: 1 } }).toArray();
-  const alerts = new Map(members.map((member) => [member._id.toHexString(), dietaryAlert(member)]));
-  return orders.map(({ _id, ...order }) => ({
-    id: (_id as ObjectId).toHexString(),
+  const memberIds = [...new Set(orders.map((o) => o.customerId).filter((id): id is string => typeof id === 'string' && id.length > 0))];
+  const members = memberIds.length > 0
+    ? await prisma.customer.findMany({ where: { id: { in: memberIds } }, select: { id: true, preferences: true } })
+    : [];
+  const alerts = new Map(members.map((m) => [m.id, dietaryAlert(m as unknown as Record<string, unknown>)]));
+  return orders.map((order) => ({
     ...order,
-    dietaryAlert: order.customerId instanceof ObjectId ? (alerts.get(order.customerId.toHexString()) ?? null) : null,
+    dietaryAlert: typeof order.customerId === 'string' ? (alerts.get(order.customerId) ?? null) : null,
   }));
 }
 
@@ -279,7 +270,6 @@ async function withDietaryAlerts(orders: Record<string, unknown>[]) {
 const KITCHEN_DONE_LIMIT = 40;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_PAUSE_MINUTES = 4 * 60;
-const KITCHEN_PROJECTION = { token: 0, ip: 0, email: 0 };
 const pauseSchema = z.object({ minutes: z.number().int().min(0).max(MAX_PAUSE_MINUTES) });
 const itemDoneSchema = z.object({ done: z.boolean() });
 
@@ -288,83 +278,103 @@ router.get('/kitchen', requireKitchen, async (_req, res) => {
   const settings = await loadSettings();
   const now = new Date();
   const today = localDateKey(now, settings.timezone);
-  const orders = db().collection('PickupOrder');
-  const [active, done, todayOrders] = await Promise.all([
-    orders.find({ status: { $in: ACTIVE_STATUSES } }, { projection: KITCHEN_PROJECTION }).sort({ pickupAt: 1 }).toArray(),
-    // "Done today" goes by when the order was finished (not its pickup date), in the restaurant's timezone.
-    orders
-      .find({ status: { $in: ['COMPLETED', 'CANCELLED'] }, updatedAt: { $gte: new Date(now.getTime() - DAY_MS) } }, { projection: KITCHEN_PROJECTION })
-      .sort({ updatedAt: -1 })
-      .limit(KITCHEN_DONE_LIMIT)
-      .toArray()
-      .then((finished) => finished.filter((order) => localDateKey(order.updatedAt, settings.timezone) === today)),
-    orders
-      .find(
-        { $or: [{ createdAt: { $gte: new Date(now.getTime() - DAY_MS) } }, { updatedAt: { $gte: new Date(now.getTime() - DAY_MS) } }] },
-        { projection: { status: 1, createdAt: 1, updatedAt: 1, confirmedAt: 1, readyAt: 1, completedAt: 1, cancelledAt: 1, items: 1 } },
-      )
-      .toArray(),
-  ]);
+  const cutoff = new Date(now.getTime() - DAY_MS);
 
-  // Each figure counts what happened today (in the restaurant's timezone), whatever the pickup date.
+  const [active, finishedRecent, todayOrders] = await Promise.all([
+    db.pickupOrder.findMany({ where: { status: { in: ACTIVE_STATUSES } }, orderBy: { pickupAt: 'asc' } }),
+    db.pickupOrder.findMany({
+      where: { status: { in: ['COMPLETED', 'CANCELLED'] }, updatedAt: { gte: cutoff } },
+      orderBy: { updatedAt: 'desc' },
+      take: KITCHEN_DONE_LIMIT,
+    }),
+    db.pickupOrder.findMany({
+      where: { OR: [{ createdAt: { gte: cutoff } }, { updatedAt: { gte: cutoff } }] },
+      select: { status: true, createdAt: true, updatedAt: true, confirmedAt: true, readyAt: true, completedAt: true, cancelledAt: true, items: true },
+    }),
+  ]) as [Record<string, unknown>[], Record<string, unknown>[], Record<string, unknown>[]];
+
+  const done = (finishedRecent as Record<string, unknown>[]).filter((o) => localDateKey(o.updatedAt as Date, settings.timezone) === today);
+
   const isToday = (value: unknown) => value instanceof Date && localDateKey(value, settings.timezone) === today;
-  const received = todayOrders.filter((order) => isToday(order.createdAt) && order.status !== 'CANCELLED');
-  // Prep time: from accepting the order to marking it ready.
+  const received = todayOrders.filter((o) => isToday(o.createdAt) && o.status !== 'CANCELLED');
   const prepMinutes = todayOrders
-    .filter((order) => order.confirmedAt instanceof Date && isToday(order.readyAt))
-    .map((order) => (order.readyAt.getTime() - order.confirmedAt.getTime()) / 60_000);
+    .filter((o) => o.confirmedAt instanceof Date && isToday(o.readyAt))
+    .map((o) => ((o.readyAt as Date).getTime() - (o.confirmedAt as Date).getTime()) / 60_000);
+
+  const stripPrivate = (o: Record<string, unknown>) => {
+    const { token: _t, ip: _i, email: _e, ...rest } = o;
+    return rest;
+  };
 
   res.setHeader('Cache-Control', 'no-store');
   res.json({
     serverTime: now,
     pausedUntil: pausedUntil(settings, now),
     ordering: fulfillmentOptions(settings),
-    active: await withDietaryAlerts(active),
-    done: await withDietaryAlerts(done),
+    active: await withDietaryAlerts((active as Record<string, unknown>[]).map(stripPrivate)),
+    done: await withDietaryAlerts(done.map(stripPrivate)),
     stats: {
       ordersToday: received.length,
-      completedToday: todayOrders.filter((order) => order.status === 'COMPLETED' && isToday(order.completedAt ?? order.updatedAt)).length,
-      cancelledToday: todayOrders.filter((order) => order.status === 'CANCELLED' && isToday(order.cancelledAt ?? order.updatedAt)).length,
-      itemsToday: received.reduce((sum, order) => sum + (order.items as OrderLine[]).reduce((n, line) => n + line.quantity, 0), 0),
+      completedToday: todayOrders.filter((o) => o.status === 'COMPLETED' && isToday(o.completedAt ?? o.updatedAt)).length,
+      cancelledToday: todayOrders.filter((o) => o.status === 'CANCELLED' && isToday(o.cancelledAt ?? o.updatedAt)).length,
+      itemsToday: received.reduce((sum, o) => sum + (o.items as { quantity: number }[]).reduce((n, line) => n + line.quantity, 0), 0),
       avgPrepMinutes: prepMinutes.length ? Math.round(prepMinutes.reduce((a, b) => a + b, 0) / prepMinutes.length) : null,
     },
   });
 });
 
-/** "Too busy": stop new online orders for a while (0 resumes now). Orders already placed are not affected. */
+/** "Too busy": stop new online orders for a while (0 resumes now). */
 router.post('/kitchen/pause', requireKitchen, async (req, res) => {
   const { minutes } = pauseSchema.parse(req.body);
   const until = minutes > 0 ? new Date(Date.now() + minutes * 60_000) : null;
-  const settingsCollection = db().collection('Settings');
-  const existing = await settingsCollection.findOne({}, { projection: { _id: 1 } });
-  if (existing) await settingsCollection.updateOne({ _id: existing._id }, { $set: { orderingPausedUntil: until, updatedAt: new Date() } });
-  else await settingsCollection.insertOne({ _id: new ObjectId(), orderingPausedUntil: until, updatedAt: new Date() });
+  const existing = await prisma.settings.findFirst({ select: { id: true } });
+  if (existing) {
+    await db.settings.update({ where: { id: existing.id }, data: { orderingPausedUntil: until } });
+  }
 
-  await db().collection('AuditLog').insertOne({
-    _id: new ObjectId(),
-    userId: new ObjectId(req.user!.id),
-    action: 'ordering.pause',
-    entity: 'Settings',
-    entityId: 'ordering',
-    diff: { minutes, until },
-    createdAt: new Date(),
+  await prisma.auditLog.create({
+    data: {
+      userId: req.user!.id,
+      action: 'ordering.pause',
+      entity: 'Settings',
+      entityId: 'ordering',
+      diff: { minutes, until },
+    },
   });
   res.json({ pausedUntil: until });
 });
 
-/** Ticks one dish off (or back on) while an order is being prepared; shared by every kitchen screen. */
+/** Ticks one dish off (or back on) while an order is being prepared. */
 router.patch('/:id/items/:index', requireKitchen, async (req, res) => {
   const id = idParam(req.params);
   const index = Number(req.params.index);
   if (!Number.isInteger(index) || index < 0 || index >= MAX_LINES) throw notFound('Order line');
   const { done } = itemDoneSchema.parse(req.body);
-  const result = await db()
-    .collection('PickupOrder')
-    .updateOne(
-      { _id: id, status: { $in: ACTIVE_STATUSES }, [`items.${index}`]: { $exists: true } },
-      { $set: { [`items.${index}.doneAt`]: done ? new Date() : null, updatedAt: new Date() } },
-    );
-  if (result.matchedCount === 0) throw notFound('Order line');
+
+  // Update the JSON array item using MySQL JSON_SET / JSON_REMOVE.
+  let count: number;
+  if (done) {
+    const isoNow = new Date().toISOString();
+    count = Number(await db.$executeRaw`
+      UPDATE \`PickupOrder\`
+      SET items = JSON_SET(items, CONCAT('$[', ${index}, '].doneAt'), ${isoNow}),
+          updatedAt = UTC_TIMESTAMP()
+      WHERE id = ${id}
+        AND status IN ('NEW', 'CONFIRMED', 'READY')
+        AND JSON_LENGTH(items) > ${index}
+    `);
+  } else {
+    count = Number(await db.$executeRaw`
+      UPDATE \`PickupOrder\`
+      SET items = JSON_REMOVE(items, CONCAT('$[', ${index}, '].doneAt')),
+          updatedAt = UTC_TIMESTAMP()
+      WHERE id = ${id}
+        AND status IN ('NEW', 'CONFIRMED', 'READY')
+        AND JSON_LENGTH(items) > ${index}
+    `);
+  }
+
+  if (count === 0) throw notFound('Order line');
   res.json({ success: true });
 });
 
@@ -373,76 +383,76 @@ router.patch('/:id/status', requireKitchen, async (req, res) => {
   const { status } = statusSchema.parse(req.body);
   const allowedFrom = ORDER_STATUSES.filter((from) => NEXT_STATUSES[from].includes(status));
 
-  // The status filter makes the check and the write one atomic step, so two staff can't race.
-  const before = await db()
-    .collection('PickupOrder')
-    .findOneAndUpdate(
-      { _id: id, status: { $in: allowedFrom } },
-      // Each step's time is kept for the kitchen timers; going back to CONFIRMED clears "ready".
-      {
-        $set: {
-          status,
-          updatedAt: new Date(),
-          ...(status !== 'NEW' ? { [STATUS_TIME_FIELD[status]]: new Date() } : {}),
-          ...(status === 'CONFIRMED' ? { readyAt: null } : {}),
-        },
-      },
-    );
+  // Fetch current state before updating.
+  const before = await db.pickupOrder.findUnique({
+    where: { id },
+    select: { id: true, status: true, customerId: true, pointsUsed: true, reward: true, confirmedAt: true, number: true, total: true },
+  }) as Record<string, unknown> | null;
 
-  if (!before) {
-    const exists = await db().collection('PickupOrder').findOne({ _id: id }, { projection: { status: 1 } });
-    if (!exists) throw notFound('Order');
-    throw new AppError(409, 'INVALID_STATUS_CHANGE', `Cannot change an order from ${exists.status} to ${status}`);
+  if (!before) throw notFound('Order');
+  if (!allowedFrom.includes(before.status as OrderStatus)) {
+    throw new AppError(409, 'INVALID_STATUS_CHANGE', `Cannot change an order from ${before.status} to ${status}`);
   }
 
-  // Sent back from "ready" to the kitchen: the prep timer keeps counting from when it was first accepted.
+  // Build the update — each step's timestamp is recorded for kitchen timers.
+  const updateData: Record<string, unknown> = { status, updatedAt: new Date() };
+  if (status === 'CONFIRMED') { updateData.confirmedAt = new Date(); updateData.readyAt = null; }
+  else if (status === 'READY') updateData.readyAt = new Date();
+  else if (status === 'COMPLETED') updateData.completedAt = new Date();
+  else if (status === 'CANCELLED') updateData.cancelledAt = new Date();
+
+  await db.pickupOrder.update({ where: { id }, data: updateData });
+
+  // Sent back from "ready" to the kitchen: keep the original confirmed time so the prep timer is continuous.
   if (before.status === 'READY' && status === 'CONFIRMED' && before.confirmedAt) {
-    await db().collection('PickupOrder').updateOne({ _id: id }, { $set: { confirmedAt: before.confirmedAt } });
+    await db.pickupOrder.update({ where: { id }, data: { confirmedAt: before.confirmedAt } });
   }
+
   await settleMemberPoints(before, status);
   const stamp = await settleMemberStamp(before, status);
-  // "Your food is ready": a notification to the customer's phone, sent in the background.
   if (status === 'READY') void notifyOrderReady(before);
 
-  await db().collection('AuditLog').insertOne({
-    _id: new ObjectId(),
-    userId: new ObjectId(req.user?.id),
-    action: 'order.status',
-    entity: 'PickupOrder',
-    entityId: id.toHexString(),
-    diff: { from: before.status, to: status },
-    createdAt: new Date(),
+  await prisma.auditLog.create({
+    data: {
+      userId: req.user?.id ?? 'system',
+      action: 'order.status',
+      entity: 'PickupOrder',
+      entityId: id,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      diff: { from: String(before.status), to: status } as any,
+    },
   });
   res.json({ success: true, status, stamp });
 });
 
 /** Members earn points when an order is picked up, and get spent points back when it is cancelled. */
 async function settleMemberPoints(order: Record<string, unknown>, status: OrderStatus) {
-  const customerId = order.customerId;
-  if (!(customerId instanceof ObjectId)) return;
-  const meta = { orderId: order._id as ObjectId, orderNumber: Number(order.number) };
+  const customerId = typeof order.customerId === 'string' ? order.customerId : null;
+  if (!customerId) return;
+  const orderId = String(order.id);
+  const orderNumber = Number(order.number);
 
   if (status === 'COMPLETED') {
     const points = earnedPoints(Number(order.total) || 0, loyaltyConfig(await loadSettings()));
     if (points > 0) {
-      await changePoints(customerId, points, 'EARN', meta);
-      await db().collection('PickupOrder').updateOne({ _id: meta.orderId }, { $set: { pointsEarned: points } });
+      await changePoints(customerId, points, 'EARN', { orderId, orderNumber });
+      await db.pickupOrder.update({ where: { id: orderId }, data: { pointsEarned: points } });
     }
   }
   const pointsUsed = Number(order.pointsUsed) || 0;
   if (status === 'CANCELLED' && pointsUsed > 0) {
-    await changePoints(customerId, pointsUsed, 'REFUND', meta);
+    await changePoints(customerId, pointsUsed, 'REFUND', { orderId, orderNumber });
   }
-  if (status === 'CANCELLED' && order.reward) await releaseReward(meta.orderId);
+  if (status === 'CANCELLED' && order.reward) await releaseReward(orderId);
 }
 
 /** A completed member order earns a stamp when it is large enough and the last stamp was long enough ago. */
 async function settleMemberStamp(order: Record<string, unknown>, status: OrderStatus) {
-  const customerId = order.customerId;
-  if (status !== 'COMPLETED' || !(customerId instanceof ObjectId)) return null;
-  const orderId = order._id as ObjectId;
+  const customerId = typeof order.customerId === 'string' ? order.customerId : null;
+  if (status !== 'COMPLETED' || !customerId) return null;
+  const orderId = String(order.id);
   const result = await awardStamp(customerId, { source: 'ORDER', amount: stampAmount(order), orderId, orderNumber: Number(order.number) });
-  if (result.status === 'AWARDED') await db().collection('PickupOrder').updateOne({ _id: orderId }, { $set: { stampAwarded: true } });
+  if (result.status === 'AWARDED') await db.pickupOrder.update({ where: { id: orderId }, data: { stampAwarded: true } });
   return result;
 }
 

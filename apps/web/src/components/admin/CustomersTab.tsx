@@ -91,7 +91,7 @@ export default function CustomersTab({ intent }: { intent?: TabIntent | null }) 
                 <tr key={c.id} style={{ borderTop: '1px solid #e5e7eb' }}>
                   <td style={{ ...cellStyle, fontWeight: 600 }}>
                     <button type="button" onClick={() => setViewing(c)} style={{ all: 'unset', cursor: 'pointer', color: '#1d4ed8', textDecoration: 'underline', whiteSpace: 'nowrap' }}>{c.name}</button>
-                    {(c.preferences.allergens.length > 0 || c.preferences.otherAllergies) && <span title="Has allergies" style={{ marginLeft: '6px' }}>⚠</span>}
+                    {((c.preferences?.allergens?.length ?? 0) > 0 || c.preferences?.otherAllergies) && <span title="Has allergies" style={{ marginLeft: '6px' }}>⚠</span>}
                   </td>
                   <td style={cellStyle}>{c.email}<div style={{ color: '#6b7280' }}>{c.phone || '—'}</div></td>
                   <td style={cellStyle}>{new Date(c.createdAt).toLocaleDateString('ja-JP')}</td>

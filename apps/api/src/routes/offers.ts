@@ -1,9 +1,8 @@
 import express from 'express';
-import { ObjectId } from 'mongodb';
 import { z } from 'zod';
 import { notFound } from '../lib/errors.js';
 import { isOfferLive, type OfferRule } from '../lib/loyalty.js';
-import { db } from '../lib/mongo.js';
+import { prisma } from '../lib/prisma.js';
 import { idParam, imageUrl, optionalText } from '../lib/schemas.js';
 import { requireAdmin } from '../middleware/auth.js';
 
@@ -39,77 +38,111 @@ const offerSchema = z
     path: ['endsAt'],
   });
 
-const toJson = ({ _id, ...offer }: Record<string, unknown>) => ({ id: String(_id), ...offer });
-
-async function audit(userId: string | undefined, action: string, entityId: ObjectId, diff: unknown) {
-  await db().collection('AuditLog').insertOne({
-    _id: new ObjectId(),
-    userId: new ObjectId(userId),
-    action,
-    entity: 'Offer',
-    entityId: entityId.toHexString(),
-    diff,
-    createdAt: new Date(),
+async function audit(userId: string | undefined, action: string, entityId: string, diff: unknown) {
+  if (!userId) return;
+  await prisma.auditLog.create({
+    data: { userId, action, entity: 'Offer', entityId, diff: diff as object ?? {} },
   });
 }
 
-/** Live member offers, for the public site to advertise. Using one still requires a member login. */
+const serializeOffer = (offer: Record<string, unknown>) => ({
+  id: String(offer.id),
+  titleJa: offer.titleJa,
+  descriptionJa: offer.descriptionJa ?? '',
+  imageUrl: offer.imageUrl ?? '',
+  discountType: offer.discountType,
+  discountValue: offer.discountValue,
+  minSubtotal: offer.minSubtotal ?? 0,
+  startsAt: offer.startsAt ?? null,
+  endsAt: offer.endsAt ?? null,
+  oncePerCustomer: offer.oncePerCustomer ?? false,
+  isActive: offer.isActive ?? true,
+  createdAt: offer.createdAt,
+  updatedAt: offer.updatedAt,
+});
+
+/** Live member offers, for the public site to advertise. */
 router.get('/', async (_req, res) => {
-  const offers = await db().collection('Offer').find({ isActive: { $ne: false } }).sort({ createdAt: -1 }).toArray();
+  const offers = await prisma.offer.findMany({
+    where: { isActive: { not: false } },
+    orderBy: { createdAt: 'desc' },
+  });
   res.setHeader('Cache-Control', 'public, max-age=60');
   res.json(
     offers
       .filter((offer) => isOfferLive(offer as unknown as OfferRule))
       .map((offer) => ({
-        id: offer._id.toHexString(),
+        id: offer.id,
         titleJa: offer.titleJa,
         descriptionJa: offer.descriptionJa ?? '',
         imageUrl: offer.imageUrl ?? '',
         discountType: offer.discountType,
         discountValue: offer.discountValue,
-        minSubtotal: offer.minSubtotal ?? 0,
+        minSubtotal: offer.minSubtotal,
         endsAt: offer.endsAt ?? null,
       })),
   );
 });
 
 router.get('/all', requireAdmin, async (_req, res) => {
-  const offers = await db().collection('Offer').find({}).sort({ createdAt: -1 }).toArray();
-  const usage = await db()
-    .collection('PickupOrder')
-    .aggregate<{ _id: ObjectId; uses: number }>([
-      { $match: { 'offer.id': { $in: offers.map((offer) => offer._id) }, status: { $ne: 'CANCELLED' } } },
-      { $group: { _id: '$offer.id', uses: { $sum: 1 } } },
-    ])
-    .toArray();
-  const uses = new Map(usage.map((entry) => [entry._id.toHexString(), entry.uses]));
+  const offers = await prisma.offer.findMany({ orderBy: { createdAt: 'desc' } });
+  // Count how many non-cancelled orders used each offer.
+  const offerIds = offers.map((o) => o.id);
+  const usageCounts = await prisma.$queryRaw<{ offerId: string; uses: bigint }[]>`
+    SELECT JSON_UNQUOTE(JSON_EXTRACT(offer, '$.id')) AS offerId, COUNT(*) AS uses
+    FROM PickupOrder
+    WHERE status != 'CANCELLED'
+      AND JSON_UNQUOTE(JSON_EXTRACT(offer, '$.id')) IN (${offerIds.join(',')})
+    GROUP BY offerId
+  `;
+  const uses = new Map(usageCounts.map((u) => [u.offerId, Number(u.uses)]));
   res.setHeader('Cache-Control', 'no-store');
-  res.json(offers.map((offer) => ({ ...toJson(offer), uses: uses.get(offer._id.toHexString()) ?? 0 })));
+  res.json(offers.map((offer) => ({ ...serializeOffer(offer as unknown as Record<string, unknown>), uses: uses.get(offer.id) ?? 0 })));
 });
 
 router.post('/', requireAdmin, async (req, res) => {
   const input = offerSchema.parse(req.body);
-  const now = new Date();
-  const offer = { _id: new ObjectId(), ...input, descriptionJa: input.descriptionJa ?? null, imageUrl: input.imageUrl ?? null, createdAt: now, updatedAt: now };
-  await db().collection('Offer').insertOne(offer);
-  await audit(req.user?.id, 'offer.create', offer._id, input);
-  res.status(201).json(toJson(offer));
+  const offer = await prisma.offer.create({
+    data: {
+      ...input,
+      discountType: input.discountType as 'PERCENT' | 'AMOUNT',
+      descriptionJa: input.descriptionJa ?? null,
+      imageUrl: input.imageUrl ?? null,
+      startsAt: input.startsAt ?? null,
+      endsAt: input.endsAt ?? null,
+    },
+  });
+  await audit(req.user?.id, 'offer.create', offer.id, input);
+  res.status(201).json(serializeOffer(offer as unknown as Record<string, unknown>));
 });
 
 router.put('/:id', requireAdmin, async (req, res) => {
   const id = idParam(req.params);
   const input = offerSchema.parse(req.body);
-  const result = await db().collection('Offer').updateOne({ _id: id }, { $set: { ...input, updatedAt: new Date() } });
-  if (result.matchedCount === 0) throw notFound('Offer');
+  try {
+    await prisma.offer.update({
+      where: { id },
+      data: {
+        ...input,
+        discountType: input.discountType as 'PERCENT' | 'AMOUNT',
+        startsAt: input.startsAt ?? null,
+        endsAt: input.endsAt ?? null,
+      },
+    });
+  } catch {
+    throw notFound('Offer');
+  }
   await audit(req.user?.id, 'offer.update', id, input);
   res.json({ success: true });
 });
 
 router.delete('/:id', requireAdmin, async (req, res) => {
   const id = idParam(req.params);
-  // Orders keep a copy of the offer title, so deleting an offer never changes past receipts.
-  const result = await db().collection('Offer').deleteOne({ _id: id });
-  if (result.deletedCount === 0) throw notFound('Offer');
+  try {
+    await prisma.offer.delete({ where: { id } });
+  } catch {
+    throw notFound('Offer');
+  }
   await audit(req.user?.id, 'offer.delete', id, null);
   res.json({ success: true });
 });

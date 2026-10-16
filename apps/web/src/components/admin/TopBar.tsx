@@ -1,21 +1,20 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Armchair, Bell, Gift, Mail, Plus, Search, ShoppingBag, Stamp, Table2, UserCircle, UserPlus, UtensilsCrossed } from 'lucide-react';
+import { Bell, Gift, Mail, Plus, Search, ShoppingBag, Stamp, UserCircle, UserPlus, UtensilsCrossed } from 'lucide-react';
 import { apiFetch } from '../../lib/api';
 import { formatOrderNumber, yen } from '../../lib/format';
 
 /** What a tab should do when it opens from the top bar (e.g. open its "add" form). */
 export interface TabIntent {
-  action: 'add-item' | 'new-offer' | 'add-table' | 'add-user' | 'stamp' | 'search';
+  action: 'add-item' | 'new-offer' | 'add-user' | 'stamp' | 'search';
   value?: string;
   nonce: number;
 }
 export type Navigate = (tab: string, intent?: Omit<TabIntent, 'nonce'>) => void;
 
 interface SearchResults {
-  orders: { id: string; number: number; status: string; fulfillment: string; tableNumber: string | null; customerName: string; createdAt: string }[];
+  orders: { id: string; number: number; status: string; fulfillment: string; customerName: string; createdAt: string }[];
   members: { id: string; name: string; email: string; phone: string }[];
   menuItems: { id: string; nameEn: string; nameJa: string | null; price: number; isSoldOut: boolean }[];
-  tables: { id: string; number: string; name: string | null }[];
   messages: { id: string; name: string; type: string; createdAt: string; isRead: boolean }[];
 }
 interface Note {
@@ -48,7 +47,7 @@ function useDismiss(open: boolean, close: () => void) {
   return ref;
 }
 
-export function GlobalSearch({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate: Navigate }) {
+export function GlobalSearch({ isAdmin: _isAdmin, onNavigate }: { isAdmin: boolean; onNavigate: Navigate }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResults | null>(null);
   const [open, setOpen] = useState(false);
@@ -95,7 +94,7 @@ export function GlobalSearch({ isAdmin, onNavigate }: { isAdmin: boolean; onNavi
     setResults(null);
   };
   const shown = query.trim() ? results : null;
-  const total = shown ? shown.orders.length + shown.members.length + shown.menuItems.length + shown.tables.length + shown.messages.length : 0;
+  const total = shown ? shown.orders.length + shown.members.length + shown.menuItems.length + shown.messages.length : 0;
 
   return (
     <div ref={ref} className="tb-search">
@@ -109,7 +108,7 @@ export function GlobalSearch({ isAdmin, onNavigate }: { isAdmin: boolean; onNavi
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}
-        placeholder={isAdmin ? 'Search orders, members, menu…  ( / )' : 'Search orders, menu, tables…  ( / )'}
+        placeholder="Search orders, members, menu…  ( / )"
         aria-label="Search the admin"
         aria-expanded={open && Boolean(shown)}
         aria-controls="admin-search-results"
@@ -125,7 +124,7 @@ export function GlobalSearch({ isAdmin, onNavigate }: { isAdmin: boolean; onNavi
               <Group title="Orders" items={shown.orders.map(order => ({
                 key: order.id,
                 icon: <ShoppingBag size={16} />,
-                title: `#${formatOrderNumber(order.number)} · ${order.fulfillment === 'DINE_IN' ? `Table ${order.tableNumber}` : order.customerName}`,
+                title: `#${formatOrderNumber(order.number)} · ${order.customerName}`,
                 detail: `${STATUS[order.status] ?? order.status} · ${new Date(order.createdAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`,
                 onSelect: () => go('Orders'),
               }))} />
@@ -142,13 +141,6 @@ export function GlobalSearch({ isAdmin, onNavigate }: { isAdmin: boolean; onNavi
                 title: item.nameJa || item.nameEn,
                 detail: `${item.nameEn} · ${yen(item.price)}${item.isSoldOut ? ' · sold out' : ''}`,
                 onSelect: () => go('Menu Management'),
-              }))} />
-              <Group title="Tables" items={shown.tables.map(table => ({
-                key: table.id,
-                icon: <Armchair size={16} />,
-                title: `Table ${table.number}`,
-                detail: table.name ?? '',
-                onSelect: () => go('Tables'),
               }))} />
               <Group title="Messages" items={shown.messages.map(message => ({
                 key: message.id,
@@ -239,10 +231,8 @@ export function QuickAdd({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate
   const ref = useDismiss(open, () => setOpen(false));
   const actions: { label: string; detail: string; icon: ReactNode; tab: string; action?: TabIntent['action']; adminOnly?: boolean }[] = [
     { label: 'Menu item', detail: 'Add a dish to the menu', icon: <UtensilsCrossed size={16} />, tab: 'Menu Management', action: 'add-item' },
-    { label: 'Seat guests', detail: 'Open a table for dine-in', icon: <Armchair size={16} />, tab: 'Tables' },
     { label: 'Give a stamp', detail: 'Scan a member at the counter', icon: <Stamp size={16} />, tab: 'Orders', action: 'stamp' },
     { label: 'Offer', detail: 'Discount or member special', icon: <Gift size={16} />, tab: 'Stamps, Offers & Points', action: 'new-offer', adminOnly: true },
-    { label: 'Table', detail: 'Add a table and its QR code', icon: <Table2 size={16} />, tab: 'Tables', action: 'add-table', adminOnly: true },
     { label: 'Staff user', detail: 'Admin, staff or kitchen account', icon: <UserPlus size={16} />, tab: 'Staff Users', action: 'add-user', adminOnly: true },
   ];
   return (

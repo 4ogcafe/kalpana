@@ -5,7 +5,7 @@ import { useCart } from '../lib/cart-context';
 import { yen } from '../lib/format';
 import OrderButtons, { type OrderableItem } from '../components/order/OrderButtons';
 import RelatedItemsPanel, { type PanelItem } from '../components/order/RelatedItemsPanel';
-import { MemberOfferStrip } from '../components/MemberOffers';
+import OfferSticker, { MemberOfferStrip } from '../components/MemberOffers';
 import NotFound from './NotFound';
 
 const HERO_IMAGES: Record<string, string> = {
@@ -26,6 +26,9 @@ export default function Menu() {
   const [settings, setSettings] = useState<any>({});
   const [orderingEnabled, setOrderingEnabled] = useState(false);
   const [relatedTrigger, setRelatedTrigger] = useState<PanelItem | null>(null);
+  const [likedItems, setLikedItems] = useState<Set<string>>(new Set());
+  const [shareOpen, setShareOpen] = useState(false);
+  const [optionGroupMap, setOptionGroupMap] = useState<Map<string, any>>(new Map());
   const cart = useCart();
 
   useEffect(() => {
@@ -52,6 +55,14 @@ export default function Menu() {
     getPublic<{ enabled: boolean }>('/api/v1/orders/slots')
       .then(data => setOrderingEnabled(Boolean(data.enabled)))
       .catch(console.error);
+
+    getPublic<any[]>('/api/v1/menu/option-groups')
+      .then(groups => {
+        if (Array.isArray(groups)) {
+          setOptionGroupMap(new Map(groups.map(g => [g.id, g])));
+        }
+      })
+      .catch(console.error);
   }, []);
 
   const menuType = (type ?? '').toLowerCase();
@@ -62,9 +73,9 @@ export default function Menu() {
   const canOrder = orderingEnabled;
   
   const dynamicHeroImages: Record<string, string> = {
-    lunch: assetUrl(settings.lunchMenuHeroImage) || HERO_IMAGES.lunch,
-    takeout: assetUrl(settings.takeoutMenuHeroImage) || HERO_IMAGES.takeout,
-    grand: assetUrl(settings.grandMenuHeroImage) || HERO_IMAGES.grand
+    lunch: assetUrl(settings.menuLunchHeroImage) || HERO_IMAGES.lunch,
+    takeout: assetUrl(settings.menuTakeoutHeroImage) || HERO_IMAGES.takeout,
+    grand: assetUrl(settings.menuGrandHeroImage) || HERO_IMAGES.grand
   };
   
   // Filter items by menu type (GRAND, LUNCH, TAKEOUT)
@@ -96,6 +107,10 @@ export default function Menu() {
       categoriesMap.set(catId, { id: catId, name: catName, icon: '🍛', sortOrder, items: [] });
     }
     
+    const resolvedGroups = Array.isArray(item.optionGroupIds)
+      ? item.optionGroupIds.map((gid: string) => optionGroupMap.get(gid)).filter(Boolean)
+      : [];
+
     categoriesMap.get(catId).items.push({
       id: item.id,
       name: item.nameJa || item.nameEn,
@@ -107,6 +122,7 @@ export default function Menu() {
       vegetarian: Boolean(item.isVegetarian),
       img: assetUrl(item.imageUrl) || DEFAULT_IMAGE,
       categoryId: catId,
+      optionGroups: resolvedGroups.length > 0 ? resolvedGroups : undefined,
       // Only show a rating the restaurant actually entered; never invent one.
       rating: typeof item.rating === 'number' ? item.rating : null,
       stars: typeof item.rating === 'number' ? '★'.repeat(Math.round(item.rating)) + '☆'.repeat(5 - Math.round(item.rating)) : ''
@@ -176,6 +192,7 @@ export default function Menu() {
       {/* Hero Section */}
       <div className="home-hero" style={{ height: '40vh', minHeight: '300px' }}>
         <img src={dynamicHeroImages[menuType]} alt="" fetchPriority="high" className="slide-bg-img" style={{ opacity: 0.5, objectFit: 'cover' }} />
+        <OfferSticker />
         <div className="hero-content">
           <div className="hero-tag">{menuInfo.tag}</div>
           <h1 className="hero-title">{menuInfo.title}</h1>
@@ -307,8 +324,71 @@ export default function Menu() {
           
           <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: 'white', borderRadius: '12px', overflowX: 'hidden', overflowY: 'auto', display: 'flex', flexDirection: 'column', maxWidth: '600px', width: '100%', maxHeight: '90vh' }}>
             {/* Shorter photo on small screens so the order buttons stay in view; the panel scrolls if needed. */}
-            <div style={{ width: '100%', height: 'min(350px, 38vh)', flexShrink: 0, backgroundColor: '#f9f6f0', padding: '0' }}>
+            <div style={{ width: '100%', height: 'min(350px, 38vh)', flexShrink: 0, backgroundColor: '#f9f6f0', padding: '0', position: 'relative' }}>
               <img src={flatItems[selectedIndex].img} alt={flatItems[selectedIndex].name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              {/* Share + Like buttons */}
+              <div style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                {/* Share button with dropdown */}
+                <div style={{ position: 'relative' }}>
+                  <button
+                    onClick={() => setShareOpen(v => !v)}
+                    title="共有する"
+                    style={{ width: '44px', height: '44px', borderRadius: '50%', border: 'none', background: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.18)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1a1814' }}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/>
+                      <polyline points="16 6 12 2 8 6"/>
+                      <line x1="12" y1="2" x2="12" y2="15"/>
+                    </svg>
+                  </button>
+                  {shareOpen && (
+                    <>
+                      {/* backdrop to close */}
+                      <div onClick={() => setShareOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 10 }} />
+                      <div style={{ position: 'absolute', top: '52px', right: 0, background: '#fff', borderRadius: '14px', boxShadow: '0 4px 24px rgba(0,0,0,0.18)', padding: '12px', display: 'flex', flexDirection: 'column', gap: '6px', zIndex: 11, minWidth: '160px' }}>
+                        {[
+                          { label: 'Facebook', color: '#1877F2', href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`, icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.469h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.469h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg> },
+                          { label: 'X (Twitter)', color: '#000', href: `https://twitter.com/intent/tweet?url=${encodeURIComponent(window.location.href)}&text=${encodeURIComponent(flatItems[selectedIndex].name)}`, icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg> },
+                          { label: 'LINE', color: '#00C300', href: `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(window.location.href)}`, icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M24 10.304c0-5.369-5.383-9.738-12-9.738-6.616 0-12 4.369-12 9.738 0 4.814 3.54 8.796 8.284 9.502.321.071.758.218.868.5.101.258.065.656.03 1.01-.036.368-.239 1.439-.29 1.742-.061.359-.283 1.391 1.22.762 1.503-.63 8.118-4.785 10.849-8.026 1.956-2.316 3.039-4.887 3.039-5.49zm-15.004 3.045H5.824a.654.654 0 01-.652-.653V7.202c0-.361.293-.653.652-.653.36 0 .653.292.653.653v4.841h2.519c.361 0 .653.292.653.653s-.292.653-.653.653zm3.013 0h-1.303a.654.654 0 01-.653-.653V7.202c0-.361.293-.653.653-.653.361 0 .652.292.652.653v5.494c0 .361-.291.653-.652.653zm4.276 0h-1.303a.654.654 0 01-.652-.653V9.124l-2.029 3.029a.656.656 0 01-.385.264.664.664 0 01-.166.021.654.654 0 01-.652-.653V7.202c0-.361.293-.653.652-.653.36 0 .653.292.653.653v3.524l2.029-3.029a.656.656 0 01.385-.264.664.664 0 01.166-.021c.361 0 .652.292.652.653v5.494c0 .361-.291.653-.652.653z"/></svg> },
+                          { label: 'WhatsApp', color: '#25D366', href: `https://api.whatsapp.com/send?text=${encodeURIComponent(flatItems[selectedIndex].name + ' ' + window.location.href)}`, icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg> },
+                          { label: 'Instagram', color: '#E1306C', href: 'https://www.instagram.com/', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg> },
+                        ].map(({ label, color, href, icon }) => (
+                          <a
+                            key={label}
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={() => setShareOpen(false)}
+                            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', borderRadius: '9px', textDecoration: 'none', color: '#1a1814', fontSize: '0.85rem', fontWeight: 600, transition: 'background 0.15s' }}
+                            onMouseEnter={e => (e.currentTarget.style.background = '#f5f5f5')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                          >
+                            <span style={{ color, display: 'flex', flexShrink: 0 }}>{icon}</span>
+                            {label}
+                          </a>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+                {/* Heart button */}
+                <button
+                  onClick={() => {
+                    const id = String(flatItems[selectedIndex].id);
+                    setLikedItems(prev => {
+                      const next = new Set(prev);
+                      next.has(id) ? next.delete(id) : next.add(id);
+                      return next;
+                    });
+                  }}
+                  title="お気に入り"
+                  style={{ width: '44px', height: '44px', borderRadius: '50%', border: 'none', background: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.18)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: likedItems.has(String(flatItems[selectedIndex].id)) ? '#e11d48' : '#1a1814' }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill={likedItems.has(String(flatItems[selectedIndex].id)) ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+                  </svg>
+                </button>
+              </div>
             </div>
             <div style={{ padding: '30px', textAlign: 'center' }}>
               <h2 style={{ margin: '0 0 10px 0', color: 'var(--dark-bark)' }}>{flatItems[selectedIndex].name}</h2>
@@ -327,38 +407,6 @@ export default function Menu() {
 
               {canOrder && <OrderButtons item={flatItems[selectedIndex]} size="popup" onAfterAdd={handleAfterAdd} />}
               
-              {/* Share Options */}
-              <div style={{ marginTop: '25px', paddingTop: '20px', borderTop: '1px solid #eee' }}>
-                <p style={{ fontSize: '0.85rem', color: '#9ca3af', marginBottom: '15px' }}>Share this item</p>
-                <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
-                  <a href={`https://www.facebook.com/sharer/sharer.php?u=${window.location.href}`} target="_blank" rel="noopener noreferrer" style={{ color: '#1877F2', transition: 'opacity 0.2s' }} title="Share on Facebook">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.469h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.469h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-                  </a>
-                  <a href={`https://twitter.com/intent/tweet?url=${window.location.href}&text=Check out ${flatItems[selectedIndex].name} at Kalpana!`} target="_blank" rel="noopener noreferrer" style={{ color: '#000000', transition: 'opacity 0.2s' }} title="Share on X">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                  </a>
-                  <a href={`https://www.instagram.com/`} target="_blank" rel="noopener noreferrer" style={{ color: '#E1306C', transition: 'opacity 0.2s' }} title="Instagram">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
-                  </a>
-                  <a href={`https://api.whatsapp.com/send?text=Check out ${flatItems[selectedIndex].name} at Kalpana! ${window.location.href}`} target="_blank" rel="noopener noreferrer" style={{ color: '#25D366', transition: 'opacity 0.2s' }} title="Share on WhatsApp">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                  </a>
-                  <a href={`https://social-plugins.line.me/lineit/share?url=${window.location.href}`} target="_blank" rel="noopener noreferrer" style={{ color: '#00C300', transition: 'opacity 0.2s' }} title="Share on LINE">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M24 10.304c0-5.369-5.383-9.738-12-9.738-6.616 0-12 4.369-12 9.738 0 4.814 3.54 8.796 8.284 9.502.321.071.758.218.868.5.101.258.065.656.03 1.01-.036.368-.239 1.439-.29 1.742-.061.359-.283 1.391 1.22.762 1.503-.63 8.118-4.785 10.849-8.026 1.956-2.316 3.039-4.887 3.039-5.49zm-15.004 3.045H5.824a.654.654 0 01-.652-.653V7.202c0-.361.293-.653.652-.653.36 0 .653.292.653.653v4.841h2.519c.361 0 .653.292.653.653s-.292.653-.653.653zm3.013 0h-1.303a.654.654 0 01-.653-.653V7.202c0-.361.293-.653.653-.653.361 0 .652.292.652.653v5.494c0 .361-.291.653-.652.653zm4.276 0h-1.303a.654.654 0 01-.652-.653V9.124l-2.029 3.029a.65.65 0 01-.157.172.636.636 0 01-.19.098.665.665 0 01-.202.032.654.654 0 01-.652-.653V7.202c0-.361.293-.653.652-.653.36 0 .653.292.653.653v3.524l2.029-3.029a.656.656 0 01.385-.264.664.664 0 01.166-.021c.361 0 .652.292.652.653v5.494c0 .361-.291.653-.652.653z"/></svg>
-                  </a>
-                  <a href={`viber://forward?text=Check out ${flatItems[selectedIndex].name} at Kalpana! ${window.location.href}`} style={{ color: '#7360F2', transition: 'opacity 0.2s' }} title="Share on Viber">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M21.286 11.455c-.238-6.196-5.111-11.218-11.31-11.439C4.52.128 0 4.542 0 9.972c0 2.222.756 4.27 2.015 5.885l-.78 3.86a.82.82 0 00.97.973l4.316-.798c1.077.542 2.289.851 3.56.88 5.768.125 10.669-4.301 11.205-9.982v-.002zm-12.723-5.26c.328-.152.697-.13.987.065l2.02 1.346c.355.237.499.7.348 1.11l-.47 1.258a3.177 3.177 0 00.18 2.378c.866 1.705 2.35 3.09 4.145 3.858.625.267 1.36.2 1.916-.176l1.09-.727a.972.972 0 011.173.064l1.666 1.25a1.002 1.002 0 01.16 1.408c-1.127 1.542-2.88 2.203-4.73 1.76-2.52-.604-5.32-2.316-7.51-4.506-2.19-2.19-3.902-4.99-4.506-7.51-.444-1.85.218-3.603 1.76-4.73a.998.998 0 011.407.16l1.25 1.667a.971.971 0 01.064 1.173l-.727 1.09a2.385 2.385 0 00-.176 1.917c.768 1.795 2.153 3.28 3.858 4.146.772.39 1.69.414 2.378.18l1.258-.47a1.18 1.18 0 011.11.348l1.346 2.02a.855.855 0 01.065.987 1.785 1.785 0 01-1.39 1.13c-2.38.307-5.093-1.077-7.25-3.235-2.158-2.157-3.542-4.87-3.235-7.25a1.785 1.785 0 011.13-1.39z"/></svg>
-                  </a>
-                  <a href={`https://www.facebook.com/sharer/sharer.php?u=${window.location.href}`} target="_blank" rel="noopener noreferrer" style={{ color: '#00B2FF', transition: 'opacity 0.2s' }} title="Share on Messenger" onClick={(e) => {
-                    if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-                      e.preventDefault();
-                      window.location.href = `fb-messenger://share/?link=${window.location.href}`;
-                    }
-                  }}>
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 4.974 0 11.111c0 3.498 1.744 6.614 4.469 8.654v4.235l4.086-2.242c1.09.301 2.246.464 3.445.464 6.627 0 12-4.974 12-11.111C24 4.974 18.627 0 12 0zm1.191 14.961l-3.056-3.262-5.963 3.262 6.559-6.964 3.13 3.262 5.888-3.262-6.558 6.964z"/></svg>
-                  </a>
-                </div>
-              </div>
             </div>
           </div>
 

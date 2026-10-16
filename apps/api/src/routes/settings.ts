@@ -1,11 +1,10 @@
 import express from 'express';
-import { ObjectId } from 'mongodb';
 import { z } from 'zod';
 import { AppError } from '../lib/errors.js';
-import { db } from '../lib/mongo.js';
 import { PICKUP_HOURS_PATTERN } from '../lib/pickup.js';
 import { MAX_STAMPS_PER_CARD, MIN_STAMPS_PER_CARD, STAMP_REWARD_KINDS } from '../lib/stamps.js';
 import { definedOnly, httpsUrl, imageUrl, optionalText } from '../lib/schemas.js';
+import { prisma } from '../lib/prisma.js';
 import { requireAdmin } from '../middleware/auth.js';
 import { publicCache } from '../middleware/cache.js';
 
@@ -31,7 +30,6 @@ const stampRewardSchema = z.object({
   amount: z.number().int().min(0).max(MAX_YEN).nullable().optional(),
 });
 
-// The admin UI posts the whole settings document; unknown keys (e.g. _id) are dropped by Zod.
 const settingsSchema = z.object({
   name: text(),
   email: z.union([z.literal(''), z.email().max(254)]).nullable().optional(),
@@ -41,7 +39,6 @@ const settingsSchema = z.object({
   weeklyHours: jsonObject,
   holidays: jsonObject,
   socials: jsonObject,
-  // Any https link is stored; the site only embeds it when it is a Google Maps embed URL.
   mapUrl: httpsUrl.nullable().optional(),
   googleMapsLink: httpsUrl.nullable().optional(),
   aboutEn: text(LONG_TEXT),
@@ -68,7 +65,6 @@ const settingsSchema = z.object({
   storeReviewScore: text(10),
   storeReviewText: text(),
   storeReviewLink: httpsUrl.nullable().optional(),
-  // Footer (Page Settings → Footer). Contact details come from the fields above.
   footerLogo: image,
   footerBrand: text(60),
   footerTaglineJa: text(500),
@@ -77,7 +73,6 @@ const settingsSchema = z.object({
     .array(
       z.object({
         label: z.string().trim().min(1).max(40),
-        // A page on this site (/menu/grand) or a full https link.
         url: z.string().trim().max(300).refine((value) => /^\/[^/]/.test(value) || value === '/' || /^https:\/\//.test(value), 'Use a path like /menu/grand or an https:// link'),
       }),
     )
@@ -85,10 +80,8 @@ const settingsSchema = z.object({
     .optional(),
   footerShowHours: z.boolean().optional(),
   footerShowSocials: z.boolean().optional(),
-  // Google reviews: the restaurant's Google Place ID ('' = not connected) and the lowest star rating to show.
   googlePlaceId: z.string().trim().max(300).regex(/^[A-Za-z0-9_-]*$/, 'Invalid Google Place ID').optional(),
   googleReviewsMinRating: z.number().int().min(1).max(5).optional(),
-  // Shown until Google is connected: the total number of Google reviews, and reviews copied from the listing.
   storeReviewCount: z.number().int().min(0).max(1_000_000).nullable().optional(),
   featuredReviews: z
     .array(
@@ -103,10 +96,9 @@ const settingsSchema = z.object({
     .optional(),
   aboutHeroImage: image,
   contactHeroImage: image,
-  grandMenuHeroImage: image,
-  lunchMenuHeroImage: image,
-  takeoutMenuHeroImage: image,
-  // Pickup ordering. Hours are structured (unlike weeklyHours, which is display text) so slots can be computed.
+  menuGrandHeroImage: image,
+  menuLunchHeroImage: image,
+  menuTakeoutHeroImage: image,
   pickupEnabled: z.boolean().optional(),
   pickupHours: z
     .string()
@@ -118,21 +110,14 @@ const settingsSchema = z.object({
   pickupClosedDates: z.array(z.iso.date()).max(MAX_CLOSED_DATES).optional(),
   pickupLeadMinutes: z.number().int().min(0).max(MAX_LEAD_MINUTES).optional(),
   pickupNoteJa: text(1000),
-  // Delivery: its own switch, hours and notice; fees are in yen (the fee is tax-included).
   deliveryEnabled: z.boolean().optional(),
-  deliveryHours: z
-    .string()
-    .trim()
-    .max(SHORT_TEXT)
-    .refine((value) => value === '' || PICKUP_HOURS_PATTERN.test(value), 'Use the format 11:30-14:30, 17:00-21:30')
-    .optional(),
+  deliveryHours: z.string().trim().max(SHORT_TEXT).refine((value) => value === '' || PICKUP_HOURS_PATTERN.test(value), 'Use the format 11:30-14:30, 17:00-21:30').optional(),
   deliveryLeadMinutes: z.number().int().min(0).max(MAX_LEAD_MINUTES).optional(),
   deliveryFee: z.number().int().min(0).max(MAX_YEN).optional(),
   deliveryFreeOver: z.number().int().min(0).max(MAX_YEN).optional(),
   deliveryMinOrder: z.number().int().min(0).max(MAX_YEN).optional(),
   deliveryAreas: z.array(z.string().trim().min(1).max(50)).max(MAX_DELIVERY_AREAS).optional(),
   deliveryNoteJa: text(1000),
-  // The website address printed in table QR codes, e.g. https://kalpana.example ('' = use the admin's own address).
   publicSiteUrl: z
     .string()
     .trim()
@@ -140,17 +125,11 @@ const settingsSchema = z.object({
     .refine((value) => value === '' || /^https?:\/\/[^\s/?#]+(:\d+)?\/?$/.test(value), 'Use a site address like https://kalpana.example')
     .transform((value) => value.replace(/\/$/, ''))
     .optional(),
-  // Dine-in: ordering from the table QR codes.
-  diningEnabled: z.boolean().optional(),
-  diningSelfOpen: z.boolean().optional(),
-  diningTargetMinutes: z.number().int().min(5).max(120).optional(),
-  // Member points: earned per ¥100 paid, each point worth pointValueYen at checkout.
   pointsEnabled: z.boolean().optional(),
   pointsPer100Yen: z.number().int().min(0).max(100).optional(),
   pointValueYen: z.number().int().min(1).max(100).optional(),
   signupBonusPoints: z.number().int().min(0).max(100_000).optional(),
   taxRatePercent: z.number().int().min(0).max(25).optional(),
-  // Stamp card: one stamp per qualifying purchase, at most one per cooldown, rewards at chosen stamps.
   stampCardEnabled: z.boolean().optional(),
   stampsPerCard: z.number().int().min(MIN_STAMPS_PER_CARD).max(MAX_STAMPS_PER_CARD).optional(),
   stampMinAmount: z.number().int().min(0).max(MAX_YEN).optional(),
@@ -159,44 +138,53 @@ const settingsSchema = z.object({
   stampRewards: z
     .array(stampRewardSchema)
     .max(MAX_STAMPS_PER_CARD)
-    .refine((rewards) => new Set(rewards.map((reward) => reward.at)).size === rewards.length, 'Only one reward per stamp')
-    .refine((rewards) => rewards.every((reward) => reward.kind !== 'AMOUNT_OFF' || (reward.amount ?? 0) > 0), 'A discount reward needs an amount')
+    .refine((rewards) => new Set(rewards.map((r) => r.at)).size === rewards.length, 'Only one reward per stamp')
+    .refine((rewards) => rewards.every((r) => r.kind !== 'AMOUNT_OFF' || (r.amount ?? 0) > 0), 'A discount reward needs an amount')
     .optional(),
 });
 
-// Used only the first time settings are saved.
-const INITIAL_SETTINGS = {
-  lat: 36.1473,
-  lng: 139.3886,
-  timezone: 'Asia/Tokyo',
-  currency: 'JPY',
-  weeklyHours: { monday: '11:00-15:00, 17:00-22:00' },
-  holidays: { regular: 'Tuesday' },
-  socials: { instagram: '@kalpana_restro' },
-};
-
 router.get('/', publicCache, async (_req, res) => {
-  const settings = await db().collection('Settings').findOne({});
+  const settings = await prisma.settings.findFirst();
   res.json(settings ?? {});
 });
 
 router.put('/', requireAdmin, async (req, res) => {
-  const fields = definedOnly(settingsSchema.parse(req.body));
-  const perCard = fields.stampsPerCard;
-  if (perCard !== undefined && fields.stampRewards?.some((reward) => reward.at > perCard)) {
+  const raw = definedOnly(settingsSchema.parse(req.body));
+  const perCard = (raw as Record<string, unknown>).stampsPerCard as number | undefined;
+  const stampRewards = (raw as Record<string, unknown>).stampRewards as { at: number }[] | undefined;
+  if (perCard !== undefined && stampRewards?.some((r) => r.at > perCard)) {
     throw new AppError(400, 'VALIDATION_ERROR', `Rewards must be on stamps 1–${perCard}.`);
   }
-  const collection = db().collection('Settings');
-  const existing = await collection.findOne({}, { projection: { _id: 1 } });
 
-  // Only fields the client sent are written, so a partial save never wipes other settings.
+  // Map stampCardEnabled → stampsEnabled for the schema column name.
+  const { stampCardEnabled, deliveryHours, deliveryNoteJa, deliveryFreeOver, ...rest } = raw as Record<string, unknown>;
+  const data: Record<string, unknown> = { ...rest };
+  if (stampCardEnabled !== undefined) data.stampsEnabled = stampCardEnabled;
+
+  // Arrays that can't be stored as plain undefined go in as JSON.
+  if ('pickupClosedDays' in data) data.pickupClosedDays = data.pickupClosedDays ?? null;
+  if ('pickupClosedDates' in data) data.pickupClosedDates = data.pickupClosedDates ?? null;
+  if ('stampRewards' in data) data.stampRewards = data.stampRewards ?? null;
+  if ('footerLinks' in data) data.footerLinks = data.footerLinks ?? null;
+  if ('featuredReviews' in data) data.featuredReviews = data.featuredReviews ?? null;
+
+  const existing = await prisma.settings.findFirst();
   if (existing) {
-    await collection.updateOne({ _id: existing._id }, { $set: { ...fields, updatedAt: new Date() } });
+    await prisma.settings.update({ where: { id: existing.id }, data });
   } else {
-    await collection.insertOne({ _id: new ObjectId(), ...INITIAL_SETTINGS, ...fields, updatedAt: new Date() });
+    await prisma.settings.create({
+      data: {
+        timezone: 'Asia/Tokyo',
+        currency: 'JPY',
+        weeklyHours: { monday: '11:00-15:00, 17:00-22:00' },
+        holidays: { regular: 'Tuesday' },
+        socials: { instagram: '@kalpana_restro' },
+        ...data,
+      },
+    });
   }
 
-  res.json(await collection.findOne({}));
+  res.json(await prisma.settings.findFirst());
 });
 
 export default router;

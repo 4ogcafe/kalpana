@@ -1,19 +1,18 @@
 import type { Request, RequestHandler, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import { ObjectId } from 'mongodb';
 import { config } from '../config.js';
 import { AppError } from '../lib/errors.js';
-import { db } from '../lib/mongo.js';
+import { prisma } from '../lib/prisma.js';
 import { readCookie } from './auth.js';
 
-// Customers get their own cookie, token audience and collection, so a customer session can never
+// Customers get their own cookie, token audience and table, so a customer session can never
 // reach staff routes (and a staff session is never mistaken for a customer).
 export const CUSTOMER_COOKIE = 'kalpana_customer';
 const CUSTOMER_AUDIENCE = 'customer';
 const CUSTOMER_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 export interface SessionCustomer {
-  id: ObjectId;
+  id: string;
   name: string;
   email: string;
 }
@@ -34,9 +33,9 @@ const cookieOptions = () => ({
   path: '/',
 });
 
-export function issueCustomerSession(res: Response, customerId: ObjectId) {
+export function issueCustomerSession(res: Response, customerId: string) {
   const token = jwt.sign({}, config.jwtSecret, {
-    subject: customerId.toHexString(),
+    subject: customerId,
     audience: CUSTOMER_AUDIENCE,
     expiresIn: CUSTOMER_SESSION_TTL_SECONDS,
   });
@@ -47,11 +46,11 @@ export function clearCustomerSession(res: Response) {
   res.clearCookie(CUSTOMER_COOKIE, cookieOptions());
 }
 
-function customerIdFromToken(token: string): ObjectId | null {
+function customerIdFromToken(token: string): string | null {
   try {
     const payload = jwt.verify(token, config.jwtSecret, { algorithms: ['HS256'], audience: CUSTOMER_AUDIENCE });
-    if (typeof payload === 'object' && typeof payload.sub === 'string' && /^[a-f\d]{24}$/i.test(payload.sub)) {
-      return new ObjectId(payload.sub);
+    if (typeof payload === 'object' && typeof payload.sub === 'string' && payload.sub.length > 0) {
+      return payload.sub;
     }
   } catch {
     // invalid or expired token
@@ -64,10 +63,11 @@ async function loadCustomer(req: Request): Promise<SessionCustomer | null> {
   const token = readCookie(req, CUSTOMER_COOKIE);
   const id = token ? customerIdFromToken(token) : null;
   if (!id) return null;
-  const customer = await db()
-    .collection('Customer')
-    .findOne({ _id: id, isActive: { $ne: false } }, { projection: { name: 1, email: 1 } });
-  return customer ? { id: customer._id, name: customer.name, email: customer.email } : null;
+  const customer = await prisma.customer.findFirst({
+    where: { id, isActive: { not: false } },
+    select: { id: true, name: true, email: true },
+  });
+  return customer ?? null;
 }
 
 /** Attaches req.customer when a valid session exists; guests continue without one. */

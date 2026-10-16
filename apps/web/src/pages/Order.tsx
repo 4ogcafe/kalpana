@@ -335,11 +335,11 @@ export default function Order() {
                       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
                         <div style={{ fontWeight: 'bold', color: 'var(--dark-bark)' }}>{line.name}</div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
-                          <QuantitySelector value={line.quantity} max={MAX_QUANTITY} onChange={value => setLineQuantity(line.id, value)} label={line.name} size="sm" />
+                          <QuantitySelector value={line.quantity} max={MAX_QUANTITY} onChange={value => setLineQuantity(line.cartKey, value)} label={line.name} size="sm" />
                           <span style={{ fontWeight: 'bold' }}>{yen(line.price * line.quantity)}</span>
                         </div>
                       </div>
-                      <button type="button" aria-label={`${line.name}を削除`} onClick={() => setLineQuantity(line.id, 0)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}>
+                      <button type="button" aria-label={`${line.name}を削除`} onClick={() => setLineQuantity(line.cartKey, 0)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}>
                         <Trash2 size={18} aria-hidden="true" />
                       </button>
                     </li>

@@ -1,8 +1,7 @@
-import { ObjectId } from 'mongodb';
 import { AppError } from '../lib/errors.js';
 import { deliveryFeeFor, type Fulfillment } from '../lib/fulfillment.js';
 import { isOfferLive, loyaltyConfig, offerDiscount, priceBreakdown, type OfferRule, type PriceBreakdown } from '../lib/loyalty.js';
-import { db } from '../lib/mongo.js';
+import { prisma } from '../lib/prisma.js';
 import type { StampRewardKind } from '../lib/stamps.js';
 import { consumptionTax, taxRatePercent } from '../lib/tax.js';
 import type { StoredSettings } from './settings-store.js';
@@ -19,23 +18,24 @@ export interface OrderLineOption {
 }
 
 export interface OrderLine {
-  itemId: ObjectId;
+  itemId: string;
   nameEn: string;
   nameJa: string | null;
   unitPrice: number;
   quantity: number;
   lineTotal: number;
   options?: OrderLineOption[];
+  doneAt?: string | null;
 }
 
 export interface AppliedOffer {
-  id: ObjectId;
+  id: string;
   titleJa: string;
   discount: number;
 }
 
 export interface AppliedReward {
-  id: ObjectId;
+  id: string;
   titleJa: string;
   kind: StampRewardKind;
   discount: number;
@@ -72,39 +72,43 @@ export async function priceLines(
     if (req.options) optionsByItemId.set(req.itemId, req.options);
   }
 
-  const ids = [...quantities.keys()].map((id) => new ObjectId(id));
-  const items = await db().collection('MenuItem').find({ _id: { $in: ids } }).toArray();
+  const ids = [...quantities.keys()];
+  const items = await prisma.menuItem.findMany({ where: { id: { in: ids } } });
 
   return [...quantities].map(([id, requestedQuantity]) => {
-    const item = items.find((candidate) => candidate._id.toHexString() === id);
+    const item = items.find((candidate) => candidate.id === id);
     // Every active item on any menu can be ordered for pickup unless staff marked it sold out.
     const orderable = item && item.isActive !== false && !item.isSoldOut;
     if (!item || !orderable) {
-      const name = item?.nameJa || item?.nameEn || id;
+      const name = (item as { nameJa?: string; nameEn?: string } | undefined)?.nameJa || (item as { nameJa?: string; nameEn?: string } | undefined)?.nameEn || id;
       throw new AppError(409, 'ITEM_UNAVAILABLE', `「${name}」は現在ご注文いただけません。カートから削除してください。`, { itemId: id });
     }
     const quantity = Math.min(requestedQuantity, MAX_QUANTITY);
     const optionAdjust = optionAdjusts.get(id) ?? 0;
     const unitPrice = (Number(item.price) || 0) + optionAdjust;
     const options = optionsByItemId.get(id);
-    return { itemId: item._id, nameEn: item.nameEn, nameJa: item.nameJa ?? null, unitPrice, quantity, lineTotal: unitPrice * quantity, ...(options ? { options } : {}) };
+    return { itemId: item.id, nameEn: item.nameEn, nameJa: item.nameJa ?? null, unitPrice, quantity, lineTotal: unitPrice * quantity, ...(options ? { options } : {}) };
   });
 }
 
 /** Has this customer already used a once-per-customer offer on an order that wasn't cancelled? */
-export async function offerAlreadyUsed(offerId: ObjectId, customerId: ObjectId): Promise<boolean> {
-  const used = await db()
-    .collection('PickupOrder')
-    .countDocuments({ customerId, 'offer.id': offerId, status: { $ne: 'CANCELLED' } }, { limit: 1 });
-  return used > 0;
+export async function offerAlreadyUsed(offerId: string, customerId: string): Promise<boolean> {
+  const rows = await prisma.$queryRaw<[{ cnt: bigint }]>`
+    SELECT COUNT(*) as cnt FROM PickupOrder
+    WHERE customerId = ${customerId}
+      AND JSON_UNQUOTE(JSON_EXTRACT(offer, '$.id')) = ${offerId}
+      AND status != 'CANCELLED'
+    LIMIT 1
+  `;
+  return Number(rows[0]?.cnt ?? 0) > 0;
 }
 
-async function usableOffer(offerId: string, customerId: ObjectId) {
-  const offer = await db().collection('Offer').findOne({ _id: new ObjectId(offerId) });
+async function usableOffer(offerId: string, customerId: string) {
+  const offer = await prisma.offer.findUnique({ where: { id: offerId } });
   if (!offer || !isOfferLive(offer as unknown as OfferRule)) {
     throw new AppError(409, 'OFFER_UNAVAILABLE', 'この特典は現在ご利用いただけません。');
   }
-  if (offer.oncePerCustomer && (await offerAlreadyUsed(offer._id, customerId))) {
+  if (offer.oncePerCustomer && (await offerAlreadyUsed(offer.id, customerId))) {
     throw new AppError(409, 'OFFER_USED', 'この特典はすでにご利用済みです。');
   }
   return offer;
@@ -116,7 +120,7 @@ export async function quoteOrder(input: {
   offerId?: string | null;
   rewardId?: string | null;
   pointsToUse?: number;
-  customerId?: ObjectId;
+  customerId?: string;
   fulfillment?: Fulfillment;
   settings: StoredSettings;
 }): Promise<OrderQuote> {
@@ -134,10 +138,10 @@ export async function quoteOrder(input: {
     throw new AppError(409, 'OFFER_MIN_SUBTOTAL', `この特典は¥${(rule.minSubtotal ?? 0).toLocaleString('ja-JP')}以上のご注文でご利用いただけます。`);
   }
 
-  const rewardDoc = input.rewardId && input.customerId ? await findUsableReward(new ObjectId(input.rewardId), input.customerId) : null;
+  const rewardDoc = input.rewardId && input.customerId ? await findUsableReward(input.rewardId, input.customerId) : null;
 
   const customer = input.customerId
-    ? await db().collection('Customer').findOne({ _id: input.customerId }, { projection: { points: 1 } })
+    ? await prisma.customer.findUnique({ where: { id: input.customerId }, select: { points: true } })
     : null;
 
   const breakdown = priceBreakdown({
@@ -161,9 +165,9 @@ export async function quoteOrder(input: {
   return {
     lines,
     breakdown: { ...breakdown, taxRate, tax, deliveryFee, minOrderShortfall, grandTotal: breakdown.total + tax + deliveryFee },
-    offer: offerDoc ? { id: offerDoc._id, titleJa: String(offerDoc.titleJa), discount: breakdown.offerDiscount } : null,
+    offer: offerDoc ? { id: offerDoc.id, titleJa: String(offerDoc.titleJa), discount: breakdown.offerDiscount } : null,
     reward: rewardDoc
-      ? { id: rewardDoc._id, titleJa: String(rewardDoc.titleJa), kind: rewardDoc.kind as StampRewardKind, discount: breakdown.rewardDiscount }
+      ? { id: rewardDoc.id, titleJa: String(rewardDoc.titleJa), kind: rewardDoc.kind as StampRewardKind, discount: breakdown.rewardDiscount }
       : null,
   };
 }
@@ -189,7 +193,7 @@ export function pricingSummary(order: Record<string, unknown>) {
     grandTotal: typeof order.grandTotal === 'number' ? order.grandTotal : total,
     pointsEarned: Number(order.pointsEarned) || 0,
     // Orders from before delivery existed are pickups.
-    fulfillment: order.fulfillment === 'DELIVERY' ? 'DELIVERY' : 'PICKUP',
+    fulfillment: order.fulfillment === 'DELIVERY' ? 'DELIVERY' : order.fulfillment === 'DINE_IN' ? 'DINE_IN' : 'PICKUP',
     deliveryFee: Number(order.deliveryFee) || 0,
     deliveryAddress: (order.deliveryAddress as Record<string, string> | null | undefined) ?? null,
   };

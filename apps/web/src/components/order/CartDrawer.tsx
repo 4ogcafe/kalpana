@@ -82,18 +82,27 @@ export default function CartDrawer() {
           <>
             <ul style={{ listStyle: 'none', margin: 0, padding: '0 20px', overflowY: 'auto', flex: 1 }}>
               {cart.lines.map(line => (
-                <li key={line.id} style={{ display: 'flex', gap: '12px', padding: '16px 0', borderBottom: '1px solid #f0ebe3' }}>
+                <li key={line.cartKey} style={{ display: 'flex', gap: '12px', padding: '16px 0', borderBottom: '1px solid #f0ebe3' }}>
                   <img src={line.img} alt="" width={64} height={64} style={{ borderRadius: '10px', objectFit: 'cover', flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontWeight: 'bold', color: 'var(--dark-bark)' }}>{line.name}</div>
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{yen(line.price)} / 点</div>
+                        {line.options && line.options.length > 0 && (
+                          <ul style={{ listStyle: 'none', margin: '4px 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            {line.options.map(o => (
+                              <li key={o.optionId} style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                {o.groupName}: {o.optionName}{o.priceAdjust !== 0 ? ` (${o.priceAdjust > 0 ? '+' : ''}${yen(o.priceAdjust)})` : ''}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                       </div>
-                      <button type="button" onClick={() => cart.remove(line.id)} aria-label={`${line.name}を削除`} style={iconButton}><Trash2 size={18} aria-hidden="true" /></button>
+                      <button type="button" onClick={() => cart.remove(line.cartKey)} aria-label={`${line.name}を削除`} style={iconButton}><Trash2 size={18} aria-hidden="true" /></button>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <QuantitySelector value={line.quantity} max={MAX_QUANTITY} onChange={value => cart.setQuantity(line.id, value)} label={line.name} size="sm" />
+                      <QuantitySelector value={line.quantity} max={MAX_QUANTITY} onChange={value => cart.setQuantity(line.cartKey, value)} label={line.name} size="sm" />
                       <strong>{yen(line.price * line.quantity)}</strong>
                     </div>
                   </div>

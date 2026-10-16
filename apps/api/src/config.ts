@@ -25,7 +25,7 @@ function parseTrustProxy(value: string | undefined): boolean | number | string {
 export const config = {
   isProduction,
   port: Number(process.env.PORT) || 4000,
-  databaseUrl: process.env.DATABASE_URL || 'mongodb://localhost:27017/kalpanarestro',
+  databaseUrl: process.env.DATABASE_URL || 'mysql://root:password@localhost:3306/kalpanarestro',
   jwtSecret: resolveJwtSecret(),
   corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:5173')
     .split(',')
@@ -43,8 +43,10 @@ export const config = {
   webDistDir: path.resolve(process.env.WEB_DIST_DIR || path.join(process.cwd(), '..', 'web', 'dist')),
   square: {
     accessToken: process.env.SQUARE_ACCESS_TOKEN?.trim() || '',
+    applicationId: process.env.SQUARE_APPLICATION_ID?.trim() || '',
     locationId: process.env.SQUARE_LOCATION_ID?.trim() || '',
     environment: (process.env.SQUARE_ENVIRONMENT?.trim() || 'sandbox') as 'sandbox' | 'production',
     webhookSignatureKey: process.env.SQUARE_WEBHOOK_SIGNATURE_KEY?.trim() || '',
+    webhookUrl: process.env.SQUARE_WEBHOOK_URL?.trim() || '',
   },
 };

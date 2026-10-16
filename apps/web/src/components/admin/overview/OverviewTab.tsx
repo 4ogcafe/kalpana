@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   AlertTriangle,
-  Armchair,
   ArrowDownRight,
   ArrowUpRight,
   Bike,
@@ -73,7 +72,7 @@ interface Analytics {
   series: { key: string; sales: number; orders: number; cancelled: number }[];
   busyHours: number[][];
   topItems: { nameEn: string; nameJa: string | null; quantity: number; sales: number; orders: number }[];
-  fulfillment: Record<'PICKUP' | 'DELIVERY' | 'DINE_IN', { orders: number; sales: number }>;
+  fulfillment: Record<'PICKUP' | 'DELIVERY', { orders: number; sales: number }>;
   promotions: { title: string; uses: number; discount: number }[];
   members: { total: number; new: number; previousNew: number; newsletter: number; buyers: number; returning: number };
   loyalty: { pointsEarned: number; pointsRedeemed: number; pointsOutstanding: number; stampsGiven: number; rewardsEarned: number; rewardsUsed: number };
@@ -85,11 +84,10 @@ interface Live {
   open: { NEW: number; CONFIRMED: number; READY: number; late: number; nextDue: { number: number; customerName: string; pickupAt: string } | null };
   today: { placed: number; completed: number; cancelled: number; sales: number | null };
   ordering: { pausedUntil: string | null; pickup: { enabled: boolean }; delivery: { enabled: boolean }; stampCard: boolean; liveOffers: number };
-  recentOrders: { id: string; number: number; status: string; fulfillment?: string; tableNumber?: string | null; customerName: string; member: boolean; amount: number | null; createdAt: string; pickupAt: string }[];
+  recentOrders: { id: string; number: number; status: string; fulfillment?: string; customerName: string; member: boolean; amount: number | null; createdAt: string; pickupAt: string }[];
   messages: { unread: number; recent: { id: string; name: string; type: string; isRead: boolean; createdAt: string; date?: string | null; guests?: number | null }[] };
   reservations: { id: string; name: string; date: string; guests: number | null; isRead: boolean }[];
   menu: { total: number; soldOut: string[] };
-  dining: { enabled: boolean; tables: number; occupied: number; guests: number; billRequested: number; calls: number };
 }
 
 const time = (iso: string) => new Date(iso).toLocaleTimeString('ja-JP', { timeZone: TZ, hour: '2-digit', minute: '2-digit' });
@@ -274,31 +272,6 @@ function LiveSection({ live, isAdmin, onNavigate }: { live: Live | null; isAdmin
 
         <div className="ov-card">
           <div className="ov-card-head">
-            <h3><Armchair size={16} /> Tables</h3>
-            <button type="button" className="ov-link" onClick={() => onNavigate('Tables')}>Floor →</button>
-          </div>
-          {live.dining.tables === 0 ? (
-            <span className="ov-muted">No tables set up yet.</span>
-          ) : (
-            <>
-              <div className="ov-open">
-                <OpenCount label="Seated" value={live.dining.occupied} />
-                <OpenCount label="Free" value={Math.max(0, live.dining.tables - live.dining.occupied)} />
-                <OpenCount label="Guests" value={live.dining.guests} />
-              </div>
-              {live.dining.calls > 0 ? (
-                <Status tone="critical" icon={<AlertTriangle size={14} />}>{live.dining.calls} table call{live.dining.calls === 1 ? '' : 's'} waiting</Status>
-              ) : live.dining.billRequested > 0 ? (
-                <Status tone="warning" icon={<AlertTriangle size={14} />}>{live.dining.billRequested} waiting to pay</Status>
-              ) : (
-                <OnOff on={live.dining.enabled} label="Table ordering" />
-              )}
-            </>
-          )}
-        </div>
-
-        <div className="ov-card">
-          <div className="ov-card-head">
             <h3><UtensilsCrossed size={16} /> Menu</h3>
             <button type="button" className="ov-link" onClick={() => onNavigate('Menu Management')}>Menu →</button>
           </div>
@@ -330,7 +303,7 @@ function LiveSection({ live, isAdmin, onNavigate }: { live: Live | null; isAdmin
                     <tr key={order.id}>
                       <td className="num">#{formatOrderNumber(order.number)}</td>
                       <td>{order.customerName}{order.member && <span className="ov-tag">Member</span>}</td>
-                      <td>{order.fulfillment === 'DELIVERY' ? 'Delivery' : order.fulfillment === 'DINE_IN' ? `Table ${order.tableNumber ?? ''}` : 'Pickup'}</td>
+                      <td>{order.fulfillment === 'DELIVERY' ? 'Delivery' : 'Pickup'}</td>
                       <td><span className={`ov-status ov-status-${order.status.toLowerCase()}`}>{STATUS_LABEL[order.status] ?? order.status}</span></td>
                       <td className="num">{dateTime(order.pickupAt)}</td>
                       {isAdmin && <td className="num">{order.amount === null ? '–' : yen(order.amount)}</td>}
@@ -489,13 +462,12 @@ function AnalyticsSection({ data, onNavigate }: { data: Analytics; onNavigate: (
 
         <div className="ov-stack">
           <div className="ov-card">
-            <ChartHead title="Sales by channel" sub="Share of sales: pickup, delivery and dine-in" />
+            <ChartHead title="Sales by channel" sub="Share of sales: pickup and delivery" />
             <SplitBar
               format={yen}
               parts={[
                 { label: 'Pickup', value: data.fulfillment.PICKUP.sales, color: SERIES.blue, detail: `${data.fulfillment.PICKUP.orders} orders · ${yen(data.fulfillment.PICKUP.sales)}` },
                 { label: 'Delivery', value: data.fulfillment.DELIVERY.sales, color: SERIES.orange, detail: `${data.fulfillment.DELIVERY.orders} orders · ${yen(data.fulfillment.DELIVERY.sales)}` },
-                { label: 'Dine-in', value: data.fulfillment.DINE_IN?.sales ?? 0, color: SERIES.aqua, detail: `${data.fulfillment.DINE_IN?.orders ?? 0} orders · ${yen(data.fulfillment.DINE_IN?.sales ?? 0)}` },
               ]}
             />
             {now.deliveryFees > 0 && <p className="ov-muted" style={{ margin: '8px 0 0' }}>Delivery fees collected: {yen(now.deliveryFees)}</p>}

@@ -1,8 +1,6 @@
 import express from 'express';
-import { ObjectId } from 'mongodb';
 import { z } from 'zod';
 import { notFound, AppError } from '../lib/errors.js';
-import { db, toObjectId } from '../lib/mongo.js';
 import { prisma } from '../lib/prisma.js';
 import { definedOnly, idParam, imageUrl, objectIdString, optionalNumber, optionalText } from '../lib/schemas.js';
 import { requireAdmin, requireStaff } from '../middleware/auth.js';
@@ -23,8 +21,6 @@ const categoryUpdateSchema = z.object({
   nameJa: optionalText(100),
   sortOrder: optionalNumber(z.number().int().min(0).max(10_000)),
   parentId: z.preprocess((value) => (value === '' ? null : value), objectIdString.nullable().optional()),
-  // Table QR menu: true = show, false = hide, null = automatic (follow the parent / hide takeout-only).
-  dineIn: z.boolean().nullable().optional(),
 });
 
 const itemFields = {
@@ -35,22 +31,30 @@ const itemFields = {
   price: z.coerce.number().int().min(0).max(MAX_PRICE),
   imageUrl: imageUrl.optional(),
   rating: optionalNumber(z.number().min(0).max(5)),
+  spiceLevel: z.coerce.number().int().min(0).max(5).optional(),
   isRecommended: z.boolean().optional(),
   isVegetarian: z.boolean().optional(),
   isVegan: z.boolean().optional(),
+  isHalal: z.boolean().optional(),
   isGlutenFree: z.boolean().optional(),
   isSoldOut: z.boolean().optional(),
+  isActive: z.boolean().optional(),
+  sortOrder: z.coerce.number().int().min(0).max(10000).optional(),
+  menuTypes: z.array(z.enum(['LUNCH', 'TAKEOUT', 'GRAND'])).optional(),
+  allergens: z.array(z.string().trim().max(50)).optional(),
 };
 
 const itemCreateSchema = z.object({
   ...itemFields,
-  categoryName: z.string().trim().min(1).max(100),
-});
+  categoryId: objectIdString.optional(),
+  categoryName: z.string().trim().min(1).max(100).optional(),
+}).refine(d => d.categoryId || d.categoryName, { message: 'categoryId or categoryName is required' });
 
 const itemUpdateSchema = z.object({
   ...itemFields,
   nameEn: itemFields.nameEn.optional(),
   price: itemFields.price.optional(),
+  categoryId: objectIdString.optional(),
   optionGroupIds: z.array(objectIdString).optional(),
 });
 
@@ -63,44 +67,44 @@ router.get('/categories', publicCache, async (_req, res) => {
 
 router.post('/categories', requireAdmin, async (req, res) => {
   const { nameEn, nameJa, parentId } = categoryCreateSchema.parse(req.body);
-  const now = new Date();
-  const category = {
-    _id: new ObjectId(),
-    nameEn,
-    nameJa: nameJa ?? nameEn,
-    sortOrder: 0,
-    ...(parentId ? { parentId: toObjectId(parentId, 'parentId') } : {}),
-    createdAt: now,
-    updatedAt: now,
-  };
-  await db().collection('Category').insertOne(category);
-  res.status(201).json({ ...category, id: category._id.toHexString() });
+  const category = await prisma.category.create({
+    data: {
+      nameEn,
+      nameJa: nameJa ?? nameEn,
+      sortOrder: 0,
+      parentId: parentId ?? null,
+    },
+  });
+  res.status(201).json(category);
 });
 
 router.put('/categories/:id', requireAdmin, async (req, res) => {
   const id = idParam(req.params);
   const { parentId, ...fields } = categoryUpdateSchema.parse(req.body);
-  if (parentId && parentId === id.toHexString()) {
+  if (parentId && parentId === id) {
     throw new AppError(400, 'VALIDATION_ERROR', 'A category cannot be its own parent');
   }
 
-  const update: Record<string, unknown> = { ...definedOnly(fields), updatedAt: new Date() };
-  if (parentId !== undefined) update.parentId = parentId ? toObjectId(parentId, 'parentId') : null;
+  const data: Record<string, unknown> = { ...definedOnly(fields) };
+  if (parentId !== undefined) data.parentId = parentId ?? null;
 
-  const result = await db().collection('Category').updateOne({ _id: id }, { $set: update });
-  if (result.matchedCount === 0) throw notFound('Category');
+  try {
+    await prisma.category.update({ where: { id }, data });
+  } catch {
+    throw notFound('Category');
+  }
   res.json({ success: true });
 });
 
-/** The category plus every descendant, so deletes never leave orphaned subcategories or items. */
-async function categoryTree(rootId: ObjectId): Promise<ObjectId[]> {
+/** The category plus every descendant so deletes never leave orphaned children. */
+async function categoryTree(rootId: string): Promise<string[]> {
   const ids = [rootId];
   for (let frontier = [rootId]; frontier.length > 0; ) {
-    const children = await db()
-      .collection('Category')
-      .find({ parentId: { $in: frontier } }, { projection: { _id: 1 } })
-      .toArray();
-    frontier = children.map((child) => child._id).filter((childId) => !ids.some((known) => known.equals(childId)));
+    const children = await prisma.category.findMany({
+      where: { parentId: { in: frontier } },
+      select: { id: true },
+    });
+    frontier = children.map((c) => c.id).filter((cid) => !ids.includes(cid));
     ids.push(...frontier);
   }
   return ids;
@@ -108,13 +112,13 @@ async function categoryTree(rootId: ObjectId): Promise<ObjectId[]> {
 
 router.delete('/categories/:id', requireAdmin, async (req, res) => {
   const id = idParam(req.params);
-  const exists = await db().collection('Category').countDocuments({ _id: id }, { limit: 1 });
+  const exists = await prisma.category.count({ where: { id } });
   if (!exists) throw notFound('Category');
 
   const ids = await categoryTree(id);
-  // Items first: an item pointing at a deleted category breaks every menu read.
-  await db().collection('MenuItem').deleteMany({ categoryId: { $in: ids } });
-  await db().collection('Category').deleteMany({ _id: { $in: ids } });
+  // Delete items first so the FK from MenuItem to Category isn't violated.
+  await prisma.menuItem.deleteMany({ where: { categoryId: { in: ids } } });
+  await prisma.category.deleteMany({ where: { id: { in: ids } } });
   res.json({ success: true });
 });
 
@@ -122,70 +126,85 @@ router.delete('/categories/:id', requireAdmin, async (req, res) => {
 
 router.get('/items', publicCache, async (_req, res) => {
   const items = await prisma.menuItem.findMany({
-    include: { category: true },
-    orderBy: { createdAt: 'desc' },
+    include: {
+      category: true,
+      variants: { orderBy: { sortOrder: 'asc' } },
+      optionGroups: { select: { id: true, nameJa: true, nameEn: true, type: true } },
+    },
+    orderBy: [{ categoryId: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'desc' }],
   });
   res.json(items);
 });
 
 router.post('/items', requireStaff, async (req, res) => {
-  const { categoryName, ...fields } = itemCreateSchema.parse(req.body);
-  const categories = db().collection('Category');
+  const { categoryId, categoryName, optionGroupIds, ...fields } = itemCreateSchema.parse(req.body) as any;
 
-  let category = await categories.findOne({ nameEn: categoryName });
-  if (!category) {
-    const now = new Date();
-    category = { _id: new ObjectId(), nameEn: categoryName, nameJa: categoryName, sortOrder: 0, createdAt: now, updatedAt: now };
-    await categories.insertOne(category);
+  let catId = categoryId as string | undefined;
+  if (!catId) {
+    let category = await prisma.category.findFirst({ where: { nameEn: categoryName } });
+    if (!category) {
+      category = await prisma.category.create({
+        data: { nameEn: categoryName, nameJa: categoryName, sortOrder: 0 },
+      });
+    }
+    catId = category.id;
   }
 
-  const now = new Date();
-  // Every field Prisma's MenuItem model requires gets a value, so reads never fail on this document.
-  const item = {
-    _id: new ObjectId(),
-    categoryId: category._id,
-    menuTypes: [],
-    nameEn: fields.nameEn,
-    nameJa: fields.nameJa ?? null,
-    descriptionEn: fields.descriptionEn ?? '',
-    descriptionJa: fields.descriptionJa ?? null,
-    price: fields.price,
-    imageUrl: fields.imageUrl ?? '',
-    rating: fields.rating ?? null,
-    spiceLevel: 0,
-    allergens: [],
-    isRecommended: fields.isRecommended ?? false,
-    isVegetarian: fields.isVegetarian ?? false,
-    isVegan: fields.isVegan ?? false,
-    isHalal: false,
-    isGlutenFree: fields.isGlutenFree ?? false,
-    isSoldOut: false,
-    isActive: true,
-    sortOrder: 0,
-    createdAt: now,
-    updatedAt: now,
-  };
-  await db().collection('MenuItem').insertOne(item);
-  res.status(201).json({ ...item, id: item._id.toHexString() });
+  const item = await prisma.menuItem.create({
+    data: {
+      categoryId: catId,
+      menuTypes: fields.menuTypes ?? [],
+      nameEn: fields.nameEn,
+      nameJa: fields.nameJa ?? null,
+      descriptionEn: fields.descriptionEn ?? '',
+      descriptionJa: fields.descriptionJa ?? null,
+      price: fields.price,
+      imageUrl: fields.imageUrl ?? '',
+      rating: fields.rating ?? null,
+      spiceLevel: fields.spiceLevel ?? 0,
+      allergens: fields.allergens ?? [],
+      isRecommended: fields.isRecommended ?? false,
+      isVegetarian: fields.isVegetarian ?? false,
+      isVegan: fields.isVegan ?? false,
+      isHalal: fields.isHalal ?? false,
+      isGlutenFree: fields.isGlutenFree ?? false,
+      isSoldOut: fields.isSoldOut ?? false,
+      isActive: fields.isActive ?? true,
+      sortOrder: fields.sortOrder ?? 0,
+      ...(optionGroupIds?.length ? { optionGroups: { connect: (optionGroupIds as string[]).map((id: string) => ({ id })) } } : {}),
+    },
+  });
+  res.status(201).json(item);
 });
 
 router.put('/items/:id', requireStaff, async (req, res) => {
   const id = idParam(req.params);
-  const { optionGroupIds, ...rest } = definedOnly(itemUpdateSchema.parse(req.body));
-  const update: Record<string, unknown> = { ...rest, updatedAt: new Date() };
-  if (optionGroupIds !== undefined) {
-    update.optionGroupIds = optionGroupIds.map((gid: string) => new ObjectId(gid));
+  const { optionGroupIds, categoryId, menuTypes, allergens, ...rest } = definedOnly(itemUpdateSchema.parse(req.body));
+
+  const data: Record<string, unknown> = { ...rest };
+  if (categoryId !== undefined) data.categoryId = categoryId;
+  if (menuTypes !== undefined) data.menuTypes = menuTypes;
+  if (allergens !== undefined) data.allergens = allergens;
+
+  const connectDisconnect = optionGroupIds !== undefined
+    ? { optionGroups: { set: optionGroupIds.map((gid: string) => ({ id: gid })) } }
+    : {};
+
+  try {
+    await prisma.menuItem.update({ where: { id }, data: { ...data, ...connectDisconnect } as any });
+  } catch {
+    throw notFound('Menu item');
   }
-  const result = await db()
-    .collection('MenuItem')
-    .updateOne({ _id: id }, { $set: update });
-  if (result.matchedCount === 0) throw notFound('Menu item');
   res.json({ success: true });
 });
 
 router.delete('/items/:id', requireAdmin, async (req, res) => {
-  const result = await db().collection('MenuItem').deleteOne({ _id: idParam(req.params) });
-  if (result.deletedCount === 0) throw notFound('Menu item');
+  const id = idParam(req.params);
+  try {
+    await prisma.menuItem.delete({ where: { id } });
+  } catch {
+    throw notFound('Menu item');
+  }
   res.json({ success: true });
 });
 
@@ -207,34 +226,46 @@ const optionGroupSchema = z.object({
   sortOrder: z.coerce.number().int().min(0).max(10000).default(0),
 });
 
-const optionGroups = () => db().collection('OptionGroup');
-
 router.get('/option-groups', publicCache, async (_req, res) => {
-  const groups = await optionGroups().find({}).sort({ sortOrder: 1, createdAt: 1 }).toArray();
-  res.json(groups.map(g => ({ id: g._id.toHexString(), nameJa: g.nameJa, nameEn: g.nameEn, type: g.type, required: g.required, options: g.options, sortOrder: g.sortOrder })));
+  const groups = await prisma.optionGroup.findMany({ orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] });
+  res.json(groups.map((g) => ({
+    id: g.id,
+    nameJa: g.nameJa,
+    nameEn: g.nameEn,
+    type: g.type,
+    required: g.required,
+    options: g.options,
+    sortOrder: g.sortOrder,
+  })));
 });
 
 router.post('/option-groups', requireAdmin, async (req, res) => {
   const data = optionGroupSchema.parse(req.body);
-  const now = new Date();
-  const result = await optionGroups().insertOne({ ...data, createdAt: now, updatedAt: now });
-  res.status(201).json({ id: result.insertedId.toHexString(), ...data });
+  const group = await prisma.optionGroup.create({ data: { ...data, options: data.options as unknown as Parameters<typeof prisma.optionGroup.create>[0]['data']['options'] } });
+  res.status(201).json({ id: group.id, ...data });
 });
 
 router.put('/option-groups/:id', requireAdmin, async (req, res) => {
   const id = idParam(req.params);
-  const group = await optionGroups().findOne({ _id: id });
+  const group = await prisma.optionGroup.findUnique({ where: { id } });
   if (!group) throw notFound('OptionGroup');
   const data = optionGroupSchema.partial().parse(req.body);
-  await optionGroups().updateOne({ _id: group._id }, { $set: { ...data, updatedAt: new Date() } });
-  res.json({ id: group._id.toHexString(), ...group, ...data, _id: undefined });
+  const updated = await prisma.optionGroup.update({
+    where: { id },
+    data: data.options !== undefined
+      ? { ...data, options: data.options as unknown as Parameters<typeof prisma.optionGroup.update>[0]['data']['options'] }
+      : data,
+  });
+  res.json({ id: updated.id, nameJa: updated.nameJa, nameEn: updated.nameEn, type: updated.type, required: updated.required, options: updated.options, sortOrder: updated.sortOrder });
 });
 
 router.delete('/option-groups/:id', requireAdmin, async (req, res) => {
   const id = idParam(req.params);
-  const group = await optionGroups().findOne({ _id: id });
-  if (!group) throw notFound('OptionGroup');
-  await optionGroups().deleteOne({ _id: group._id });
+  try {
+    await prisma.optionGroup.delete({ where: { id } });
+  } catch {
+    throw notFound('OptionGroup');
+  }
   res.status(204).end();
 });
 

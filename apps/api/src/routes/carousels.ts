@@ -1,8 +1,6 @@
 import express from 'express';
-import { ObjectId } from 'mongodb';
 import { z } from 'zod';
 import { notFound } from '../lib/errors.js';
-import { db } from '../lib/mongo.js';
 import { prisma } from '../lib/prisma.js';
 import { definedOnly, idParam, imageUrl, optionalText } from '../lib/schemas.js';
 import { requireAdmin } from '../middleware/auth.js';
@@ -29,7 +27,6 @@ const slideCreateSchema = z.object({
 });
 
 router.get('/', publicCache, async (req, res) => {
-  // ?all=true is the admin list (every placement, inactive included); everything here is public content.
   const showAll = req.query.all === 'true';
   const slides = await prisma.carouselSlide.findMany({
     orderBy: { sortOrder: 'asc' },
@@ -42,36 +39,42 @@ router.get('/', publicCache, async (req, res) => {
 router.put('/:id', requireAdmin, async (req, res) => {
   const id = idParam(req.params);
   const fields = definedOnly(slideUpdateSchema.parse(req.body));
-  // altEn is required by the schema; never let an update null it out.
   if (fields.altEn === null) fields.altEn = '';
-  const result = await db()
-    .collection('CarouselSlide')
-    .updateOne({ _id: id }, { $set: { ...fields, updatedAt: new Date() } });
-  if (result.matchedCount === 0) throw notFound('Slide');
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await prisma.carouselSlide.update({ where: { id }, data: fields as any });
+  } catch {
+    throw notFound('Slide');
+  }
+  res.json({ success: true });
+});
+
+router.delete('/:id', requireAdmin, async (req, res) => {
+  const id = idParam(req.params);
+  try {
+    await prisma.carouselSlide.delete({ where: { id } });
+  } catch {
+    throw notFound('Slide');
+  }
   res.json({ success: true });
 });
 
 router.post('/', requireAdmin, async (req, res) => {
   const { titleEn, titleJa, altEn, imageUrl: image, placement: slidePlacement } = slideCreateSchema.parse(req.body);
-  const slides = db().collection('CarouselSlide');
-  const count = await slides.countDocuments({ placement: slidePlacement });
-  const now = new Date();
+  const count = await prisma.carouselSlide.count({ where: { placement: slidePlacement as 'HOME' | 'CONTACT' } });
 
-  const slide = {
-    _id: new ObjectId(),
-    titleEn: titleEn ?? '',
-    titleJa: titleJa ?? '',
-    // Required by the Prisma model: a slide without it makes every carousel read fail.
-    altEn: altEn || titleEn || titleJa || '',
-    imageUrl: image,
-    placement: slidePlacement,
-    isActive: true,
-    sortOrder: count,
-    createdAt: now,
-    updatedAt: now,
-  };
-  await slides.insertOne(slide);
-  res.status(201).json({ ...slide, id: slide._id.toHexString() });
+  const slide = await prisma.carouselSlide.create({
+    data: {
+      titleEn: titleEn ?? '',
+      titleJa: titleJa ?? '',
+      altEn: altEn || titleEn || titleJa || '',
+      imageUrl: image,
+      placement: slidePlacement as 'HOME' | 'CONTACT',
+      isActive: true,
+      sortOrder: count,
+    },
+  });
+  res.status(201).json(slide);
 });
 
 export default router;

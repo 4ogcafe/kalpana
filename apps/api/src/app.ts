@@ -17,7 +17,7 @@ import orderRoutes from './routes/orders.js';
 import customerRoutes from './routes/customers.js';
 import offerRoutes from './routes/offers.js';
 import stampRoutes from './routes/stamps.js';
-import diningRoutes from './routes/dining.js';
+
 import reviewRoutes from './routes/reviews.js';
 import pushRoutes from './routes/push.js';
 import squareRoutes from './routes/square.js';
@@ -44,8 +44,9 @@ export function createApp() {
           'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
           'font-src': ["'self'", 'data:', 'https://fonts.gstatic.com'],
           'img-src': ["'self'", 'data:', 'blob:', 'https:'],
-          'frame-src': ['https://www.google.com', 'https://maps.google.com'],
-          'connect-src': ["'self'", ...config.corsOrigins],
+          'frame-src': ['https://www.google.com', 'https://maps.google.com', 'https://pci.squarecdn.com'],
+          'connect-src': ["'self'", 'https://pci.squareup.com', 'https://js.squareup.com', ...config.corsOrigins],
+          'script-src': ["'self'", 'https://sandbox.web.squarecdn.com', 'https://web.squarecdn.com'],
         },
       },
     }),
@@ -79,7 +80,7 @@ export function createApp() {
   app.use('/api/v1/customers', customerRoutes);
   app.use('/api/v1/offers', offerRoutes);
   app.use('/api/v1/stamps', stampRoutes);
-  app.use('/api/v1/dining', diningRoutes);
+
   app.use('/api/v1/reviews', reviewRoutes);
   app.use('/api/v1/push', pushRoutes);
   app.use('/api/v1/square', squareRoutes);

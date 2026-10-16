@@ -22,14 +22,12 @@ const AccountAuth = lazy(() => import('./pages/AccountAuth'));
 const Login = lazy(() => import('./pages/Login'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const Kitchen = lazy(() => import('./pages/Kitchen'));
-const CashDashboard = lazy(() => import('./pages/CashDashboard'));
-const TableOrder = lazy(() => import('./pages/TableOrder'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 function AppContent() {
   const location = useLocation();
   // The admin, kitchen and member dashboards have their own navigation.
-  const hideNavAndFooter = ['/login', '/admin', '/kitchen', '/cash', '/account'].includes(location.pathname) || location.pathname.startsWith('/t/');
+  const hideNavAndFooter = ['/login', '/admin', '/kitchen', '/account'].includes(location.pathname);
 
   return (
     <div className="antialiased">
@@ -48,8 +46,6 @@ function AppContent() {
           <Route path="/login" element={<Login />} />
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/kitchen" element={<Kitchen />} />
-          <Route path="/cash" element={<CashDashboard />} />
-          <Route path="/t/:token" element={<TableOrder />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>

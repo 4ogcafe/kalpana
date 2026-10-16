@@ -1,7 +1,7 @@
 import { Check, Printer, RotateCcw, X } from 'lucide-react';
 import { formatOrderNumber } from '../../lib/format';
 import { alertText } from '../admin/dietary';
-import { clockTime, countdown, dueDay, isDelivery, isDineIn, minutesBetween, nextAction, typeLabel, urgency, type KitchenOrder, type KitchenStatus } from './kitchen';
+import { clockTime, countdown, dueDay, isDelivery, minutesBetween, nextAction, typeLabel, urgency, type KitchenOrder, type KitchenStatus } from './kitchen';
 
 /** One order on the kitchen display: what to cook, by when, and the next step. */
 export default function KitchenTicket({ order, now, busy, onMove, onToggleLine, onPrint }: {
@@ -28,7 +28,7 @@ export default function KitchenTicket({ order, now, busy, onMove, onToggleLine, 
       <header className="kt-head">
         <div>
           <div className="kt-number">#{formatOrderNumber(order.number)}</div>
-          <span className={`kt-type${delivery ? ' is-delivery' : ''}${isDineIn(order) ? ' is-table' : ''}`}>{typeLabel(order)}</span>
+          <span className={`kt-type${delivery ? ' is-delivery' : ''}`}>{typeLabel(order)}</span>
           {order.customerId && <span className="kt-member">Member</span>}
         </div>
         <div className="kt-due">
@@ -38,7 +38,7 @@ export default function KitchenTicket({ order, now, busy, onMove, onToggleLine, 
       </header>
 
       <div className="kt-meta">
-        <span>{isDineIn(order) ? 'Dine-in' : order.customerName}</span>
+        <span>{order.customerName}</span>
         {waited !== null && order.status !== 'READY' && <span>{order.status === 'NEW' ? `placed ${waited} min ago` : `cooking ${waited} min`}</span>}
       </div>
 

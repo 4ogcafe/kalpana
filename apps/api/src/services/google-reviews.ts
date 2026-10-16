@@ -1,6 +1,6 @@
 import { config } from '../config.js';
 import { logger } from '../lib/logger.js';
-import { db } from '../lib/mongo.js';
+import { prisma } from '../lib/prisma.js';
 import { loadSettings } from './settings-store.js';
 
 // The restaurant's Google rating and latest reviews, from the Google Places API (New). Fetched on the
@@ -94,10 +94,20 @@ export function toCache(placeId: string, details: PlaceDetails, now: Date = new 
   };
 }
 
-const cacheCollection = () => db().collection<ReviewCache & { _id: string }>('GoogleReviewCache');
-
 export async function readCache(): Promise<ReviewCache | null> {
-  return cacheCollection().findOne({ _id: CACHE_ID });
+  const row = await prisma.googleReviewCache.findUnique({ where: { id: CACHE_ID } });
+  if (!row) return null;
+  return {
+    placeId: row.placeId,
+    name: row.name,
+    rating: row.rating,
+    userRatingCount: row.userRatingCount,
+    mapsUrl: row.mapsUrl,
+    reviews: row.reviews as unknown as GoogleReview[],
+    fetchedAt: row.fetchedAt,
+    lastError: row.lastError,
+    lastErrorAt: row.lastErrorAt,
+  };
 }
 
 /** Fetches the latest rating and reviews now. On failure the previous copy is kept and the error recorded. */
@@ -111,12 +121,20 @@ export async function refreshReviews(fetchImpl: Fetch = fetch): Promise<ReviewCa
       fieldMask: 'id,displayName,rating,userRatingCount,googleMapsUri,reviews',
     }, fetchImpl);
     const cache = toCache(placeId, details);
-    await cacheCollection().replaceOne({ _id: CACHE_ID }, cache, { upsert: true });
+    await prisma.googleReviewCache.upsert({
+      where: { id: CACHE_ID },
+      create: { id: CACHE_ID, ...cache, reviews: cache.reviews as unknown as Parameters<typeof prisma.googleReviewCache.create>[0]['data']['reviews'] },
+      update: { ...cache, reviews: cache.reviews as unknown as Parameters<typeof prisma.googleReviewCache.update>[0]['data']['reviews'] },
+    });
     logger.info({ placeId, reviews: cache.reviews.length }, 'Google reviews refreshed');
     return cache;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    await cacheCollection().updateOne({ _id: CACHE_ID }, { $set: { lastError: message, lastErrorAt: new Date(), placeId } }, { upsert: true });
+    await prisma.googleReviewCache.upsert({
+      where: { id: CACHE_ID },
+      create: { id: CACHE_ID, placeId, reviews: [], lastError: message, lastErrorAt: new Date() },
+      update: { lastError: message, lastErrorAt: new Date(), placeId },
+    });
     logger.warn({ err: message }, 'Google reviews refresh failed');
     throw new Error(message);
   }

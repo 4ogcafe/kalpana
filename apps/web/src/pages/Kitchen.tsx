@@ -12,7 +12,6 @@ import {
   allDayCounts,
   clockTime,
   isDelivery,
-  isDineIn,
   printTicket,
   type ActiveStatus,
   type KitchenBoard,
@@ -37,7 +36,7 @@ const notify = {
   error: (message: string) => toast.error(message, AT_BOTTOM),
 };
 
-type Filter = 'ALL' | 'PICKUP' | 'DELIVERY' | 'DINE_IN';
+type Filter = 'ALL' | 'PICKUP' | 'DELIVERY';
 
 interface Prefs {
   sound: boolean;
@@ -47,7 +46,7 @@ interface Prefs {
 function loadPrefs(): Prefs {
   try {
     const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}');
-    return { sound: saved.sound !== false, filter: ['ALL', 'PICKUP', 'DELIVERY', 'DINE_IN'].includes(saved.filter) ? saved.filter : 'ALL' };
+    return { sound: saved.sound !== false, filter: ['ALL', 'PICKUP', 'DELIVERY'].includes(saved.filter) ? saved.filter : 'ALL' };
   } catch {
     return { sound: true, filter: 'ALL' };
   }
@@ -118,7 +117,7 @@ export default function Kitchen() {
       if (knownNew.current) {
         const arrived = data.active.filter(order => order.status === 'NEW' && !knownNew.current!.has(order.id));
         if (arrived.length > 0) {
-          for (const order of arrived) notify.success(`New order #${formatOrderNumber(order.number)} · ${isDineIn(order) ? `Table ${order.tableNumber}` : `${isDelivery(order) ? 'Delivery' : 'Pickup'} ${clockTime(order.pickupAt)}`}`, { duration: 8000, id: `new-${order.id}` });
+          for (const order of arrived) notify.success(`New order #${formatOrderNumber(order.number)} · ${isDelivery(order) ? 'Delivery' : 'Pickup'} ${clockTime(order.pickupAt)}`, { duration: 8000, id: `new-${order.id}` });
         }
       }
       knownNew.current = newIds;
@@ -247,7 +246,7 @@ export default function Kitchen() {
     toast(
       t => (
         <span style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          #{formatOrderNumber(order.number)} {isDineIn(order) ? 'served' : isDelivery(order) ? 'delivered' : 'picked up'}
+          #{formatOrderNumber(order.number)} {isDelivery(order) ? 'delivered' : 'picked up'}
           <button
             type="button"
             className="kd-undo"
@@ -380,9 +379,9 @@ export default function Kitchen() {
         </dl>
 
         <div className="kd-filter" role="group" aria-label="Show orders">
-          {(['ALL', 'DINE_IN', 'PICKUP', 'DELIVERY'] as Filter[]).map(value => (
+          {(['ALL', 'PICKUP', 'DELIVERY'] as Filter[]).map(value => (
             <button key={value} type="button" aria-pressed={prefs.filter === value} onClick={() => setPrefs(p => ({ ...p, filter: value }))}>
-              {value === 'ALL' ? 'All' : value === 'DINE_IN' ? '🍽 Tables' : value === 'PICKUP' ? '🛍 Pickup' : '🛵 Delivery'}
+              {value === 'ALL' ? 'All' : value === 'PICKUP' ? '🛍 Pickup' : '🛵 Delivery'}
             </button>
           ))}
         </div>
@@ -491,8 +490,8 @@ export default function Kitchen() {
                 {board.done.map(order => (
                   <li key={order.id} className={order.status === 'CANCELLED' ? 'is-cancelled' : undefined}>
                     <div>
-                      <strong>#{formatOrderNumber(order.number)}</strong> {isDineIn(order) ? `Table ${order.tableNumber}` : order.customerName}
-                      <span className="kd-muted"> · {order.status === 'CANCELLED' ? 'Cancelled' : isDineIn(order) ? 'Served' : isDelivery(order) ? 'Delivered' : 'Picked up'} {clockTime(order.completedAt ?? order.cancelledAt ?? order.updatedAt)}</span>
+                      <strong>#{formatOrderNumber(order.number)}</strong> {order.customerName}
+                      <span className="kd-muted"> · {order.status === 'CANCELLED' ? 'Cancelled' : isDelivery(order) ? 'Delivered' : 'Picked up'} {clockTime(order.completedAt ?? order.cancelledAt ?? order.updatedAt)}</span>
                       <div className="kd-muted">{order.items.map(line => `${line.quantity}× ${line.nameEn}`).join(', ')}</div>
                     </div>
                     <button type="button" className="kd-tool" onClick={() => print(order)} aria-label={`Print order ${order.number}`}><Printer size={18} /></button>

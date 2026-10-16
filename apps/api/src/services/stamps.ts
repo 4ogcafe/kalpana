@@ -1,6 +1,5 @@
-import { MongoServerError, ObjectId } from 'mongodb';
 import { AppError } from '../lib/errors.js';
-import { db } from '../lib/mongo.js';
+import { prisma } from '../lib/prisma.js';
 import {
   cooldownCutoff,
   newMemberCode,
@@ -13,35 +12,30 @@ import {
 } from '../lib/stamps.js';
 import { loadSettings } from './settings-store.js';
 
-const DUPLICATE_KEY = 11000;
 const HISTORY_LIMIT = 50;
 
-let indexesReady: Promise<unknown> | undefined;
-const ensureIndexes = () =>
-  (indexesReady ??= Promise.all([
-    db().collection('Customer').createIndex({ memberCode: 1 }, { unique: true, partialFilterExpression: { memberCode: { $type: 'string' } } }),
-    db().collection('Stamp').createIndex({ customerId: 1, createdAt: -1 }),
-    db().collection('Stamp').createIndex({ orderId: 1 }, { unique: true, partialFilterExpression: { orderId: { $type: 'objectId' } } }),
-    db().collection('StampReward').createIndex({ customerId: 1, status: 1, earnedAt: -1 }),
-  ]));
-
 /** The member's in-store code, created the first time it is needed. */
-export async function memberCodeFor(customerId: ObjectId): Promise<string> {
-  await ensureIndexes();
-  const existing = await db().collection('Customer').findOne({ _id: customerId }, { projection: { memberCode: 1 } });
-  if (typeof existing?.memberCode === 'string') return existing.memberCode;
+export async function memberCodeFor(customerId: string): Promise<string> {
+  const existing = await prisma.customer.findUnique({
+    where: { id: customerId },
+    select: { memberCode: true },
+  });
+  if (existing?.memberCode) return existing.memberCode;
+
+  // Assign a unique code. Retry on the rare collision from the UNIQUE constraint.
   for (;;) {
     const code = newMemberCode();
     try {
-      const updated = await db()
-        .collection('Customer')
-        .findOneAndUpdate({ _id: customerId, memberCode: { $exists: false } }, { $set: { memberCode: code } }, { returnDocument: 'after' });
-      if (updated) return code;
-      // Another request created it first.
-      const again = await db().collection('Customer').findOne({ _id: customerId }, { projection: { memberCode: 1 } });
-      return String(again?.memberCode);
-    } catch (err) {
-      if (!(err instanceof MongoServerError && err.code === DUPLICATE_KEY)) throw err;
+      const result = await prisma.customer.updateMany({
+        where: { id: customerId, memberCode: null },
+        data: { memberCode: code },
+      });
+      if (result.count > 0) return code;
+      // Another request raced ahead — return whatever was set.
+      const again = await prisma.customer.findUnique({ where: { id: customerId }, select: { memberCode: true } });
+      return again?.memberCode ?? code;
+    } catch {
+      // Unique constraint violation — try a different code.
     }
   }
 }
@@ -56,124 +50,154 @@ export type StampResult =
   | { status: 'NOT_FOUND' };
 
 /**
- * Gives a member one stamp if the amount qualifies and the minimum gap since their last stamp has
- * passed. The gap check and the stamp are one atomic update, so a stamp can never be given twice.
+ * Gives a member one stamp if the amount qualifies and the minimum gap has passed.
+ * Uses an atomic UPDATE WHERE to ensure a stamp is never given twice.
  */
 export async function awardStamp(
-  customerId: ObjectId,
-  input: { source: StampSource; amount: number; orderId?: ObjectId; orderNumber?: number; userId?: string; note?: string },
+  customerId: string,
+  input: { source: StampSource; amount: number; orderId?: string; orderNumber?: number; userId?: string; note?: string },
   config?: StampConfig,
   now: Date = new Date(),
 ): Promise<StampResult> {
   const settings = config ?? stampConfig(await loadSettings());
   if (!settings.enabled) return { status: 'DISABLED' };
   if (input.amount < settings.minAmount) return { status: 'BELOW_MINIMUM', minAmount: settings.minAmount };
-  await ensureIndexes();
 
   const cutoff = cooldownCutoff(settings, now);
-  const customers = db().collection('Customer');
-  const updated = await customers.findOneAndUpdate(
-    {
-      _id: customerId,
-      deletedAt: { $exists: false },
-      $or: [{ lastStampAt: { $exists: false } }, { lastStampAt: null }, { lastStampAt: { $lte: cutoff } }],
+
+  // Atomically claim the stamp slot by updating only when the cooldown has passed.
+  const updated = await prisma.customer.updateMany({
+    where: {
+      id: customerId,
+      deletedAt: null,
+      OR: [
+        { lastStampAt: null },
+        { lastStampAt: { lte: cutoff } },
+      ],
     },
-    { $inc: { stampCount: 1, stampTotal: 1 }, $set: { lastStampAt: now, updatedAt: now } },
-    { returnDocument: 'after' },
-  );
-  if (!updated) {
-    const customer = await customers.findOne({ _id: customerId, deletedAt: { $exists: false } }, { projection: { lastStampAt: 1 } });
+    data: {
+      stampCount: { increment: 1 },
+      stampTotal: { increment: 1 },
+      lastStampAt: now,
+      updatedAt: now,
+    },
+  });
+
+  if (updated.count === 0) {
+    const customer = await prisma.customer.findFirst({
+      where: { id: customerId, deletedAt: null },
+      select: { lastStampAt: true },
+    });
     if (!customer) return { status: 'NOT_FOUND' };
     return { status: 'TOO_SOON', nextAt: nextStampAt(customer.lastStampAt, settings, now) ?? now };
   }
 
-  // If the admin made cards shorter, a card already past the new length is completed by this stamp.
-  const count = Number(updated.stampCount);
-  const position = Math.min(count, settings.perCard);
-  const card = (Number(updated.stampCardsCompleted) || 0) + 1;
-  const cardCompleted = position >= settings.perCard;
-
-  await db().collection('Stamp').insertOne({
-    _id: new ObjectId(),
-    customerId,
-    card,
-    position,
-    source: input.source,
-    amount: input.amount,
-    orderId: input.orderId ?? null,
-    orderNumber: input.orderNumber ?? null,
-    userId: input.userId ? new ObjectId(input.userId) : null,
-    note: input.note ?? null,
-    createdAt: now,
+  const customer = await prisma.customer.findUnique({
+    where: { id: customerId },
+    select: { stampCount: true, stampCardsCompleted: true },
   });
 
-  const rewards = rewardsForStamp(position, settings).map((rule) => ({ titleJa: rule.titleJa, kind: rule.kind, amount: rule.kind === 'AMOUNT_OFF' ? (rule.amount ?? 0) : 0 }));
+  const count = customer?.stampCount ?? 1;
+  const position = Math.min(count, settings.perCard);
+  const card = (customer?.stampCardsCompleted ?? 0) + 1;
+  const cardCompleted = position >= settings.perCard;
+
+  await prisma.stamp.create({
+    data: {
+      customerId,
+      card,
+      position,
+      source: input.source,
+      amount: input.amount,
+      orderId: input.orderId ?? null,
+      orderNumber: input.orderNumber ?? null,
+      userId: input.userId ?? null,
+      note: input.note ?? null,
+      createdAt: now,
+    },
+  });
+
+  const rewards = rewardsForStamp(position, settings).map((rule) => ({
+    titleJa: rule.titleJa,
+    kind: rule.kind,
+    amount: rule.kind === 'AMOUNT_OFF' ? (rule.amount ?? 0) : 0,
+  }));
+
   if (rewards.length > 0) {
-    await db()
-      .collection('StampReward')
-      .insertMany(
-        rewards.map((reward) => ({
-          _id: new ObjectId(),
-          customerId,
-          ...reward,
-          card,
-          at: position,
-          status: 'AVAILABLE',
-          earnedAt: now,
-          expiresAt: rewardExpiry(now, settings),
-          usedAt: null,
-          orderId: null,
-        })),
-      );
+    await prisma.stampReward.createMany({
+      data: rewards.map((reward) => ({
+        customerId,
+        ...reward,
+        card,
+        at: position,
+        status: 'AVAILABLE',
+        earnedAt: now,
+        expiresAt: rewardExpiry(now, settings) ?? null,
+      })),
+    });
   }
 
   if (cardCompleted) {
-    await customers.updateOne({ _id: customerId, stampCount: count }, { $set: { stampCount: 0 }, $inc: { stampCardsCompleted: 1 } });
+    // Reset the stamp counter atomically; only when it still matches what we read.
+    await prisma.customer.updateMany({
+      where: { id: customerId, stampCount: count },
+      data: { stampCount: 0, stampCardsCompleted: { increment: 1 } },
+    });
   }
+
   return { status: 'AWARDED', position, perCard: settings.perCard, cardCompleted, rewards };
 }
 
-/** A reward the member holds that can be used now (not used, not expired). */
-export const usableRewardFilter = (customerId: ObjectId, now: Date = new Date()) => ({
-  customerId,
-  status: 'AVAILABLE',
-  $or: [{ expiresAt: null }, { expiresAt: { $exists: false } }, { expiresAt: { $gt: now } }],
-});
+const now = () => new Date();
 
-export async function findUsableReward(rewardId: ObjectId, customerId: ObjectId) {
-  const reward = await db().collection('StampReward').findOne({ _id: rewardId, ...usableRewardFilter(customerId) });
+/** A reward the member holds that can be used now. */
+export async function findUsableReward(rewardId: string, customerId: string) {
+  const reward = await prisma.stampReward.findFirst({
+    where: {
+      id: rewardId,
+      customerId,
+      status: 'AVAILABLE',
+      OR: [{ expiresAt: null }, { expiresAt: { gt: now() } }],
+    },
+  });
   if (!reward) throw new AppError(409, 'REWARD_UNAVAILABLE', 'このスタンプ特典はご利用いただけません。');
   return reward;
 }
 
-/** Marks a reward used, atomically, so it can't be used on two orders. Returns false if it was already used. */
-export async function useReward(rewardId: ObjectId, customerId: ObjectId, meta: { orderId?: ObjectId; orderNumber?: number; userId?: string }) {
-  const result = await db()
-    .collection('StampReward')
-    .updateOne(
-      { _id: rewardId, ...usableRewardFilter(customerId) },
-      {
-        $set: {
-          status: 'USED',
-          usedAt: new Date(),
-          orderId: meta.orderId ?? null,
-          orderNumber: meta.orderNumber ?? null,
-          usedBy: meta.userId ? new ObjectId(meta.userId) : null,
-        },
-      },
-    );
-  return result.modifiedCount === 1;
+/** Marks a reward used atomically. Returns false if it was already used. */
+export async function useReward(
+  rewardId: string,
+  customerId: string,
+  meta: { orderId?: string; orderNumber?: number; userId?: string },
+) {
+  const result = await prisma.stampReward.updateMany({
+    where: {
+      id: rewardId,
+      customerId,
+      status: 'AVAILABLE',
+      OR: [{ expiresAt: null }, { expiresAt: { gt: now() } }],
+    },
+    data: {
+      status: 'USED',
+      usedAt: new Date(),
+      orderId: meta.orderId ?? null,
+      orderNumber: meta.orderNumber ?? null,
+      usedBy: meta.userId ?? null,
+    },
+  });
+  return result.count === 1;
 }
 
-/** Gives a reward back when the order it was used on is cancelled (or could not be saved). */
-export async function releaseReward(orderId: ObjectId) {
-  await db()
-    .collection('StampReward')
-    .updateOne({ orderId, status: 'USED' }, { $set: { status: 'AVAILABLE', usedAt: null, orderId: null, orderNumber: null } });
+/** Returns a reward when the order it was used on is cancelled. */
+export async function releaseReward(orderId: string) {
+  await prisma.stampReward.updateMany({
+    where: { orderId, status: 'USED' },
+    data: { status: 'AVAILABLE', usedAt: null, orderId: null, orderNumber: null },
+  });
 }
 
 const publicReward = (reward: Record<string, unknown>) => ({
-  id: String(reward._id),
+  id: String(reward.id),
   titleJa: reward.titleJa,
   kind: reward.kind,
   amount: Number(reward.amount) || 0,
@@ -185,33 +209,45 @@ const publicReward = (reward: Record<string, unknown>) => ({
   usedAt: reward.usedAt ?? null,
 });
 
-/** Everything the member's stamp card page (and staff at the counter) need. */
-export async function stampCardFor(customerId: ObjectId) {
+/** Everything the member's stamp card page needs. */
+export async function stampCardFor(customerId: string) {
   const config = stampConfig(await loadSettings());
-  const now = new Date();
+  const n = new Date();
   const [customer, history, rewards] = await Promise.all([
-    db().collection('Customer').findOne({ _id: customerId }, { projection: { stampCount: 1, stampTotal: 1, stampCardsCompleted: 1, lastStampAt: 1 } }),
-    db().collection('Stamp').find({ customerId }).sort({ createdAt: -1 }).limit(HISTORY_LIMIT).toArray(),
-    db().collection('StampReward').find({ customerId }).sort({ earnedAt: -1 }).limit(HISTORY_LIMIT).toArray(),
+    prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { stampCount: true, stampTotal: true, stampCardsCompleted: true, lastStampAt: true },
+    }),
+    prisma.stamp.findMany({
+      where: { customerId },
+      orderBy: { createdAt: 'desc' },
+      take: HISTORY_LIMIT,
+    }),
+    prisma.stampReward.findMany({
+      where: { customerId },
+      orderBy: { earnedAt: 'desc' },
+      take: HISTORY_LIMIT,
+    }),
   ]);
-  const isUsable = (reward: Record<string, unknown>) =>
-    reward.status === 'AVAILABLE' && !(reward.expiresAt instanceof Date && reward.expiresAt <= now);
+
+  const isUsable = (reward: { status: string; expiresAt: Date | null }) =>
+    reward.status === 'AVAILABLE' && !(reward.expiresAt && reward.expiresAt <= n);
 
   return {
     enabled: config.enabled,
     memberCode: await memberCodeFor(customerId),
     perCard: config.perCard,
-    stamps: Math.min(Number(customer?.stampCount) || 0, config.perCard),
-    totalStamps: Number(customer?.stampTotal) || 0,
-    completedCards: Number(customer?.stampCardsCompleted) || 0,
+    stamps: Math.min(customer?.stampCount ?? 0, config.perCard),
+    totalStamps: customer?.stampTotal ?? 0,
+    completedCards: customer?.stampCardsCompleted ?? 0,
     lastStampAt: customer?.lastStampAt ?? null,
-    nextStampAt: nextStampAt(customer?.lastStampAt, config, now),
+    nextStampAt: nextStampAt(customer?.lastStampAt ?? null, config, n),
     rules: { minAmount: config.minAmount, cooldownHours: config.cooldownHours, rewardValidDays: config.rewardValidDays },
     milestones: config.rewards.map(({ at, titleJa, kind, amount }) => ({ at, titleJa, kind, amount: kind === 'AMOUNT_OFF' ? (amount ?? 0) : 0 })),
     rewards: rewards.filter(isUsable).map(publicReward),
-    pastRewards: rewards.filter((reward) => !isUsable(reward)).map((reward) => ({ ...publicReward(reward), status: reward.status === 'AVAILABLE' ? 'EXPIRED' : reward.status })),
+    pastRewards: rewards.filter((r) => !isUsable(r)).map((r) => ({ ...publicReward(r as unknown as Record<string, unknown>), status: r.status === 'AVAILABLE' ? 'EXPIRED' : r.status })),
     history: history.map((stamp) => ({
-      id: stamp._id.toHexString(),
+      id: stamp.id,
       card: stamp.card,
       position: stamp.position,
       source: stamp.source,

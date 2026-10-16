@@ -35,8 +35,7 @@ interface AdminOrder {
   pointsDiscount?: number;
   pointsEarned?: number;
   dietaryAlert?: DietaryAlert | null;
-  fulfillment?: 'PICKUP' | 'DELIVERY' | 'DINE_IN';
-  tableNumber?: string | null;
+  fulfillment?: 'PICKUP' | 'DELIVERY';
   deliveryFee?: number;
   deliveryAddress?: { postalCode: string; prefecture: string; city: string; line1: string; building?: string } | null;
 }
@@ -53,7 +52,7 @@ const STATUS_STYLE: Record<Status, { label: string; color: string; background: s
 };
 
 /** The one forward step staff take next for each active status; delivery words the last two differently. */
-const NEXT_ACTION: Record<'PICKUP' | 'DELIVERY' | 'DINE_IN', Partial<Record<Status, { status: Status; label: string }>>> = {
+const NEXT_ACTION: Record<'PICKUP' | 'DELIVERY', Partial<Record<Status, { status: Status; label: string }>>> = {
   PICKUP: {
     NEW: { status: 'CONFIRMED', label: 'Accept order' },
     CONFIRMED: { status: 'READY', label: 'Mark ready' },
@@ -64,18 +63,11 @@ const NEXT_ACTION: Record<'PICKUP' | 'DELIVERY' | 'DINE_IN', Partial<Record<Stat
     CONFIRMED: { status: 'READY', label: 'Out for delivery' },
     READY: { status: 'COMPLETED', label: 'Delivered' },
   },
-  DINE_IN: {
-    NEW: { status: 'CONFIRMED', label: 'Accept order' },
-    CONFIRMED: { status: 'READY', label: 'Ready to serve' },
-    READY: { status: 'COMPLETED', label: 'Served' },
-  },
 };
 
-const statusText = (status: Status, fulfillment: 'PICKUP' | 'DELIVERY' | 'DINE_IN') => {
+const statusText = (status: Status, fulfillment: 'PICKUP' | 'DELIVERY') => {
   if (fulfillment === 'DELIVERY' && status === 'READY') return 'Out for delivery';
   if (fulfillment === 'DELIVERY' && status === 'COMPLETED') return 'Delivered';
-  if (fulfillment === 'DINE_IN' && status === 'READY') return 'Ready to serve';
-  if (fulfillment === 'DINE_IN' && status === 'COMPLETED') return 'Served';
   return STATUS_STYLE[status].label;
 };
 
@@ -151,7 +143,6 @@ export default function OrdersTab({ isAdmin, intent }: { isAdmin: boolean; inten
             const badge = STATUS_STYLE[order.status];
             const isDelivery = order.fulfillment === 'DELIVERY';
             const type = order.fulfillment ?? 'PICKUP';
-            const isTable = type === 'DINE_IN';
             const next = NEXT_ACTION[type][order.status];
             const address = order.deliveryAddress;
             const addressText = address ? [`〒${address.postalCode}`, address.prefecture, address.city, address.line1, address.building].filter(Boolean).join(' ') : '';
@@ -161,7 +152,7 @@ export default function OrdersTab({ isAdmin, intent }: { isAdmin: boolean; inten
                   <div>
                     <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>No. {formatOrderNumber(order.number)}</div>
                     <div style={{ fontWeight: 600, color: '#111827' }}>
-                      <span className={`fulfill-badge${isDelivery ? ' is-delivery' : ''}${isTable ? ' is-table' : ''}`}>{isTable ? `🍽 Table ${order.tableNumber}` : isDelivery ? '🛵 Delivery' : '🛍 Pickup'}</span> {isTable ? `ordered ${pickupLabel(order.createdAt)}` : pickupLabel(order.pickupAt)}
+                      <span className={`fulfill-badge${isDelivery ? ' is-delivery' : ''}`}>{isDelivery ? '🛵 Delivery' : '🛍 Pickup'}</span> {pickupLabel(order.pickupAt)}
                     </div>
                   </div>
                   <span style={{ padding: '4px 10px', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: 600, color: badge.color, backgroundColor: badge.background }}>{statusText(order.status, type)}</span>

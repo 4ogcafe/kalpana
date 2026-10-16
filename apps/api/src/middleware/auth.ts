@@ -59,7 +59,7 @@ function verifiedUserId(token: string): string {
     const payload = jwt.verify(token, config.jwtSecret, { algorithms: ['HS256'] });
     // Customer tokens carry an audience; staff tokens never do, so one can't stand in for the other.
     const isStaffToken = typeof payload === 'object' && payload.aud === undefined;
-    if (isStaffToken && typeof payload.sub === 'string' && /^[a-f\d]{24}$/i.test(payload.sub)) {
+    if (isStaffToken && typeof payload.sub === 'string' && payload.sub.length > 0) {
       return payload.sub;
     }
   } catch {

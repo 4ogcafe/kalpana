@@ -100,7 +100,7 @@ export function publicProfile(customer: Record<string, unknown>) {
   const address = (customer.address ?? {}) as Record<string, string | null>;
   const preferences = (customer.preferences ?? {}) as StoredPreferences;
   return {
-    id: String(customer._id),
+    id: String(customer.id ?? customer._id),
     name: customer.name,
     nameKana: customer.nameKana ?? '',
     email: customer.email,
