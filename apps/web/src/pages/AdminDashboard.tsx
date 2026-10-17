@@ -11,6 +11,7 @@ import OverviewTab from '../components/admin/overview/OverviewTab';
 import { GlobalSearch, NotificationBell, OrderingStatusToggle, QuickAdd, type Navigate, type TabIntent } from '../components/admin/TopBar';
 import MenuManagementTab from '../components/admin/MenuManagementTab';
 import PageSettingsTabComponent from '../components/admin/PageSettingsTab';
+import PrinterSettings from '../components/admin/PrinterSettings';
 import { 
   LayoutDashboard, 
   Settings, 
@@ -376,83 +377,88 @@ function SettingsTab() {
   };
 
   return (
-    <div style={{ backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
-      <div style={{ padding: '1.5rem', borderBottom: '1px solid #e5e7eb' }}>
-        <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '600' }}>General Information</h3>
-        <p style={{ margin: '0.25rem 0 0 0', color: '#6b7280', fontSize: '0.875rem' }}>Update your restaurant's core details and location.</p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <div style={{ backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+        <div style={{ padding: '1.5rem', borderBottom: '1px solid #e5e7eb' }}>
+          <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '600' }}>General Information</h3>
+          <p style={{ margin: '0.25rem 0 0 0', color: '#6b7280', fontSize: '0.875rem' }}>Update your restaurant's core details and location.</p>
+        </div>
+        <div style={{ padding: '2rem' }}>
+          <form style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={labelStyle}>Restaurant Name</label>
+              <input name="name" type="text" value={settings.name} onChange={handleChange} style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Email Address</label>
+              <input name="email" type="email" value={settings.email} onChange={handleChange} style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Phone Number</label>
+              <input name="phone" type="text" value={settings.phone} onChange={handleChange} style={inputStyle} />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={labelStyle}>Address (EN)</label>
+              <input name="addressEn" type="text" value={settings.addressEn} onChange={handleChange} style={inputStyle} />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={labelStyle}>Address (JA)</label>
+              <input name="addressJa" type="text" value={settings.addressJa} onChange={handleChange} style={inputStyle} />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={labelStyle}>Google Maps Embed URL</label>
+              <input name="mapUrl" type="text" placeholder="https://www.google.com/maps/embed?..." value={settings.mapUrl} onChange={handleChange} style={inputStyle} />
+              <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: '#6b7280' }}>
+                On Google Maps, click "Share" -&gt; "Embed a map" -&gt; "Copy HTML". Paste it here, and the URL will automatically be extracted! (Do not use standard Google Maps links).
+              </p>
+            </div>
+            <div style={{ gridColumn: '1 / -1', margin: '1rem 0 -0.5rem 0' }}>
+              <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '600', color: '#111827' }}>Business Details</h4>
+              <div style={{ borderBottom: '1px solid #e5e7eb', marginTop: '0.5rem' }}></div>
+            </div>
+            <div>
+              <label style={labelStyle}>Weekly Hours</label>
+              <input name="weeklyHours.monday" type="text" placeholder="e.g. ランチ 11:30–15:00 / ディナー 17:00–22:00" value={settings.weeklyHours.monday} onChange={handleChange} style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Regular Holiday</label>
+              <input name="holidays.regular" type="text" placeholder="e.g. 火曜日 (Tuesday)" value={settings.holidays.regular} onChange={handleChange} style={inputStyle} />
+            </div>
+            <div style={{ gridColumn: '1 / -1', margin: '1rem 0 -0.5rem 0' }}>
+              <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '600', color: '#111827' }}>Social Media Links</h4>
+              <div style={{ borderBottom: '1px solid #e5e7eb', marginTop: '0.5rem' }}></div>
+            </div>
+            <div>
+              <label style={labelStyle}>Instagram URL</label>
+              <input name="socials.instagram" type="text" placeholder="https://instagram.com/..." value={settings.socials.instagram} onChange={handleChange} style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Facebook URL</label>
+              <input name="socials.facebook" type="text" placeholder="https://facebook.com/..." value={settings.socials.facebook} onChange={handleChange} style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>X (Twitter) URL</label>
+              <input name="socials.x" type="text" placeholder="https://x.com/..." value={settings.socials.x} onChange={handleChange} style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>YouTube URL</label>
+              <input name="socials.youtube" type="text" placeholder="https://youtube.com/..." value={settings.socials.youtube} onChange={handleChange} style={inputStyle} />
+            </div>
+            <div style={{ gridColumn: '1 / -1', marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
+              <button 
+                type="button" 
+                onClick={handleSave}
+                style={{ padding: '0.75rem 1.5rem', backgroundColor: '#000', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '500', cursor: 'pointer' }}
+              >
+                Save Settings
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-      <div style={{ padding: '2rem' }}>
-        <form style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label style={labelStyle}>Restaurant Name</label>
-            <input name="name" type="text" value={settings.name} onChange={handleChange} style={inputStyle} />
-          </div>
-          <div>
-            <label style={labelStyle}>Email Address</label>
-            <input name="email" type="email" value={settings.email} onChange={handleChange} style={inputStyle} />
-          </div>
-          <div>
-            <label style={labelStyle}>Phone Number</label>
-            <input name="phone" type="text" value={settings.phone} onChange={handleChange} style={inputStyle} />
-          </div>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label style={labelStyle}>Address (EN)</label>
-            <input name="addressEn" type="text" value={settings.addressEn} onChange={handleChange} style={inputStyle} />
-          </div>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label style={labelStyle}>Address (JA)</label>
-            <input name="addressJa" type="text" value={settings.addressJa} onChange={handleChange} style={inputStyle} />
-          </div>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label style={labelStyle}>Google Maps Embed URL</label>
-            <input name="mapUrl" type="text" placeholder="https://www.google.com/maps/embed?..." value={settings.mapUrl} onChange={handleChange} style={inputStyle} />
-            <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: '#6b7280' }}>
-              On Google Maps, click "Share" -&gt; "Embed a map" -&gt; "Copy HTML". Paste it here, and the URL will automatically be extracted! (Do not use standard Google Maps links).
-            </p>
-          </div>
-          <div style={{ gridColumn: '1 / -1', margin: '1rem 0 -0.5rem 0' }}>
-            <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '600', color: '#111827' }}>Business Details</h4>
-            <div style={{ borderBottom: '1px solid #e5e7eb', marginTop: '0.5rem' }}></div>
-          </div>
-          <div>
-            <label style={labelStyle}>Weekly Hours</label>
-            <input name="weeklyHours.monday" type="text" placeholder="e.g. ランチ 11:30–15:00 / ディナー 17:00–22:00" value={settings.weeklyHours.monday} onChange={handleChange} style={inputStyle} />
-          </div>
-          <div>
-            <label style={labelStyle}>Regular Holiday</label>
-            <input name="holidays.regular" type="text" placeholder="e.g. 火曜日 (Tuesday)" value={settings.holidays.regular} onChange={handleChange} style={inputStyle} />
-          </div>
-          <div style={{ gridColumn: '1 / -1', margin: '1rem 0 -0.5rem 0' }}>
-            <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '600', color: '#111827' }}>Social Media Links</h4>
-            <div style={{ borderBottom: '1px solid #e5e7eb', marginTop: '0.5rem' }}></div>
-          </div>
-          <div>
-            <label style={labelStyle}>Instagram URL</label>
-            <input name="socials.instagram" type="text" placeholder="https://instagram.com/..." value={settings.socials.instagram} onChange={handleChange} style={inputStyle} />
-          </div>
-          <div>
-            <label style={labelStyle}>Facebook URL</label>
-            <input name="socials.facebook" type="text" placeholder="https://facebook.com/..." value={settings.socials.facebook} onChange={handleChange} style={inputStyle} />
-          </div>
-          <div>
-            <label style={labelStyle}>X (Twitter) URL</label>
-            <input name="socials.x" type="text" placeholder="https://x.com/..." value={settings.socials.x} onChange={handleChange} style={inputStyle} />
-          </div>
-          <div>
-            <label style={labelStyle}>YouTube URL</label>
-            <input name="socials.youtube" type="text" placeholder="https://youtube.com/..." value={settings.socials.youtube} onChange={handleChange} style={inputStyle} />
-          </div>
-          <div style={{ gridColumn: '1 / -1', marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
-            <button 
-              type="button" 
-              onClick={handleSave}
-              style={{ padding: '0.75rem 1.5rem', backgroundColor: '#000', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '500', cursor: 'pointer' }}
-            >
-              Save Settings
-            </button>
-          </div>
-        </form>
-      </div>
+
+      {/* Printer & Receipt Settings */}
+      <PrinterSettings storeName={settings.name} phone={settings.phone} addressJa={settings.addressJa} />
     </div>
   );
 }

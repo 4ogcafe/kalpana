@@ -7,7 +7,6 @@ import { Printer, ReceiptText } from 'lucide-react';
 import DeliverySettings from './DeliverySettings';
 import OrderingSwitches from './OrderingSwitches';
 import PickupSettings from './PickupSettings';
-import PrinterSettings from './PrinterSettings';
 import StampCounter from './StampCounter';
 import { alertText, type DietaryAlert } from './dietary';
 import { printTicket } from '../kitchen/kitchen';
@@ -261,7 +260,6 @@ export default function OrdersTab({ isAdmin, intent }: { isAdmin: boolean; inten
 
       {isAdmin && <PickupSettings onSaved={() => setSettingsVersion(v => v + 1)} />}
       {isAdmin && <DeliverySettings onSaved={() => setSettingsVersion(v => v + 1)} />}
-      {isAdmin && <PrinterSettings />}
     </div>
   );
 }

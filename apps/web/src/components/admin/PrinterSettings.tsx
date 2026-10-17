@@ -16,7 +16,13 @@ const DEFAULT_CONFIG: PrinterConfig = {
   lanIp: '',
 };
 
-export default function PrinterSettings() {
+export interface PrinterSettingsProps {
+  storeName?: string;
+  phone?: string;
+  addressJa?: string;
+}
+
+export default function PrinterSettings({ storeName, phone, addressJa }: PrinterSettingsProps = {}) {
   const [activeTab, setActiveTab] = useState<'lan' | 'usb' | 'kiosk' | 'square'>('lan');
   const [config, setConfig] = useState<PrinterConfig>(() => {
     try {
@@ -26,6 +32,26 @@ export default function PrinterSettings() {
       return DEFAULT_CONFIG;
     }
   });
+
+  useEffect(() => {
+    setConfig(prev => {
+      let changed = false;
+      const next = { ...prev };
+      if (storeName && (!prev.storeNameJa || prev.storeNameJa === DEFAULT_STORE_SETTINGS.storeNameJa)) {
+        next.storeNameJa = storeName;
+        changed = true;
+      }
+      if (phone && (!prev.phone || prev.phone === DEFAULT_STORE_SETTINGS.phone)) {
+        next.phone = phone;
+        changed = true;
+      }
+      if (addressJa && (!prev.addressJa || prev.addressJa === DEFAULT_STORE_SETTINGS.addressJa)) {
+        next.addressJa = addressJa;
+        changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [storeName, phone, addressJa]);
   const [testPrintingReceipt, setTestPrintingReceipt] = useState(false);
   const [testPrintingKitchen, setTestPrintingKitchen] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
