@@ -232,7 +232,7 @@ export function QuickAdd({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate
   const ref = useDismiss(open, () => setOpen(false));
   const actions: { label: string; detail: string; icon: ReactNode; tab: string; action?: TabIntent['action']; adminOnly?: boolean }[] = [
     { label: 'Menu item', detail: 'Add a dish to the menu', icon: <UtensilsCrossed size={16} />, tab: 'Menu Management', action: 'add-item' },
-    { label: 'Give a stamp', detail: 'Scan a member at the counter', icon: <Stamp size={16} />, tab: 'Orders', action: 'stamp' },
+    { label: 'Give a stamp', detail: 'Scan a member at the counter', icon: <Stamp size={16} />, tab: 'Stamps, Offers & Points', action: 'stamp' },
     { label: 'Offer', detail: 'Discount or member special', icon: <Gift size={16} />, tab: 'Stamps, Offers & Points', action: 'new-offer', adminOnly: true },
     { label: 'Staff user', detail: 'Admin, staff or kitchen account', icon: <UserPlus size={16} />, tab: 'Staff Users', action: 'add-user', adminOnly: true },
   ];

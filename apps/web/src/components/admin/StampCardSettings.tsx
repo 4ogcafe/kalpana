@@ -108,7 +108,7 @@ export default function StampCardSettings() {
     <section style={cardStyle}>
       <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600 }}>Stamp Card</h3>
       <p style={{ margin: '0.25rem 0 1.25rem', color: '#6b7280', fontSize: '0.875rem' }}>
-        Members get one stamp when an online order is completed, or when staff scan their member QR at the counter (Orders tab → Stamp card at the counter).
+        Members get one stamp when an online order is completed, or when staff scan their member QR at the counter (Stamps, Offers &amp; Points tab → Stamp card at the counter).
         Rewards are given automatically when a member reaches that stamp; a full card starts a new one.
       </p>
 

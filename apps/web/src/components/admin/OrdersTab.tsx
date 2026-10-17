@@ -7,7 +7,6 @@ import { Printer, ReceiptText } from 'lucide-react';
 import DeliverySettings from './DeliverySettings';
 import OrderingSwitches from './OrderingSwitches';
 import PickupSettings from './PickupSettings';
-import StampCounter from './StampCounter';
 import { alertText, type DietaryAlert } from './dietary';
 import { printTicket } from '../kitchen/kitchen';
 import { printCustomerReceipt } from '../../lib/receipt';
@@ -77,7 +76,7 @@ const statusText = (status: Status, fulfillment: 'PICKUP' | 'DELIVERY') => {
 const pickupLabel = (iso: string) =>
   new Date(iso).toLocaleString('ja-JP', { timeZone: TIMEZONE, month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' });
 
-export default function OrdersTab({ isAdmin, intent }: { isAdmin: boolean; intent?: TabIntent | null }) {
+export default function OrdersTab({ isAdmin, intent: _intent }: { isAdmin: boolean; intent?: TabIntent | null }) {
   const [scope, setScope] = useState<'active' | 'history'>('active');
   // Bumped when hours are saved below, so the on/off switches re-read them.
   const [settingsVersion, setSettingsVersion] = useState(0);
@@ -125,7 +124,6 @@ export default function OrdersTab({ isAdmin, intent }: { isAdmin: boolean; inten
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {isAdmin && <OrderingSwitches key={settingsVersion} />}
-      <StampCounter focus={intent?.action === 'stamp' ? intent.nonce : undefined} />
       <div style={{ display: 'flex', gap: '8px' }}>
         {(['active', 'history'] as const).map(value => (
           <button key={value} type="button" onClick={() => { setOrders(null); setScope(value); }} style={{ ...pillStyle, backgroundColor: scope === value ? '#000' : '#fff', color: scope === value ? '#fff' : '#374151' }}>
