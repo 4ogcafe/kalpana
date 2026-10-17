@@ -196,24 +196,6 @@ export default function OfferSticker() {
   );
 }
 
-/** One-line strip for menu pages: the best live offer and how to get it. */
-export function MemberOfferStrip({ next }: { next: string }) {
-  const { offers, used, isMember } = useOffers();
-  const usable = (offers ?? []).filter(offer => !used.has(offer.id));
-  if (usable.length === 0) return null;
-  const offer = usable[0];
-  return (
-    <div className="mo-strip" role="note">
-      <Gift size={18} aria-hidden="true" />
-      <span>
-        <strong>会員限定：{offer.titleJa}</strong>（{offerLabel(offer)}{offer.minSubtotal > 0 ? `・${yen(offer.minSubtotal)}以上` : ''}）
-        {usable.length > 1 && <> ほか{usable.length - 1}件</>}
-      </span>
-      {isMember ? (
-        <span className="mo-strip-note">ご注文時に選べます</span>
-      ) : (
-        <Link to={`/account/register?next=${encodeURIComponent(next)}`}>無料会員登録で使う →</Link>
-      )}
-    </div>
-  );
+export function MemberOfferStrip(_props?: { next?: string }) {
+  return null;
 }

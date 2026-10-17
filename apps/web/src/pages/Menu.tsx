@@ -5,7 +5,7 @@ import { useCart } from '../lib/cart-context';
 import { yen } from '../lib/format';
 import OrderButtons, { type OrderableItem } from '../components/order/OrderButtons';
 import RelatedItemsPanel, { type PanelItem } from '../components/order/RelatedItemsPanel';
-import OfferSticker, { MemberOfferStrip } from '../components/MemberOffers';
+import OfferSticker from '../components/MemberOffers';
 import NotFound from './NotFound';
 
 const HERO_IMAGES: Record<string, string> = {
@@ -220,9 +220,6 @@ export default function Menu() {
 
       <div className="section" style={{ backgroundColor: 'var(--cream)', paddingTop: '40px' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px' }}>
-          
-          <MemberOfferStrip next={`/menu/${menuType}`} />
-
           <div className="centered" style={{ marginBottom: '40px' }}>
             <h2 className="section-title">メニューを<em>見る</em></h2>
             <div className="divider"></div>
