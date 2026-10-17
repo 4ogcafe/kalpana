@@ -103,21 +103,22 @@ export async function offerAlreadyUsed(offerId: string, customerId: string): Pro
   return Number(rows[0]?.cnt ?? 0) > 0;
 }
 
-async function usableOffer(offerId: string, customerId: string) {
+async function usableOffer(offerId: string, customerId?: string | null) {
   const offer = await prisma.offer.findUnique({ where: { id: offerId } });
   if (!offer || !isOfferLive(offer as unknown as OfferRule)) {
     throw new AppError(409, 'OFFER_UNAVAILABLE', 'この特典は現在ご利用いただけません。');
   }
-  if (offer.oncePerCustomer && (await offerAlreadyUsed(offer.id, customerId))) {
+  if (offer.oncePerCustomer && customerId && (await offerAlreadyUsed(offer.id, customerId))) {
     throw new AppError(409, 'OFFER_USED', 'この特典はすでにご利用済みです。');
   }
   return offer;
 }
 
-/** The full price of a cart for this customer (or guest), with the chosen offer and points applied. */
+/** The full price of a cart for this customer (or guest), with the chosen offer(s) and points applied. */
 export async function quoteOrder(input: {
   items: { itemId: string; quantity: number; optionAdjust?: number; options?: OrderLineOption[] }[];
-  offerId?: string | null;
+  offerId?: string | string[] | null;
+  offerIds?: string[] | null;
   rewardId?: string | null;
   pointsToUse?: number;
   customerId?: string;
@@ -128,14 +129,35 @@ export async function quoteOrder(input: {
   const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
   const isMember = Boolean(input.customerId);
 
-  if ((input.offerId || input.rewardId || input.pointsToUse) && !input.customerId) {
-    throw new AppError(401, 'UNAUTHENTICATED', '特典やポイントのご利用には会員ログインが必要です。');
+  if ((input.rewardId || input.pointsToUse) && !input.customerId) {
+    throw new AppError(401, 'UNAUTHENTICATED', 'スタンプ特典やポイントのご利用には会員ログインが必要です。');
   }
 
-  const offerDoc = input.offerId && input.customerId ? await usableOffer(input.offerId, input.customerId) : null;
-  const rule = offerDoc as unknown as OfferRule | null;
-  if (rule && offerDiscount(rule, subtotal) === 0) {
-    throw new AppError(409, 'OFFER_MIN_SUBTOTAL', `この特典は¥${(rule.minSubtotal ?? 0).toLocaleString('ja-JP')}以上のご注文でご利用いただけます。`);
+  const rawIds = input.offerIds && Array.isArray(input.offerIds)
+    ? input.offerIds
+    : Array.isArray(input.offerId)
+      ? input.offerId
+      : input.offerId
+        ? [input.offerId]
+        : [];
+  const targetOfferIds = [...new Set(rawIds.filter(Boolean))];
+
+  const appliedOffers: { id: string; titleJa: string; discount: number }[] = [];
+  let currentSubtotalForDiscount = subtotal;
+  let totalOfferDiscount = 0;
+
+  for (const id of targetOfferIds) {
+    const offerDoc = await usableOffer(id, input.customerId);
+    const rule = offerDoc as unknown as OfferRule;
+    if (subtotal < (rule.minSubtotal ?? 0)) {
+      throw new AppError(409, 'OFFER_MIN_SUBTOTAL', `特典「${offerDoc.titleJa}」は¥${(rule.minSubtotal ?? 0).toLocaleString('ja-JP')}以上のご注文でご利用いただけます。`);
+    }
+    const disc = offerDiscount(rule, currentSubtotalForDiscount);
+    if (disc > 0) {
+      totalOfferDiscount += disc;
+      currentSubtotalForDiscount = Math.max(0, currentSubtotalForDiscount - disc);
+      appliedOffers.push({ id: offerDoc.id, titleJa: String(offerDoc.titleJa), discount: disc });
+    }
   }
 
   const rewardDoc = input.rewardId && input.customerId ? await findUsableReward(input.rewardId, input.customerId) : null;
@@ -146,7 +168,7 @@ export async function quoteOrder(input: {
 
   const breakdown = priceBreakdown({
     subtotal,
-    offer: rule,
+    offerDiscount: totalOfferDiscount,
     rewardAmount: rewardDoc?.kind === 'AMOUNT_OFF' ? Number(rewardDoc.amount) || 0 : 0,
     pointsRequested: input.pointsToUse,
     pointsBalance: Number(customer?.points) || 0,
@@ -165,7 +187,13 @@ export async function quoteOrder(input: {
   return {
     lines,
     breakdown: { ...breakdown, taxRate, tax, deliveryFee, minOrderShortfall, grandTotal: breakdown.total + tax + deliveryFee },
-    offer: offerDoc ? { id: offerDoc.id, titleJa: String(offerDoc.titleJa), discount: breakdown.offerDiscount } : null,
+    offer: appliedOffers.length > 0
+      ? {
+          id: appliedOffers.map((o) => o.id).join(','),
+          titleJa: appliedOffers.map((o) => o.titleJa).join(' ＋ '),
+          discount: totalOfferDiscount,
+        }
+      : null,
     reward: rewardDoc
       ? { id: rewardDoc.id, titleJa: String(rewardDoc.titleJa), kind: rewardDoc.kind as StampRewardKind, discount: breakdown.rewardDiscount }
       : null,

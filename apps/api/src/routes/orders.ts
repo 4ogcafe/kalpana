@@ -9,7 +9,7 @@ import { FULFILLMENTS, deliveryAddressSchema, fulfillmentOptions, isEnabled, isI
 import { localDateKey } from '../lib/pickup.js';
 import { idParam, objectIdString, optionalText } from '../lib/schemas.js';
 import { requireKitchen } from '../middleware/auth.js';
-import { optionalCustomer, requireCustomer } from '../middleware/customerAuth.js';
+import { optionalCustomer } from '../middleware/customerAuth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { MAX_QUANTITY, pricingSummary, quoteOrder, type OrderLine } from '../services/order-pricing.js';
 import { changePoints } from '../services/points.js';
@@ -52,7 +52,8 @@ const cartSchema = {
     .array(z.object({ itemId: objectIdString, quantity: z.number().int().min(1).max(MAX_QUANTITY) }))
     .min(1)
     .max(MAX_LINES),
-  offerId: objectIdString.nullable().optional(),
+  offerId: z.union([objectIdString, z.array(objectIdString)]).nullable().optional(),
+  offerIds: z.array(objectIdString).nullable().optional(),
   rewardId: objectIdString.nullable().optional(),
   pointsToUse: z.number().int().min(0).max(MAX_POINTS_PER_ORDER).optional(),
   fulfillment: z.enum(FULFILLMENTS).default('PICKUP'),
@@ -126,8 +127,8 @@ router.post('/quote', optionalCustomer, async (req, res) => {
   });
 });
 
-// Only signed-in members can place orders, so every order belongs to a verified account.
-router.post('/', orderLimiter, requireCustomer, async (req, res) => {
+// Both members and guests can place orders. Signed-in members earn points/stamps and can use point rewards.
+router.post('/', orderLimiter, optionalCustomer, async (req, res) => {
   const { website, ...input } = orderSchema.parse(req.body);
   if (website) {
     res.status(201).json({ token: crypto.randomBytes(TOKEN_BYTES).toString('base64url') });

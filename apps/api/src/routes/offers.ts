@@ -86,18 +86,42 @@ router.get('/', async (_req, res) => {
 
 router.get('/all', requireAdmin, async (_req, res) => {
   const offers = await prisma.offer.findMany({ orderBy: { createdAt: 'desc' } });
-  // Count how many non-cancelled orders used each offer.
-  const offerIds = offers.map((o) => o.id);
-  const usageCounts = await prisma.$queryRaw<{ offerId: string; uses: bigint }[]>`
-    SELECT JSON_UNQUOTE(JSON_EXTRACT(offer, '$.id')) AS offerId, COUNT(*) AS uses
-    FROM PickupOrder
-    WHERE status != 'CANCELLED'
-      AND JSON_UNQUOTE(JSON_EXTRACT(offer, '$.id')) IN (${offerIds.join(',')})
-    GROUP BY offerId
-  `;
-  const uses = new Map(usageCounts.map((u) => [u.offerId, Number(u.uses)]));
+  if (offers.length === 0) {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json([]);
+    return;
+  }
+
+  // Count how many non-cancelled orders used each offer (supporting both single and combined offers)
+  const nonCancelledOrders = await (prisma as any).pickupOrder.findMany({
+    where: { status: { not: 'CANCELLED' } },
+    select: { offer: true },
+  });
+  const uses = new Map<string, number>();
+  for (const order of nonCancelledOrders) {
+    const offerObj = order.offer as { id?: string } | null;
+    if (offerObj?.id) {
+      const ids = String(offerObj.id).split(',').map((s) => s.trim());
+      for (const id of ids) {
+        uses.set(id, (uses.get(id) ?? 0) + 1);
+      }
+    }
+  }
+
   res.setHeader('Cache-Control', 'no-store');
   res.json(offers.map((offer) => ({ ...serializeOffer(offer as unknown as Record<string, unknown>), uses: uses.get(offer.id) ?? 0 })));
+});
+
+router.patch('/:id/toggle', requireAdmin, async (req, res) => {
+  const id = idParam(req.params);
+  const current = await prisma.offer.findUnique({ where: { id } });
+  if (!current) throw notFound('Offer');
+  const updated = await prisma.offer.update({
+    where: { id },
+    data: { isActive: !current.isActive },
+  });
+  await audit(req.user?.id, 'offer.toggle', id, { isActive: updated.isActive });
+  res.json({ success: true, isActive: updated.isActive });
 });
 
 router.post('/', requireAdmin, async (req, res) => {

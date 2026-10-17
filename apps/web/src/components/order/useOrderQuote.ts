@@ -9,6 +9,8 @@ export interface Quote {
   rewardDiscount: number;
   /** The stamp-card reward applied, if any (a PERK takes nothing off but is handed over with the order). */
   reward: { id: string; titleJa: string; kind: 'AMOUNT_OFF' | 'PERK' } | null;
+  /** The offer(s) applied, if any. */
+  offer?: { id: string; titleJa: string } | null;
   pointsUsed: number;
   pointsDiscount: number;
   total: number;
@@ -23,7 +25,8 @@ export interface Quote {
 }
 
 export interface Savings {
-  offerId: string;
+  offerId?: string;
+  offerIds?: string[];
   rewardId: string;
   pointsToUse: number;
 }
@@ -36,6 +39,12 @@ export function useOrderQuote(items: { itemId: string; quantity: number }[], sav
   const [problem, setProblem] = useState('');
   // Keyed on the serialized items: callers pass a new array on every render.
   const itemsKey = JSON.stringify(items);
+  const rawOfferIds = savings.offerIds && savings.offerIds.length > 0
+    ? savings.offerIds
+    : savings.offerId
+      ? [savings.offerId]
+      : [];
+  const offerIdsKey = JSON.stringify(rawOfferIds);
 
   useEffect(() => {
     const parsed: { itemId: string; quantity: number }[] = JSON.parse(itemsKey);
@@ -43,10 +52,18 @@ export function useOrderQuote(items: { itemId: string; quantity: number }[], sav
     let cancelled = false;
     const timer = setTimeout(async () => {
       try {
+        const targetOfferIds: string[] = JSON.parse(offerIdsKey);
         const res = await apiFetch('/api/v1/orders/quote', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items: parsed, fulfillment, ...(isMember ? { offerId: savings.offerId || null, rewardId: savings.rewardId || null, pointsToUse: savings.pointsToUse } : {}) }),
+          body: JSON.stringify({
+            items: parsed,
+            fulfillment,
+            // Offers can be used by both members and guests
+            offerIds: targetOfferIds,
+            offerId: targetOfferIds[0] || null,
+            ...(isMember ? { rewardId: savings.rewardId || null, pointsToUse: savings.pointsToUse } : {}),
+          }),
         });
         if (cancelled) return;
         if (res.ok) {
@@ -64,7 +81,7 @@ export function useOrderQuote(items: { itemId: string; quantity: number }[], sav
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [itemsKey, savings.offerId, savings.rewardId, savings.pointsToUse, isMember, fulfillment]);
+  }, [itemsKey, offerIdsKey, savings.rewardId, savings.pointsToUse, isMember, fulfillment]);
 
   return { quote, problem };
 }

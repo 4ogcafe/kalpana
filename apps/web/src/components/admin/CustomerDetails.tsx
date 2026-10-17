@@ -96,7 +96,7 @@ export default function CustomerDetails({ member, onClose }: { member: MemberDet
         ) : (
           <>
             {offers.available.length === 0 ? (
-              <p style={{ color: '#6b7280', margin: 0, fontSize: '0.9rem' }}>No live offers right now (Stamps, Offers &amp; Points → Member Offers).</p>
+              <p style={{ color: '#6b7280', margin: 0, fontSize: '0.9rem' }}>現在有効なオファー・クーポンはありません（会員・特典設定 → 割引オファー・クーポン設定）。</p>
             ) : (
               <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: '6px' }}>
                 {offers.available.map(offer => (

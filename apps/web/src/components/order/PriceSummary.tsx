@@ -6,7 +6,12 @@ export default function PriceSummary({ quote }: { quote: Quote }) {
   return (
     <dl style={{ margin: 0, display: 'grid', gridTemplateColumns: '1fr auto', gap: '6px 12px', fontSize: '0.92rem' }}>
       <dt>小計 (税抜)</dt><dd style={dd}>{yen(quote.subtotal)}</dd>
-      {quote.offerDiscount > 0 && <><dt>特典割引</dt><dd style={{ ...dd, color: '#047857' }}>−{yen(quote.offerDiscount)}</dd></>}
+      {quote.offerDiscount > 0 && (
+        <>
+          <dt>クーポン割引{quote.offer?.titleJa ? `（${quote.offer.titleJa}）` : ''}</dt>
+          <dd style={{ ...dd, color: '#047857', fontWeight: 600 }}>−{yen(quote.offerDiscount)}</dd>
+        </>
+      )}
       {quote.reward && (
         <><dt>スタンプ特典「{quote.reward.titleJa}」</dt><dd style={{ ...dd, color: '#047857' }}>{quote.rewardDiscount > 0 ? `−${yen(quote.rewardDiscount)}` : 'お渡し時に適用'}</dd></>
       )}

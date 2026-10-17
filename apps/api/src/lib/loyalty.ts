@@ -69,6 +69,7 @@ export interface PriceBreakdown {
 export function priceBreakdown(input: {
   subtotal: number;
   offer?: OfferRule | null;
+  offerDiscount?: number;
   /** Yen a stamp-card reward takes off, applied after the offer. */
   rewardAmount?: number;
   pointsRequested?: number;
@@ -77,7 +78,11 @@ export function priceBreakdown(input: {
   isMember: boolean;
 }): PriceBreakdown {
   const { subtotal, loyalty, isMember } = input;
-  const discount = input.offer ? offerDiscount(input.offer, subtotal) : 0;
+  const discount = typeof input.offerDiscount === 'number'
+    ? Math.max(0, Math.min(input.offerDiscount, subtotal))
+    : input.offer
+      ? offerDiscount(input.offer, subtotal)
+      : 0;
   const reward = Math.max(0, Math.min(input.rewardAmount ?? 0, subtotal - discount));
   const afterOffer = subtotal - discount - reward;
 

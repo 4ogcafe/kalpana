@@ -110,7 +110,8 @@ export default function Order() {
   const [step, setStep] = useState<'details' | 'review'>('details');
   // Set once the order is saved, so the emptied cart isn't shown while the status page loads.
   const [placed, setPlaced] = useState(false);
-  const [savings, setSavings] = useState<Savings>({ offerId: '', rewardId: '', pointsToUse: 0 });
+  const [asGuest, setAsGuest] = useState(false);
+  const [savings, setSavings] = useState<Savings>({ offerId: '', offerIds: [], rewardId: '', pointsToUse: 0 });
   const [fulfillment, setFulfillment] = useState<Fulfillment>('PICKUP');
   const [address, setAddress] = useState<DeliveryAddress>(EMPTY_ADDRESS);
   const [addressErrors, setAddressErrors] = useState<AddressErrors>({});
@@ -249,13 +250,19 @@ export default function Order() {
     if (submitting) return;
     setSubmitting(true);
     try {
+      const rawOfferIds = savings.offerIds && savings.offerIds.length > 0
+        ? savings.offerIds
+        : savings.offerId
+          ? [savings.offerId]
+          : [];
       const res = await apiFetch('/api/v1/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
           items,
-          offerId: savings.offerId || null,
+          offerIds: rawOfferIds,
+          offerId: rawOfferIds[0] || null,
           rewardId: savings.rewardId || null,
           pointsToUse: savings.pointsToUse,
           fulfillment,
@@ -358,11 +365,11 @@ export default function Order() {
                 <Link to="/menu/takeout" style={{ display: 'inline-block', marginTop: '16px', color: 'var(--spice)' }}>← メニューに戻る</Link>
               </section>
 
-              <section style={cardStyle} aria-labelledby={customer && step === 'details' ? 'details-heading' : undefined}>
+              <section style={cardStyle} aria-labelledby={(customer || asGuest) && step === 'details' ? 'details-heading' : undefined}>
                 {customer === undefined ? (
                   <p aria-busy="true">読み込み中…</p>
-                ) : customer === null ? (
-                  <LoginGate />
+                ) : customer === null && !asGuest ? (
+                  <LoginGate onGuestCheckout={() => setAsGuest(true)} />
                 ) : step === 'review' ? (
                   <OrderReview
                     lines={lines}
@@ -389,7 +396,14 @@ export default function Order() {
                   <p>現在オンラインでのご注文を受け付けておりません。{phoneLink && <>お電話（{phoneLink}）でご注文ください。</>}</p>
                 ) : (
                   <form onSubmit={handleReview} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    <h2 id="details-heading" style={{ ...headingStyle, marginBottom: 0 }}>お客様情報</h2>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <h2 id="details-heading" style={{ ...headingStyle, marginBottom: 0 }}>お客様情報</h2>
+                      {!customer && asGuest && (
+                        <span style={{ fontSize: '0.8rem', color: '#6b7280', backgroundColor: '#f3f4f6', padding: '2px 8px', borderRadius: '4px', fontWeight: 500 }}>
+                          ゲスト注文
+                        </span>
+                      )}
+                    </div>
                     <StepIndicator />
                     {(slotsData.pickup.enabled || slotsData.delivery.enabled) && (
                       <FulfillmentPicker value={fulfillment} onChange={chooseFulfillment} pickupEnabled={slotsData.pickup.enabled} delivery={slotsData.delivery} />
