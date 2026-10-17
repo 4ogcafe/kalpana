@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { toast } from 'react-hot-toast';
 import { Bell, Gift, Mail, Plus, Search, ShoppingBag, Stamp, UserCircle, UserPlus, UtensilsCrossed } from 'lucide-react';
 import { apiFetch } from '../../lib/api';
 import { formatOrderNumber, yen } from '../../lib/format';
@@ -254,3 +255,86 @@ export function QuickAdd({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate
     </div>
   );
 }
+
+export function OrderingStatusToggle() {
+  const [orderingEnabled, setOrderingEnabled] = useState<boolean | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const load = () => {
+    apiFetch('/api/v1/settings')
+      .then(res => res.json())
+      .then(data => setOrderingEnabled(data.orderingEnabled !== false))
+      .catch(() => undefined);
+  };
+
+  useEffect(() => {
+    load();
+    const timer = setInterval(load, 15000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const toggle = async () => {
+    if (orderingEnabled === null || saving) return;
+    const next = !orderingEnabled;
+    setSaving(true);
+    try {
+      const res = await apiFetch('/api/v1/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderingEnabled: next }),
+      });
+      if (res.ok) {
+        setOrderingEnabled(next);
+        toast.success(
+          next
+            ? '注文受付システムを ON にしました。（フードカードに注文ボタンが表示されます）'
+            : '注文受付システムを OFF にしました。（フードカードの注文ボタンが非表示になります）'
+        );
+      } else {
+        toast.error('切り替えに失敗しました。');
+      }
+    } catch {
+      toast.error('通信エラーが発生しました。');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (orderingEnabled === null) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      disabled={saving}
+      title={orderingEnabled ? '注文受付中 (クリックで受付停止・注文ボタン非表示)' : '注文受付停止中 (クリックで注文受付開始)'}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '6px',
+        padding: '0.4rem 0.85rem',
+        borderRadius: '9999px',
+        border: `1px solid ${orderingEnabled ? '#86efac' : '#fca5a5'}`,
+        backgroundColor: orderingEnabled ? '#f0fdf4' : '#fef2f2',
+        color: orderingEnabled ? '#15803d' : '#b91c1c',
+        fontSize: '0.82rem',
+        fontWeight: 600,
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+      }}
+    >
+      <span
+        style={{
+          width: '8px',
+          height: '8px',
+          borderRadius: '50%',
+          backgroundColor: orderingEnabled ? '#22c55e' : '#ef4444',
+          display: 'inline-block',
+          boxShadow: orderingEnabled ? '0 0 6px rgba(34, 197, 94, 0.6)' : 'none',
+        }}
+      />
+      <span>{orderingEnabled ? '注文システム: ON' : '注文システム: OFF'}</span>
+    </button>
+  );
+}
+

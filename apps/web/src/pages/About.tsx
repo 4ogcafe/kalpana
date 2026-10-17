@@ -19,8 +19,8 @@ export default function About() {
       <div className="home-hero" style={{ height: '50vh', minHeight: '400px' }}>
         <img src={assetUrl(settings.aboutHeroImage) || "https://images.unsplash.com/photo-1552566626-52f8b828add9?auto=format&fit=crop&w=1920&q=80"} alt="" fetchPriority="high" className="slide-bg-img" style={{ opacity: 0.5, objectFit: 'cover' }} />
         <div className="hero-content">
-          <div className="hero-tag">ABOUT US</div>
-          <h1 className="hero-title">私たちに<em>ついて</em></h1>
+          <div className="hero-tag">{settings.aboutHeroTag || 'ABOUT US'}</div>
+          <h1 className="hero-title"><EmphasisText text={settings.aboutHeroTitle || '私たちに<em>ついて</em>'} /></h1>
         </div>
       </div>
 

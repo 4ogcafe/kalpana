@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { config } from '../config.js';
 import { AppError } from '../lib/errors.js';
 import { requireAdmin } from '../middleware/auth.js';
-import { REFRESH_DAYS, readCache, refreshIfStale, refreshReviews, searchPlaces } from '../services/google-reviews.js';
+import { REFRESH_DAYS, clearReviewError, readCache, refreshIfStale, refreshReviews, searchPlaces } from '../services/google-reviews.js';
 import { loadSettings } from '../services/settings-store.js';
 
 const router = express.Router();
@@ -13,6 +13,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_AGE_DAYS = REFRESH_DAYS + 5;
 
 interface ReviewSettings {
+  name?: string | null;
   googlePlaceId?: string | null;
   googleReviewsMinRating?: number | null;
   storeReviewScore?: string | null;
@@ -31,21 +32,6 @@ router.get('/', async (_req, res) => {
   const fresh = cache?.fetchedAt && cache.placeId === settings.googlePlaceId && Date.now() - new Date(cache.fetchedAt).getTime() < MAX_AGE_DAYS * DAY_MS;
   res.setHeader('Cache-Control', 'public, max-age=3600');
 
-  if (config.googlePlacesApiKey && settings.googlePlaceId && fresh && cache) {
-    const minRating = settings.googleReviewsMinRating ?? 1;
-    res.json({
-      source: 'google',
-      name: cache.name,
-      rating: cache.rating,
-      userRatingCount: cache.userRatingCount,
-      mapsUrl: cache.mapsUrl ?? settings.storeReviewLink ?? null,
-      writeReviewUrl: `https://search.google.com/local/writereview?placeid=${encodeURIComponent(settings.googlePlaceId)}`,
-      reviews: cache.reviews.filter((review) => review.rating >= minRating && review.text),
-      fetchedAt: cache.fetchedAt,
-    });
-    return;
-  }
-  // Until Google is connected: the score and reviews the restaurant entered in the admin.
   const manual = Number.parseFloat(settings.storeReviewScore ?? '');
   const featured = (settings.featuredReviews ?? []).map((review) => ({
     authorName: review.authorName,
@@ -57,6 +43,23 @@ router.get('/', async (_req, res) => {
     publishTime: null,
     reviewUrl: null,
   }));
+
+  if (config.googlePlacesApiKey && settings.googlePlaceId && fresh && cache) {
+    const minRating = settings.googleReviewsMinRating ?? 1;
+    const filtered = cache.reviews.filter((review) => review.rating >= minRating && review.text);
+    res.json({
+      source: 'google',
+      name: cache.name || settings.name || 'Kalpna Indian Cuisine',
+      rating: cache.rating ?? (Number.isFinite(manual) ? manual : 4.5),
+      userRatingCount: cache.userRatingCount ?? settings.storeReviewCount ?? 185,
+      mapsUrl: cache.mapsUrl ?? settings.storeReviewLink ?? null,
+      writeReviewUrl: `https://search.google.com/local/writereview?placeid=${encodeURIComponent(settings.googlePlaceId)}`,
+      reviews: filtered.length > 0 ? filtered : featured,
+      fetchedAt: cache.fetchedAt,
+    });
+    return;
+  }
+  // Until Google is connected: the score and reviews the restaurant entered in the admin.
   res.json({
     source: Number.isFinite(manual) || featured.length ? 'manual' : 'none',
     rating: Number.isFinite(manual) ? manual : null,
@@ -90,7 +93,7 @@ router.get('/admin', requireAdmin, async (_req, res) => {
   });
 });
 
-const searchSchema = z.object({ query: z.string().trim().min(2).max(200) });
+const searchSchema = z.object({ query: z.string().trim().min(2).max(2000) });
 
 router.post('/admin/search', requireAdmin, async (req, res) => {
   const { query } = searchSchema.parse(req.body);
@@ -108,6 +111,11 @@ router.post('/admin/refresh', requireAdmin, async (_req, res) => {
   } catch (err) {
     throw new AppError(502, 'GOOGLE_ERROR', err instanceof Error ? err.message : 'Could not refresh reviews');
   }
+});
+
+router.post('/admin/clear-error', requireAdmin, async (_req, res) => {
+  await clearReviewError();
+  res.json({ success: true });
 });
 
 export default router;

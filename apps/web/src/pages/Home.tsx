@@ -143,9 +143,9 @@ export default function Home() {
         <OfferSticker />
 
         <div className="hero-content">
-          <div className="hero-tag">埼玉・熊谷で味わう、本場のインド料理</div>
+          <div className="hero-tag">{settings.heroTagJa || '埼玉・熊谷で味わう、本場のインド料理'}</div>
           <h1 className="hero-title">{carousels[currentSlide]?.titleJa || 'インドの香りを、そのままに'}</h1>
-          <p className="hero-sub">愛とスパイス、そして伝統に彩られた数世紀にわたるレシピを。<br/>Kalpana Indian Cuisineで皆様をお待ちしております。</p>
+          <p className="hero-sub" style={{ whiteSpace: 'pre-line' }}>{settings.heroSubJa || <>愛とスパイス、そして伝統に彩られた数世紀にわたるレシピを。<br/>Kalpana Indian Cuisineで皆様をお待ちしております。</>}</p>
           <div className="hero-btns">
             <Link to="/menu/lunch" style={{ textDecoration: 'none' }}>
               <button className="btn-warm">ランチメニューを見る</button>
@@ -154,6 +154,70 @@ export default function Home() {
           </div>
         </div>
         
+        {/* Slider Controls (Prev / Next) */}
+        {heroImages.length > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={() => setCurrentSlide((prev) => (prev - 1 + heroImages.length) % heroImages.length)}
+              aria-label="Previous slide"
+              style={{
+                position: 'absolute',
+                left: '20px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                zIndex: 20,
+                width: '44px',
+                height: '44px',
+                borderRadius: '50%',
+                background: 'rgba(0, 0, 0, 0.35)',
+                color: '#fff',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                backdropFilter: 'blur(4px)',
+                transition: 'all 0.2s',
+                fontSize: '18px',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(0, 0, 0, 0.65)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(0, 0, 0, 0.35)')}
+            >
+              ❮
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentSlide((prev) => (prev + 1) % heroImages.length)}
+              aria-label="Next slide"
+              style={{
+                position: 'absolute',
+                right: '20px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                zIndex: 20,
+                width: '44px',
+                height: '44px',
+                borderRadius: '50%',
+                background: 'rgba(0, 0, 0, 0.35)',
+                color: '#fff',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                backdropFilter: 'blur(4px)',
+                transition: 'all 0.2s',
+                fontSize: '18px',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(0, 0, 0, 0.65)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(0, 0, 0, 0.35)')}
+            >
+              ❯
+            </button>
+          </>
+        )}
+
         {/* Slider Indicators */}
         <div style={{ position: 'absolute', bottom: '30px', display: 'flex', gap: '10px', zIndex: 20 }}>
           {heroImages.map((_, idx) => (
@@ -172,26 +236,24 @@ export default function Home() {
       </div>
 
       {/* Indian Food Welcome Section */}
-      {(settings.welcomeTitleJa || settings.welcomeTextJa) && (
-        <div className="section" style={{ backgroundColor: 'white', padding: '4rem 20px' }}>
-          <div className="centered" style={{ maxWidth: '800px', margin: '0 auto' }}>
-            <div className="section-label">{settings.welcomeTitleEn || 'Welcome to Kalpana'}</div>
-            <h2 className="section-title" style={{ fontSize: '2.5rem', marginBottom: '1.5rem', color: 'var(--dark-bark)' }}>
-              {settings.welcomeTitleJa || '本格インドの味わい'}
-            </h2>
-            <div className="divider" style={{ marginBottom: '2rem' }}></div>
-            <p style={{ fontSize: '1.1rem', lineHeight: '1.8', color: 'var(--text-muted)', whiteSpace: 'pre-wrap' }}>
-              {settings.welcomeTextJa || 'スパイスの香り豊かな本格インド料理をお楽しみください。'}
-            </p>
-          </div>
+      <div className="section" style={{ backgroundColor: 'white', padding: '4rem 20px' }}>
+        <div className="centered" style={{ maxWidth: '800px', margin: '0 auto' }}>
+          <div className="section-label">{settings.welcomeTitleEn || 'Authentic Indian Flavors'}</div>
+          <h2 className="section-title" style={{ fontSize: '2.5rem', marginBottom: '1.5rem', color: 'var(--dark-bark)' }}>
+            {settings.welcomeTitleJa || '本格インドの味わい'}
+          </h2>
+          <div className="divider" style={{ marginBottom: '2rem' }}></div>
+          <p style={{ fontSize: '1.1rem', lineHeight: '1.8', color: 'var(--text-muted)', whiteSpace: 'pre-wrap' }}>
+            {settings.welcomeTextJa || 'インドの豊かな食文化と鮮やかなスパイスを体験してください。熟練のシェフが伝統的なタンドール窯と新鮮な食材を使用し、すべての料理をゼロから手作りしています。忘れられない特別なひとときをお届けします。'}
+          </p>
         </div>
-      )}
+      </div>
 
       {/* Menu Explorer */}
       <div className="section" style={{ backgroundColor: 'var(--cream)' }}>
         <div className="centered" style={{ marginBottom: '40px' }}>
-          <div className="section-label">メニューを見る</div>
-          <h2 className="section-title">キッチンから<em>お届け</em></h2>
+          <div className="section-label">{settings.menuExplorerLabelJa || 'メニューを見る'}</div>
+          <h2 className="section-title"><EmphasisText text={settings.menuExplorerTitleJa || 'キッチンから<em>お届け</em>'} /></h2>
           <div className="divider"></div>
           <p className="section-sub">{settings.aboutJa || '毎日手作りの新鮮な味 — 手挽きのスパイス、本格的な粘土窯（タンドール）、妥協のない調理'}</p>
         </div>
@@ -247,10 +309,10 @@ export default function Home() {
       {recommendedItems.length > 0 && (
         <div className="section" style={{ backgroundColor: 'var(--cream)', paddingTop: '0' }}>
           <div className="centered" style={{ marginBottom: '40px' }}>
-            <div className="section-label">シェフの厳選</div>
-            <h2 className="section-title">おすすめ<em>メニュー</em></h2>
+            <div className="section-label">{settings.recommendedLabelJa || 'シェフの厳選'}</div>
+            <h2 className="section-title"><EmphasisText text={settings.recommendedTitleJa || 'おすすめ<em>メニュー</em>'} /></h2>
             <div className="divider"></div>
-            <p className="section-sub">全店舗で愛され続けている、不動の人気メニュー</p>
+            <p className="section-sub">{settings.recommendedSubJa || '全店舗で愛され続けている、不動の人気メニュー'}</p>
           </div>
 
           <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px' }}>
@@ -355,7 +417,7 @@ export default function Home() {
                   <>
                     <span aria-hidden="true" style={{ color: 'var(--gold)', letterSpacing: '2px', fontSize: '0.9rem' }}>★</span>
                     <span style={{ fontWeight: 'bold', color: 'var(--dark-bark)' }}>{liveRating ?? settings.storeReviewScore}</span>
-                    {liveCount ? <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>({liveCount.toLocaleString('ja-JP')})</span> : null}
+                    {(liveCount ?? settings.storeReviewCount) ? <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>({(liveCount ?? settings.storeReviewCount).toLocaleString('ja-JP')}件)</span> : null}
                   </>
                 )}
                 {settings.storeReviewLink ? (
@@ -397,10 +459,10 @@ export default function Home() {
       
       {/* Subscription Section */}
       <div className="section" style={{ position: 'relative', padding: '100px 20px', backgroundColor: 'var(--dark-bark)', color: 'white', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0.15, backgroundImage: 'url(https://images.unsplash.com/photo-1596797038530-2c107229654b?auto=format&fit=crop&w=1920&q=80)', backgroundSize: 'cover', backgroundPosition: 'center', zIndex: 0 }}></div>
+        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0.15, backgroundImage: `url(${settings.newsletterBgImage || 'https://images.unsplash.com/photo-1596797038530-2c107229654b?auto=format&fit=crop&w=1920&q=80'})`, backgroundSize: 'cover', backgroundPosition: 'center', zIndex: 0 }}></div>
         <div style={{ position: 'relative', zIndex: 1, maxWidth: '800px', margin: '0 auto', textAlign: 'center' }}>
-          <h2 style={{ fontSize: '2.5rem', fontFamily: 'var(--font-display)', marginBottom: '16px', letterSpacing: '2px' }}>ニュースレターに登録</h2>
-          <p style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.8)', marginBottom: '40px', lineHeight: '1.6' }}>最新のメニュー、シークレットレシピ、そして限定のお得な情報を<br/>あなたのメールボックスへ直接お届けします。</p>
+          <h2 style={{ fontSize: '2.5rem', fontFamily: 'var(--font-display)', marginBottom: '16px', letterSpacing: '2px' }}>{settings.newsletterTitleJa || 'ニュースレターに登録'}</h2>
+          <p style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.8)', marginBottom: '40px', lineHeight: '1.6', whiteSpace: 'pre-line' }}>{settings.newsletterSubJa || <>最新のメニュー、シークレットレシピ、そして限定のお得な情報を<br/>あなたのメールボックスへ直接お届けします。</>}</p>
           
           <form style={{ display: 'flex', gap: '10px', maxWidth: '500px', margin: '0 auto', flexWrap: 'wrap', justifyContent: 'center' }} onSubmit={handleNewsletterSubmit}>
             <input type="email" aria-label="メールアドレス" value={newsletterEmail} onChange={(e) => setNewsletterEmail(e.target.value)} placeholder="メールアドレスを入力" required style={{ flex: '1', minWidth: '250px', padding: '16px 24px', borderRadius: '50px', border: 'none', fontSize: '1rem', outline: 'none' }} />

@@ -111,6 +111,7 @@ model MenuItem {
   allergens     Json          // String[] stored as JSON array
   isRecommended Boolean       @default(false)
   isSoldOut     Boolean       @default(false)
+  isOrderable   Boolean       @default(true)
   isActive      Boolean       @default(true)
   sortOrder     Int           @default(0)
   optionGroups  OptionGroup[]
@@ -178,11 +179,13 @@ model Settings {
   holidays               Json?
   socials                Json?
   googlePlaceId          String?
-  mapUrl                 String?
-  googleMapsLink         String?
+  mapUrl                 String?   @db.Text
+  googleMapsLink         String?   @db.Text
   aboutEn                String?   @db.Text
   aboutJa                String?   @db.Text
   aboutHeroImage         String?
+  aboutHeroTag           String?
+  aboutHeroTitle         String?
   aboutStoryJa           String?   @db.Text
   aboutStoryLabelJa      String?
   aboutStoryTitleJa      String?
@@ -198,6 +201,7 @@ model Settings {
   menuLunchHeroImage     String?
   menuTakeoutHeroImage   String?
   menuGrandHeroImage     String?
+  orderingEnabled        Boolean   @default(true)
   pickupEnabled          Boolean   @default(false)
   pickupHours            String?
   pickupClosedDays       Json?     // Int[]
@@ -217,7 +221,7 @@ model Settings {
   featuredReviews        Json?
   storeReviewScore       String?
   storeReviewText        String?
-  storeReviewLink        String?
+  storeReviewLink        String?   @db.Text
   orderingPausedUntil    DateTime?
   pointsEnabled          Boolean?
   pointsPer100Yen        Int?
@@ -246,6 +250,20 @@ model Settings {
   storeSectionSubJa      String?   @db.Text
   storeLocationJa        String?
   storeBadgeJa           String?
+  // Hero carousel section
+  heroTagJa              String?
+  heroSubJa              String?   @db.Text
+  // Menu explorer section
+  menuExplorerLabelJa    String?
+  menuExplorerTitleJa    String?
+  // Recommended menu section
+  recommendedLabelJa     String?
+  recommendedTitleJa     String?
+  recommendedSubJa       String?
+  // Newsletter section
+  newsletterTitleJa      String?
+  newsletterSubJa        String?   @db.Text
+  newsletterBgImage      String?
   updatedAt              DateTime  @updatedAt
 }
 
@@ -483,7 +501,7 @@ model GoogleReviewCache {
   name             String?
   rating           Float?
   userRatingCount  Int?
-  mapsUrl          String?
+  mapsUrl          String?   @db.Text
   reviews          Json      // GoogleReview[]
   fetchedAt        DateTime?
   lastError        String?   @db.Text

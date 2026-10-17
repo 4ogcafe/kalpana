@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
-import { Bike, ShoppingBag } from 'lucide-react';
+import { Bike, ShoppingBag, ShoppingCart } from 'lucide-react';
 import { apiFetch, errorMessage } from '../../lib/api';
 
 interface Switches {
+  orderingEnabled: boolean;
   pickupEnabled: boolean;
   deliveryEnabled: boolean;
   pickupHours: string;
   deliveryHours: string;
 }
 
-type Key = 'pickupEnabled' | 'deliveryEnabled';
+type Key = 'orderingEnabled' | 'pickupEnabled' | 'deliveryEnabled';
 
 /**
  * The main on/off controls for online ordering. Each switch saves immediately, so staff can pause
@@ -24,6 +25,7 @@ export default function OrderingSwitches({ onChange }: { onChange?: () => void }
     apiFetch('/api/v1/settings')
       .then(res => res.json())
       .then(data => setState({
+        orderingEnabled: data.orderingEnabled !== false,
         pickupEnabled: Boolean(data.pickupEnabled),
         deliveryEnabled: Boolean(data.deliveryEnabled),
         pickupHours: data.pickupHours || '',
@@ -36,11 +38,12 @@ export default function OrderingSwitches({ onChange }: { onChange?: () => void }
 
   const toggle = async (key: Key) => {
     const next = !state[key];
-    // Delivery without its own hours follows the pickup hours.
-    const hours = key === 'pickupEnabled' ? state.pickupHours : state.deliveryHours || state.pickupHours;
-    if (next && !hours.trim()) {
-      toast.error(`Set the ${key === 'pickupEnabled' ? 'pickup' : 'delivery'} hours below first, then switch it on.`);
-      return;
+    if (key !== 'orderingEnabled') {
+      const hours = key === 'pickupEnabled' ? state.pickupHours : state.deliveryHours || state.pickupHours;
+      if (next && !hours.trim()) {
+        toast.error(`Set the ${key === 'pickupEnabled' ? 'pickup' : 'delivery'} hours below first, then switch it on.`);
+        return;
+      }
     }
     setSaving(key);
     try {
@@ -50,7 +53,8 @@ export default function OrderingSwitches({ onChange }: { onChange?: () => void }
         return;
       }
       setState({ ...state, [key]: next });
-      toast.success(`${key === 'pickupEnabled' ? 'Pickup' : 'Delivery'} ${next ? 'is now ON — customers can order.' : 'is now OFF.'}`);
+      const label = key === 'orderingEnabled' ? 'Online ordering system' : key === 'pickupEnabled' ? 'Pickup' : 'Delivery';
+      toast.success(`${label} ${next ? 'is now ON — customers can order.' : 'is now OFF.'}`);
       onChange?.();
     } catch {
       toast.error('Network error.');
@@ -60,6 +64,7 @@ export default function OrderingSwitches({ onChange }: { onChange?: () => void }
   };
 
   const options = [
+    { key: 'orderingEnabled' as const, icon: ShoppingCart, title: 'Master Ordering System (全体注文受付)', detail: 'Turn online ordering on or off across the entire website. When OFF, all order buttons are hidden on food cards.' },
     { key: 'pickupEnabled' as const, icon: ShoppingBag, title: 'Pickup (お持ち帰り)', detail: 'Customers order online and collect at the counter.' },
     { key: 'deliveryEnabled' as const, icon: Bike, title: 'Delivery (デリバリー)', detail: 'Delivered to the customer within the delivery area.' },
   ];

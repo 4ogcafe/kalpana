@@ -8,7 +8,7 @@ import OffersTab from '../components/admin/OffersTab';
 import CustomersTab from '../components/admin/CustomersTab';
 import StaffUsersTab from '../components/admin/StaffUsersTab';
 import OverviewTab from '../components/admin/overview/OverviewTab';
-import { GlobalSearch, NotificationBell, QuickAdd, type Navigate, type TabIntent } from '../components/admin/TopBar';
+import { GlobalSearch, NotificationBell, OrderingStatusToggle, QuickAdd, type Navigate, type TabIntent } from '../components/admin/TopBar';
 import MenuManagementTab from '../components/admin/MenuManagementTab';
 import PageSettingsTabComponent from '../components/admin/PageSettingsTab';
 import { 
@@ -232,6 +232,7 @@ export default function AdminDashboard() {
           </button>
           <GlobalSearch isAdmin={user.role === 'ADMIN'} onNavigate={navigateTo} />
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <OrderingStatusToggle />
             <NotificationBell onNavigate={navigateTo} />
             <QuickAdd isAdmin={user.role === 'ADMIN'} onNavigate={navigateTo} />
           </div>

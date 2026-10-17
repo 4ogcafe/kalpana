@@ -104,11 +104,13 @@ router.get('/slots', async (req, res) => {
   const options = fulfillmentOptions(settings);
   const fulfillment = type === 'delivery' ? 'DELIVERY' : 'PICKUP';
   res.setHeader('Cache-Control', 'no-store');
+  const masterEnabled = (settings as any).orderingEnabled !== false;
   res.json({
-    enabled: options.pickup.enabled || options.delivery.enabled,
-    note: options.pickup.note,
+    enabled: masterEnabled && (options.pickup.enabled || options.delivery.enabled),
+    orderingEnabled: masterEnabled,
+    note: masterEnabled ? options.pickup.note : 'ただいまオンラインでのご注文を停止しています。',
     ...options,
-    slots: slotsFor(settings, fulfillment),
+    slots: masterEnabled ? slotsFor(settings, fulfillment) : [],
   });
 });
 
@@ -226,11 +228,21 @@ router.get('/track/:token', async (req, res) => {
 
   res.setHeader('Cache-Control', 'no-store');
   res.json({
+    token: order.token,
     number: order.number,
     status: order.status,
     customerName: order.customerName,
+    phone: order.phone,
+    note: order.note,
     pickupAt: order.pickupAt,
-    items: (order.items as OrderLine[]).map((line) => ({ nameEn: line.nameEn, nameJa: line.nameJa, quantity: line.quantity, lineTotal: line.lineTotal })),
+    items: (order.items as OrderLine[]).map((line) => ({
+      nameEn: line.nameEn,
+      nameJa: line.nameJa,
+      quantity: line.quantity,
+      unitPrice: line.unitPrice,
+      lineTotal: line.lineTotal,
+      options: line.options,
+    })),
     ...pricingSummary(order as unknown as Record<string, unknown>),
     isMember: Boolean(order.customerId),
     createdAt: order.createdAt,

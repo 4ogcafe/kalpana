@@ -416,23 +416,26 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
   gap: 28px;
+  align-items: stretch;
 }
 
 /* ---- Menu item card ---- */
 .menu-card {
   display: flex;
   flex-direction: column;
+  height: 100%;
   background: #fff;
   border: 1px solid #efe7dc;
   border-radius: 18px;
   overflow: hidden;
   cursor: pointer;
+  box-shadow: 0 4px 18px rgba(42, 35, 33, 0.04);
   transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
 }
 .menu-card:hover {
   transform: translateY(-4px);
-  border-color: #e6d9c8;
-  box-shadow: 0 18px 40px -18px rgba(42, 35, 33, 0.28);
+  border-color: #dfcdb8;
+  box-shadow: 0 16px 36px -12px rgba(42, 35, 33, 0.16);
 }
 .menu-card-media {
   position: relative;
@@ -457,42 +460,227 @@ body {
   font-weight: 700;
   letter-spacing: 0.3px;
   backdrop-filter: blur(6px);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
 }
 .menu-badge-gold { background: rgba(242, 168, 59, 0.95); color: var(--dark-bark); }
 .menu-badge-green { background: rgba(236, 253, 243, 0.95); color: #067647; }
 .menu-badge-dark { background: rgba(42, 35, 33, 0.85); color: #fff; }
+.menu-badge-spice { background: rgba(254, 243, 199, 0.95); color: #b45309; }
 
-.menu-card-body { display: flex; flex-direction: column; flex: 1; gap: 10px; padding: 20px 20px 22px; }
+.menu-card-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 18px 20px 20px;
+  gap: 12px;
+}
+.menu-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 .menu-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.menu-card-title { margin: 0; font-size: 1.08rem; line-height: 1.4; color: var(--dark-bark); }
+.menu-card-title { margin: 0; font-size: 1.1rem; line-height: 1.35; color: var(--dark-bark); font-weight: 700; }
 .menu-card-title button {
   all: unset;
   cursor: pointer;
   font-weight: 700;
+  color: inherit;
+  transition: color 0.15s ease;
+}
+.menu-card:hover .menu-card-title button {
+  color: var(--spice);
 }
 .menu-card-title button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; border-radius: 4px; }
+.menu-card-subname {
+  font-size: 0.8rem;
+  color: #8c7e72;
+  font-family: var(--font-display, serif);
+  font-style: italic;
+  letter-spacing: 0.3px;
+  margin-top: -2px;
+  line-height: 1.3;
+}
 .menu-card-price {
   flex-shrink: 0;
   font-family: var(--font-display);
-  font-size: 1.2rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: var(--spice);
-  line-height: 1.3;
+  line-height: 1.25;
   text-align: right;
+  letter-spacing: -0.5px;
 }
 .menu-card-price small { display: block; font-family: var(--font-sans); font-size: 0.68rem; font-weight: 500; color: var(--text-muted); }
 .menu-card-desc {
   margin: 0;
   color: var(--text-muted);
   font-size: 0.85rem;
-  line-height: 1.65;
+  line-height: 1.6;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  min-height: 2.7em;
 }
-.menu-card-rating { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--text-muted); }
+.menu-card-desc-placeholder {
+  color: #a39589;
+  font-style: normal;
+  opacity: 0.85;
+}
+.menu-card-meta-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+.menu-card-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.78rem;
+  color: var(--dark-bark);
+  background: #fdfaf3;
+  border: 1px solid #fae8c8;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-weight: 600;
+}
 .menu-card-rating span { color: var(--gold); letter-spacing: 1px; }
+.menu-card-rating strong { font-weight: 700; }
+
+.menu-meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+  line-height: 1.3;
+}
+.menu-meta-spice {
+  background: #fdf2f2;
+  border: 1px solid #fed7d7;
+  color: #c53030;
+}
+.menu-meta-veg {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+}
+
+/* Card footer when ordering is off */
+.menu-card-footer {
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid #f1ebe2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.menu-card-status {
+  display: flex;
+  align-items: center;
+}
+.menu-card-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 9999px;
+  line-height: 1;
+}
+.menu-card-status-pill.is-avail {
+  background: #f4fbf7;
+  color: #166534;
+  border: 1px solid #dcfce7;
+}
+.menu-card-status-pill.is-sold {
+  background: #f5f5f5;
+  color: #737373;
+  border: 1px solid #e5e5e5;
+}
+.status-dot-pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25);
+  display: inline-block;
+}
+
+.menu-card-view-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--spice);
+  background: #fff8f5;
+  border: 1px solid #fed7cc;
+  padding: 6px 13px;
+  border-radius: 9999px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.menu-card:hover .menu-card-view-btn {
+  background: var(--spice);
+  color: #fff;
+  border-color: var(--spice);
+  box-shadow: 0 4px 12px rgba(184, 61, 39, 0.25);
+}
+.menu-card-view-btn svg {
+  transition: transform 0.2s ease;
+}
+.menu-card:hover .menu-card-view-btn svg {
+  transform: translateX(3px);
+}
+
+/* Modal lightbox dine-in card */
+.popup-dinein-box {
+  margin-top: 22px;
+  padding: 18px 20px;
+  background: linear-gradient(135deg, #fdfbf7 0%, #f7f2eb 100%);
+  border: 1px solid #ebdccb;
+  border-radius: 14px;
+  text-align: center;
+}
+.popup-dinein-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: left;
+}
+.popup-dinein-call-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 360px;
+  margin: 0 auto;
+  background: var(--spice);
+  color: #fff !important;
+  font-weight: 700;
+  font-size: 0.92rem;
+  padding: 11px 20px;
+  border-radius: 9999px;
+  text-decoration: none;
+  box-shadow: 0 6px 18px rgba(184, 61, 39, 0.25);
+  transition: all 0.2s ease;
+}
+.popup-dinein-call-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(184, 61, 39, 0.35);
+  background: #a3321d;
+}
 
 /* ---- Ordering controls (cards and the item popup) ---- */
 .order-actions {

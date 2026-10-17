@@ -124,45 +124,23 @@ export function allDayCounts(orders: KitchenOrder[]) {
   return [...counts.values()].sort((a, b) => b.quantity - a.quantity);
 }
 
-const escapeHtml = (value: string) => value.replace(/[&<>"']/g, char => `&#${char.charCodeAt(0)};`);
+import {
+  generateKitchenTicketHtml,
+  printKitchenTicket,
+  printTestTicket as printReceiptTestTicket,
+} from '../../lib/receipt';
 
 /** A kitchen ticket for an 80 mm receipt printer (or any printer). */
-export function ticketHtml(order: KitchenOrder, allergyLine: string | null): string {
-  const lines = order.items
-    .map(line => `<tr><td class="q">${line.quantity}×</td><td>${escapeHtml(line.nameEn)}${line.nameJa ? `<br><small>${escapeHtml(line.nameJa)}</small>` : ''}</td></tr>`)
-    .join('');
-  const due = new Date(order.pickupAt).toLocaleString('ja-JP', { timeZone: TIMEZONE, month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-  const address = order.deliveryAddress
-    ? [order.deliveryAddress.postalCode && `〒${order.deliveryAddress.postalCode}`, order.deliveryAddress.prefecture, order.deliveryAddress.city, order.deliveryAddress.line1, order.deliveryAddress.building].filter(Boolean).join(' ')
-    : '';
-  return `<!doctype html><html><head><meta charset="utf-8"><title>Order ${order.number}</title><style>
-    @page { size: 80mm auto; margin: 4mm; }
-    body { font-family: system-ui, sans-serif; width: 72mm; margin: 0; color: #000; }
-    h1 { font-size: 28px; margin: 0; } .type { font-size: 16px; font-weight: 700; border: 2px solid #000; display: inline-block; padding: 2px 6px; margin: 4px 0; }
-    table { width: 100%; border-collapse: collapse; font-size: 16px; margin: 8px 0; } td { padding: 4px 0; border-bottom: 1px dashed #000; vertical-align: top; } .q { width: 36px; font-weight: 700; font-size: 18px; }
-    .box { border: 2px solid #000; padding: 4px 6px; margin: 6px 0; font-weight: 700; } small { font-size: 12px; } p { margin: 2px 0; font-size: 14px; }
-  </style></head><body>
-    <h1>#${String(order.number).padStart(3, '0')}</h1>
-    <div class="type">${isDelivery(order) ? 'DELIVERY デリバリー' : 'PICKUP お持ち帰り'}</div>
-    <p><b>Due: ${escapeHtml(due)}</b></p>
-    <p>${escapeHtml(order.customerName)} · ${escapeHtml(order.phone)}</p>
-    ${address ? `<p>${escapeHtml(address)}</p>` : ''}
-    <table>${lines}</table>
-    ${allergyLine ? `<div class="box">⚠ ${escapeHtml(allergyLine)}</div>` : ''}
-    ${order.reward?.kind === 'PERK' ? `<div class="box">🎁 ${escapeHtml(order.reward.titleJa)}</div>` : ''}
-    ${order.note ? `<div class="box">📝 ${escapeHtml(order.note)}</div>` : ''}
-    <p><small>Printed ${new Date().toLocaleString('ja-JP', { timeZone: TIMEZONE })}</small></p>
-  </body></html>`;
+export function ticketHtml(order: KitchenOrder | any, allergyLine: string | null = null): string {
+  return generateKitchenTicketHtml(order, allergyLine);
 }
 
-/** Prints one ticket from a blank window (no inline script, so the site's security policy still applies). */
-export function printTicket(order: KitchenOrder, allergyLine: string | null): boolean {
-  const win = window.open('', '_blank', 'width=420,height=640');
-  if (!win) return false;
-  win.document.write(ticketHtml(order, allergyLine));
-  win.document.close();
-  win.focus();
-  win.print();
-  win.close();
-  return true;
+/** Prints one ticket without opening a new tab whenever possible. */
+export function printTicket(order: KitchenOrder | any, allergyLine: string | null = null): boolean {
+  return printKitchenTicket(order, allergyLine);
+}
+
+/** Prints a test ticket formatted for MUNBYN / Epson TM-m30 80mm printers */
+export function printTestTicket(): boolean {
+  return printReceiptTestTicket();
 }

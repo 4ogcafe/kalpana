@@ -2,18 +2,30 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import ReadyAlertButton from '../components/order/ReadyAlertButton';
 import { readyChime } from '../lib/push';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Printer } from 'lucide-react';
 import { formatAddress, fulfillmentLabel, statusLabel, timeWord, type DeliveryAddress, type Fulfillment } from '../components/order/fulfillment';
 import type { PlacedState } from './Order';
 import { apiFetch, getPublic } from '../lib/api';
 import { amountDue, formatOrderNumber, yen } from '../lib/format';
 
+import { printCustomerReceipt as printReceiptEngine } from '../lib/receipt';
+
 interface TrackedOrder {
+  token?: string;
   number: number;
   status: 'NEW' | 'CONFIRMED' | 'READY' | 'COMPLETED' | 'CANCELLED';
   customerName: string;
+  phone?: string;
+  note?: string | null;
   pickupAt: string;
-  items: { nameEn: string; nameJa: string | null; quantity: number; lineTotal: number }[];
+  items: {
+    nameEn: string;
+    nameJa: string | null;
+    quantity: number;
+    unitPrice?: number;
+    lineTotal: number;
+    options?: any[];
+  }[];
   subtotal: number;
   offerTitle: string | null;
   offerDiscount: number;
@@ -61,6 +73,10 @@ const HINTS: Record<Fulfillment, Partial<Record<TrackedOrder['status'], string>>
   },
 };
 
+export function printCustomerReceipt(order: TrackedOrder, settings: any) {
+  return printReceiptEngine(order, settings);
+}
+
 export default function OrderStatus() {
   const { token } = useParams();
   // Shown once, right after ordering: the flag is read from navigation state and then cleared,
@@ -77,10 +93,21 @@ export default function OrderStatus() {
   // Shown (with a chime) when the order turns ready while this page is open.
   const [readyAlert, setReadyAlert] = useState(false);
   const lastStatus = useRef<string | null>(null);
+  const printedRef = useRef(false);
 
   useEffect(() => {
     getPublic<any>('/api/v1/settings').then(setSettings).catch(console.error);
   }, []);
+
+  useEffect(() => {
+    if (justPlaced && order && !printedRef.current) {
+      printedRef.current = true;
+      const timer = setTimeout(() => {
+        printCustomerReceipt(order, settings);
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [justPlaced, order, settings]);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -150,12 +177,36 @@ export default function OrderStatus() {
             )}
             {(order.status === 'NEW' || order.status === 'CONFIRMED') && token && <ReadyAlertButton target={{ orderToken: token }} />}
             {justPlaced && (
-              <div role="status" style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '16px 18px', borderRadius: '14px', backgroundColor: '#ecfdf3', border: '1px solid #abefc6', color: '#067647' }}>
-                <CheckCircle2 size={24} aria-hidden="true" style={{ flexShrink: 0 }} />
-                <div>
-                  <strong style={{ display: 'block', fontSize: '1.05rem' }}>ご注文が確定しました</strong>
-                  <span style={{ fontSize: '0.9rem', lineHeight: 1.6 }}>受付番号 {formatOrderNumber(order.number)} ・ 店舗が確認すると、この画面の状況が自動で更新されます。</span>
+              <div role="status" style={{ display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderRadius: '14px', backgroundColor: '#ecfdf3', border: '1px solid #abefc6', color: '#067647', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <CheckCircle2 size={26} aria-hidden="true" style={{ flexShrink: 0 }} />
+                  <div>
+                    <strong style={{ display: 'block', fontSize: '1.08rem' }}>ご注文が確定しました（受付完了）</strong>
+                    <span style={{ fontSize: '0.9rem', lineHeight: 1.6 }}>受付番号 {formatOrderNumber(order.number)} ・ 控え・領収書を印刷できます。</span>
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => printCustomerReceipt(order, settings)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '9px 18px',
+                    borderRadius: '8px',
+                    backgroundColor: '#067647',
+                    color: '#fff',
+                    border: 'none',
+                    fontWeight: 700,
+                    fontSize: '0.92rem',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px rgba(6, 118, 71, 0.25)',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <Printer size={18} />
+                  領収書を印刷
+                </button>
               </div>
             )}
             <div style={cardStyle}>
@@ -172,6 +223,31 @@ export default function OrderStatus() {
                 {order.deliveryAddress && (
                   <p style={{ margin: '6px 0 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>お届け先：{formatAddress(order.deliveryAddress)}</p>
                 )}
+
+                <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={() => printCustomerReceipt(order, settings)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '10px 22px',
+                      backgroundColor: '#fff8f5',
+                      border: '1px solid #fed7cc',
+                      color: 'var(--spice)',
+                      borderRadius: '9999px',
+                      fontWeight: 700,
+                      fontSize: '0.92rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px rgba(184, 61, 39, 0.08)',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    <Printer size={18} />
+                    注文控え / 領収書を印刷
+                  </button>
+                </div>
               </div>
 
               {order.status === 'CANCELLED' ? (

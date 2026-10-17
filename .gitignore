@@ -19,3 +19,4 @@ apps/api/public/uploads/*
 .DS_Store
 .vscode/
 *.log
+kalpana/

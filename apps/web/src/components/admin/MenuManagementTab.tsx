@@ -12,7 +12,7 @@ interface MenuItem {
   descriptionEn: string | null; descriptionJa: string | null;
   price: number; imageUrl: string | null; rating: number | null; spiceLevel: number;
   isRecommended: boolean; isVegetarian: boolean; isVegan: boolean; isHalal: boolean;
-  isGlutenFree: boolean; isSoldOut: boolean; isActive: boolean;
+  isGlutenFree: boolean; isSoldOut: boolean; isOrderable?: boolean; isActive: boolean;
   menuTypes: string[]; allergens: string[]; sortOrder: number;
   optionGroups: OptionGroupStub[];
 }
@@ -34,7 +34,7 @@ const blankForm = (categoryId = '') => ({
   id: '', categoryId, nameEn: '', nameJa: '', descriptionEn: '', descriptionJa: '',
   price: '', imageUrl: '', rating: '', spiceLevel: 0,
   isRecommended: false, isVegetarian: false, isVegan: false, isHalal: false, isGlutenFree: false,
-  isSoldOut: false, isActive: true, menuTypes: [] as string[], allergens: [] as string[],
+  isSoldOut: false, isOrderable: true, isActive: true, menuTypes: [] as string[], allergens: [] as string[],
   optionGroupIds: [] as string[], newAllergen: '',
 });
 
@@ -53,6 +53,7 @@ export default function MenuManagementTab({ intent }: { intent: TabIntent | null
   const [optionGroups, setOptionGroups] = useState<OptionGroup[]>([]);
 
   // ── UI state ──
+  const [orderingEnabled, setOrderingEnabled] = useState<boolean>(true);
   const [selectedCatId, setSelectedCatId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [form, setForm] = useState(blankForm());
@@ -74,16 +75,43 @@ export default function MenuManagementTab({ intent }: { intent: TabIntent | null
 
   // ── Fetch ──
   const fetchAll = async () => {
-    const [catRes, itemRes, ogRes] = await Promise.all([
+    const [catRes, itemRes, ogRes, settingsRes] = await Promise.all([
       apiFetch('/api/v1/menu/categories').then(r => r.json()),
       apiFetch('/api/v1/menu/items').then(r => r.json()),
       apiFetch('/api/v1/menu/option-groups').then(r => r.json()),
+      apiFetch('/api/v1/settings').then(r => r.json()).catch(() => ({})),
     ]);
     if (Array.isArray(catRes)) setCategories(catRes);
     if (Array.isArray(itemRes)) setItems(itemRes);
     if (Array.isArray(ogRes)) setOptionGroups(ogRes);
+    if (settingsRes && typeof settingsRes.orderingEnabled === 'boolean') {
+      setOrderingEnabled(settingsRes.orderingEnabled);
+    }
   };
   useEffect(() => { fetchAll(); }, []);
+
+  const toggleMasterOrdering = async () => {
+    const next = !orderingEnabled;
+    try {
+      const res = await apiFetch('/api/v1/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderingEnabled: next }),
+      });
+      if (res.ok) {
+        setOrderingEnabled(next);
+        toast.success(
+          next
+            ? '全体注文受付を ON にしました。（フードカードに注文ボタンが表示されます）'
+            : '全体注文受付を OFF にしました。（フードカードの注文ボタンが非表示になります）'
+        );
+      } else {
+        toast.error('設定の更新に失敗しました。');
+      }
+    } catch {
+      toast.error('通信エラーが発生しました。');
+    }
+  };
 
   // ── Select first category automatically ──
   useEffect(() => {
@@ -107,7 +135,7 @@ export default function MenuManagementTab({ intent }: { intent: TabIntent | null
       spiceLevel: item.spiceLevel,
       isRecommended: item.isRecommended, isVegetarian: item.isVegetarian,
       isVegan: item.isVegan, isHalal: item.isHalal, isGlutenFree: item.isGlutenFree,
-      isSoldOut: item.isSoldOut, isActive: item.isActive,
+      isSoldOut: item.isSoldOut, isOrderable: item.isOrderable !== false, isActive: item.isActive,
       menuTypes: [...item.menuTypes], allergens: [...item.allergens],
       optionGroupIds: item.optionGroups.map(g => g.id), newAllergen: '',
     });
@@ -144,7 +172,7 @@ export default function MenuManagementTab({ intent }: { intent: TabIntent | null
         spiceLevel: form.spiceLevel, menuTypes: form.menuTypes, allergens: form.allergens,
         isRecommended: form.isRecommended, isVegetarian: form.isVegetarian,
         isVegan: form.isVegan, isHalal: form.isHalal, isGlutenFree: form.isGlutenFree,
-        isSoldOut: form.isSoldOut, isActive: form.isActive,
+        isSoldOut: form.isSoldOut, isOrderable: form.isOrderable !== false, isActive: form.isActive,
         optionGroupIds: form.optionGroupIds,
       };
       const url = form.id ? `/api/v1/menu/items/${form.id}` : '/api/v1/menu/items';
@@ -163,6 +191,16 @@ export default function MenuManagementTab({ intent }: { intent: TabIntent | null
     const res = await apiFetch(`/api/v1/menu/items/${item.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ isSoldOut: !item.isSoldOut }) });
     if (res.ok) { toast.success(item.isSoldOut ? 'Back in stock.' : 'Marked sold out.'); fetchAll(); }
     else toast.error('Failed.');
+  };
+
+  // ── Orderable toggle ──
+  const toggleOrderable = async (item: MenuItem) => {
+    const next = item.isOrderable === false;
+    const res = await apiFetch(`/api/v1/menu/items/${item.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ isOrderable: next }) });
+    if (res.ok) {
+      toast.success(next ? `“${item.nameJa || item.nameEn}” の注文ボタンを表示にしました。` : `“${item.nameJa || item.nameEn}” の注文ボタンを非表示にしました。`);
+      fetchAll();
+    } else toast.error('Failed to update.');
   };
 
   // ── Active toggle ──
@@ -438,6 +476,41 @@ export default function MenuManagementTab({ intent }: { intent: TabIntent | null
               </div>
             )}
 
+            {/* Master Ordering System Banner */}
+            {!isEditing && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', padding: '12px 16px', background: orderingEnabled ? '#f0fdf4' : '#fef2f2', border: `1px solid ${orderingEnabled ? '#bbf7d0' : '#fecaca'}`, borderRadius: '10px', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '1.3rem' }}>{orderingEnabled ? '🟢' : '🔴'}</span>
+                  <div>
+                    <strong style={{ fontSize: '0.92rem', color: orderingEnabled ? '#166534' : '#991b1b', display: 'block' }}>
+                      Online Ordering System: {orderingEnabled ? 'ON (注文受付中)' : 'OFF (注文受付停止中)'}
+                    </strong>
+                    <span style={{ fontSize: '0.8rem', color: orderingEnabled ? '#15803d' : '#b91c1c' }}>
+                      {orderingEnabled
+                        ? 'Website customers can see order buttons on food cards.'
+                        : 'Ordering is turned OFF. All order buttons are hidden on food cards.'}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={toggleMasterOrdering}
+                  style={{
+                    padding: '0.45rem 1rem',
+                    borderRadius: '8px',
+                    border: `1px solid ${orderingEnabled ? '#bbf7d0' : '#fca5a5'}`,
+                    background: '#fff',
+                    color: orderingEnabled ? '#b91c1c' : '#15803d',
+                    fontWeight: 700,
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {orderingEnabled ? 'Turn OFF Ordering (注文ボタン非表示)' : 'Turn ON Ordering (注文ボタン表示)'}
+                </button>
+              </div>
+            )}
+
             {/* Item list */}
             {!isEditing && !selectedCat && (
               <div style={{ padding: '3rem', textAlign: 'center', color: '#9ca3af' }}>Select a category to manage its items.</div>
@@ -468,6 +541,7 @@ export default function MenuManagementTab({ intent }: { intent: TabIntent | null
                     {item.menuTypes.map(t => <span key={t} style={badge('#f3f4f6', '#374151')}>{t}</span>)}
                     {item.spiceLevel > 0 && <span style={{ fontSize: '0.78rem' }}>{spiceIcon(item.spiceLevel)}</span>}
                     {!item.isActive && <span style={badge('#fee2e2', '#b91c1c')}>Hidden</span>}
+                    {item.isOrderable === false && <span style={badge('#fee2e2', '#991b1b')}>Order OFF</span>}
                     {item.isSoldOut && <span style={badge('#fee2e2', '#b91c1c')}>Sold out</span>}
                     {item.isRecommended && <span style={badge('#fef3c7', '#d97706')}>⭐ Recommended</span>}
                     {item.isVegetarian && <span style={badge('#d1fae5', '#059669')}>🌿 Veg</span>}
@@ -478,8 +552,9 @@ export default function MenuManagementTab({ intent }: { intent: TabIntent | null
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flexShrink: 0 }}>
                   <button onClick={() => openEdit(item)} style={{ padding: '0.4rem 0.8rem', border: '1px solid #d1d5db', borderRadius: '6px', background: '#fff', cursor: 'pointer', fontWeight: 500, fontSize: '0.82rem', color: '#374151' }}>Edit</button>
-                  <button onClick={() => toggleActive(item)} style={{ padding: '0.4rem 0.8rem', border: '1px solid #d1d5db', borderRadius: '6px', background: '#fff', cursor: 'pointer', fontWeight: 500, fontSize: '0.82rem', color: item.isActive ? '#6b7280' : '#059669' }}>{item.isActive ? 'Hide' : 'Show'}</button>
+                  <button onClick={() => toggleOrderable(item)} style={{ padding: '0.4rem 0.8rem', border: '1px solid #d1d5db', borderRadius: '6px', background: item.isOrderable !== false ? '#ecfdf5' : '#fef2f2', cursor: 'pointer', fontWeight: 600, fontSize: '0.82rem', color: item.isOrderable !== false ? '#065f46' : '#991b1b' }}>{item.isOrderable !== false ? 'Order: ON' : 'Order: OFF'}</button>
                   <button onClick={() => toggleSoldOut(item)} style={{ padding: '0.4rem 0.8rem', border: '1px solid #d1d5db', borderRadius: '6px', background: '#fff', cursor: 'pointer', fontWeight: 500, fontSize: '0.82rem', color: item.isSoldOut ? '#059669' : '#b45309' }}>{item.isSoldOut ? 'In stock' : 'Sold out'}</button>
+                  <button onClick={() => toggleActive(item)} style={{ padding: '0.4rem 0.8rem', border: '1px solid #d1d5db', borderRadius: '6px', background: '#fff', cursor: 'pointer', fontWeight: 500, fontSize: '0.82rem', color: item.isActive ? '#6b7280' : '#059669' }}>{item.isActive ? 'Hide' : 'Show'}</button>
                   <button onClick={() => deleteItem(item.id)} style={{ padding: '0.4rem 0.8rem', border: '1px solid #fca5a5', borderRadius: '6px', background: '#fee2e2', cursor: 'pointer', fontWeight: 500, fontSize: '0.82rem', color: '#ef4444' }}>Delete</button>
                 </div>
               </div>
@@ -576,6 +651,7 @@ export default function MenuManagementTab({ intent }: { intent: TabIntent | null
                   <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                     {([
                       ['isRecommended', '⭐ Recommended'],
+                      ['isOrderable', '🛒 Online Ordering (Show order button in food card)'],
                       ['isVegetarian', '🌿 Vegetarian'],
                       ['isVegan', '🌱 Vegan'],
                       ['isHalal', '🥩 Halal'],

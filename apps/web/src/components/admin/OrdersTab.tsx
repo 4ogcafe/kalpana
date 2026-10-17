@@ -3,11 +3,15 @@ import type { TabIntent } from './TopBar';
 import { toast } from 'react-hot-toast';
 import { apiFetch, errorMessage } from '../../lib/api';
 import { amountDue, formatOrderNumber, yen } from '../../lib/format';
+import { Printer, ReceiptText } from 'lucide-react';
 import DeliverySettings from './DeliverySettings';
 import OrderingSwitches from './OrderingSwitches';
 import PickupSettings from './PickupSettings';
+import PrinterSettings from './PrinterSettings';
 import StampCounter from './StampCounter';
 import { alertText, type DietaryAlert } from './dietary';
+import { printTicket } from '../kitchen/kitchen';
+import { printCustomerReceipt } from '../../lib/receipt';
 
 type Status = 'NEW' | 'CONFIRMED' | 'READY' | 'COMPLETED' | 'CANCELLED';
 
@@ -213,16 +217,42 @@ export default function OrdersTab({ isAdmin, intent }: { isAdmin: boolean; inten
                   </div>
                 )}
 
-                {next && (
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '16px', flexWrap: 'wrap' }}>
+                  {next && (
                     <button type="button" disabled={busyId === order.id} onClick={() => changeStatus(order, next.status)} style={{ ...actionStyle, flex: 1, backgroundColor: '#000', color: '#fff', border: 'none' }}>
                       {next.label}
                     </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      printCustomerReceipt(order as any);
+                      toast.success(`領収書 No. ${formatOrderNumber(order.number)} を印刷しました`);
+                    }}
+                    title="領収書・お控えを印刷"
+                    style={{ ...actionStyle, backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                  >
+                    <ReceiptText size={16} />
+                    <span>領収書</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      printTicket(order, order.dietaryAlert ? alertText(order.dietaryAlert) : null);
+                      toast.success(`調理伝票 No. ${formatOrderNumber(order.number)} を印刷しました`);
+                    }}
+                    title="調理伝票を印刷"
+                    style={{ ...actionStyle, backgroundColor: '#f9fafb', color: '#111827', border: '1px solid #d1d5db', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                  >
+                    <Printer size={16} />
+                    <span>調理伝票</span>
+                  </button>
+                  {next && (
                     <button type="button" disabled={busyId === order.id} onClick={() => changeStatus(order, 'CANCELLED')} style={{ ...actionStyle, backgroundColor: '#fff', color: '#b91c1c', border: '1px solid #fca5a5' }}>
                       Cancel
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </article>
             );
           })}
@@ -231,6 +261,7 @@ export default function OrdersTab({ isAdmin, intent }: { isAdmin: boolean; inten
 
       {isAdmin && <PickupSettings onSaved={() => setSettingsVersion(v => v + 1)} />}
       {isAdmin && <DeliverySettings onSaved={() => setSettingsVersion(v => v + 1)} />}
+      {isAdmin && <PrinterSettings />}
     </div>
   );
 }

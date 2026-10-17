@@ -1,16 +1,23 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { toast } from 'react-hot-toast';
-import { Image, Plus, Trash2, Eye, EyeOff, Upload, X } from 'lucide-react';
+import { Image, Plus, Trash2, Eye, EyeOff, Upload, X, RotateCcw, ArrowUp, ArrowDown } from 'lucide-react';
 import FooterSettings from './FooterSettings';
 import GoogleReviewsSettings from './GoogleReviewsSettings';
 import { apiFetch, assetUrl, errorMessage } from '../../lib/api';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface Settings {
+  heroTagJa?: string;
+  heroSubJa?: string;
   welcomeTitleEn?: string;
   welcomeTitleJa?: string;
   welcomeTextJa?: string;
+  menuExplorerLabelJa?: string;
+  menuExplorerTitleJa?: string;
   aboutJa?: string;
+  recommendedLabelJa?: string;
+  recommendedTitleJa?: string;
+  recommendedSubJa?: string;
   storeSectionLabelJa?: string;
   storeSectionTitleJa?: string;
   storeSectionSubJa?: string;
@@ -19,7 +26,12 @@ interface Settings {
   storeReviewScore?: string;
   storeReviewText?: string;
   storeReviewLink?: string;
+  newsletterTitleJa?: string;
+  newsletterSubJa?: string;
+  newsletterBgImage?: string;
   aboutHeroImage?: string;
+  aboutHeroTag?: string;
+  aboutHeroTitle?: string;
   contactHeroImage?: string;
   menuGrandHeroImage?: string;
   menuLunchHeroImage?: string;
@@ -36,6 +48,47 @@ interface Settings {
   aboutChefDescJa?: string;
   aboutChefImage?: string;
 }
+
+export const DEFAULT_ABOUT_CONTENT: Record<string, string> = {
+  aboutHeroTag: 'ABOUT US',
+  aboutHeroTitle: '私たちについて',
+  aboutHeroImage: 'https://images.unsplash.com/photo-1552566626-52f8b828add9?auto=format&fit=crop&w=1920&q=80',
+  aboutStoryLabelJa: '私たちの物語',
+  aboutStoryTitleJa: '本場インドの味を、熊谷へ',
+  aboutStoryJa: 'Kalpana（カルパナ）は、サンスクリット語で「想像」や「創造」を意味します。\n私たちは、インドの伝統的なスパイスと製法を守りながら、日本の皆さまの味覚に寄り添う新しいインディアン・ダイニングを創造しています。\n\n本場インドのホテルで腕を磨いたシェフが、厳選された数十種類のスパイスを巧みにブレンド。\n特注のタンドール（土窯）で焼き上げる備長炭の香ばしいナンやタンドリーチキンは、多くのお客様に愛されています。',
+  aboutSpiceLabelJa: 'こだわり',
+  aboutSpiceTitleJa: '命を吹き込む、スパイス',
+  aboutSpiceDescJa: 'カレーの味の決め手となるスパイスは、インドから直接取り寄せた最高品質のものを使用しています。クミン、コリアンダー、ターメリック、カルダモン... それぞれのスパイスが持つ薬効や香りを最大限に引き出すため、独自に配合し、挽きたてを使用しています。',
+  aboutSpiceImage: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=800&q=80',
+  aboutChefLabelJa: 'シェフ紹介',
+  aboutChefTitleJa: '熟練の技',
+  aboutChefDescJa: '長年の経験を積み、日本の皆さまに「本物のインド料理」を届けるために来日しました。カレーの奥深さ、スパイスの魔法、そしてインドの温かいおもてなしの心を、一皿一皿に込めて提供しています。辛さの調節や、ベジタリアン対応などもお気軽にお声がけください。',
+  aboutChefImage: 'https://images.unsplash.com/photo-1583394838336-acd977736f90?auto=format&fit=crop&w=800&q=80',
+};
+
+export const DEFAULT_HOME_CONTENT: Record<string, string> = {
+  heroTagJa: '埼玉・熊谷で味わう、本場のインド料理',
+  heroSubJa: '愛とスパイス、そして伝統に彩られた数世紀にわたるレシピを。\nKalpana Indian Cuisineで皆様をお待ちしております。',
+  welcomeTitleEn: 'Authentic Indian Flavors',
+  welcomeTitleJa: '本格インドの味わい',
+  welcomeTextJa: 'インドの豊かな食文化と鮮やかなスパイスを体験してください。熟練のシェフが伝統的なタンドール窯と新鮮な食材を使用し、すべての料理をゼロから手作りしています。忘れられない特別なひとときをお届けします。',
+  menuExplorerLabelJa: 'メニューを見る',
+  menuExplorerTitleJa: 'キッチンからお届け',
+  aboutJa: '毎日手作りの新鮮な味 — 手挽きのスパイス、本格的な粘土窯（タンドール）、妥協のない調理',
+  recommendedLabelJa: 'シェフの厳選',
+  recommendedTitleJa: 'おすすめメニュー',
+  recommendedSubJa: '全店舗で愛され続けている、不動の人気メニュー',
+  storeSectionLabelJa: '店舗を探す',
+  storeSectionTitleJa: '私たちの店舗',
+  storeSectionSubJa: '店舗を選択して、住所、営業時間、地図をご確認ください。',
+  storeLocationJa: '埼玉県熊谷市佐谷田2081（国道17号沿い・加賀家食堂隣）',
+  storeBadgeJa: '🍛 インド料理',
+  storeReviewScore: '4.5',
+  storeReviewText: 'Googleでレビューを見る',
+  storeReviewLink: 'https://www.google.com/maps/place/Kalpna+Indian+Cuisine/@36.1250995,138.8116637,10z/data=!4m6!3m5!1s0x601f2b0605446c1f:0x1a31a406a1c1b3d6!8m2!3d36.1250995!4d139.4214049!16s%2Fg%2F11mf64qypb?entry=ttu',
+  newsletterTitleJa: 'ニュースレターに登録',
+  newsletterSubJa: '最新のメニュー、シークレットレシピ、そして限定のお得な情報を\nあなたのメールボックスへ直接お届けします。',
+};
 
 interface Slide {
   id: string;
@@ -158,10 +211,17 @@ function HomePageTab({ settings, setSettings }: { settings: Settings; setSetting
     setSaving(true);
     try {
       await saveFields({
+        heroTagJa: settings.heroTagJa,
+        heroSubJa: settings.heroSubJa,
         welcomeTitleEn: settings.welcomeTitleEn,
         welcomeTitleJa: settings.welcomeTitleJa,
         welcomeTextJa: settings.welcomeTextJa,
+        menuExplorerLabelJa: settings.menuExplorerLabelJa,
+        menuExplorerTitleJa: settings.menuExplorerTitleJa,
         aboutJa: settings.aboutJa,
+        recommendedLabelJa: settings.recommendedLabelJa,
+        recommendedTitleJa: settings.recommendedTitleJa,
+        recommendedSubJa: settings.recommendedSubJa,
         storeSectionLabelJa: settings.storeSectionLabelJa,
         storeSectionTitleJa: settings.storeSectionTitleJa,
         storeSectionSubJa: settings.storeSectionSubJa,
@@ -170,10 +230,17 @@ function HomePageTab({ settings, setSettings }: { settings: Settings; setSetting
         storeReviewScore: settings.storeReviewScore,
         storeReviewText: settings.storeReviewText,
         storeReviewLink: settings.storeReviewLink,
+        newsletterTitleJa: settings.newsletterTitleJa,
+        newsletterSubJa: settings.newsletterSubJa,
       }, 'Home page content');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleLoadDefaults = () => {
+    setSettings(DEFAULT_HOME_CONTENT);
+    toast.success('Loaded default home page content into form.');
   };
 
   const set = (key: keyof Settings) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -181,8 +248,37 @@ function HomePageTab({ settings, setSettings }: { settings: Settings; setSetting
 
   return (
     <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <div>
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: '0 0 0.25rem 0', color: '#111827' }}>Home Page Content</h2>
+          <p style={{ margin: 0, color: '#6b7280', fontSize: '0.85rem' }}>Manage all text sections displayed on the public home page.</p>
+        </div>
+        <button
+          type="button"
+          onClick={handleLoadDefaults}
+          style={{ ...outlineBtn, padding: '0.5rem 1rem' }}
+          title="Fill in standard Japanese & English texts for the home page"
+        >
+          <RotateCcw size={14} /> Fill Default Home Content
+        </button>
+      </div>
+
       <div style={card}>
-        <h3 style={h3}>Indian Food Section</h3>
+        <h3 style={h3}>Hero Banner Section</h3>
+        <label style={lbl}>
+          Hero Tagline (JA)
+          <span style={muted}>Badge text above the main banner headline (e.g. 埼玉・熊谷で味わう、本場のインド料理)</span>
+          <input style={inp} type="text" value={settings.heroTagJa ?? ''} onChange={set('heroTagJa')} placeholder="埼玉・熊谷で味わう、本場のインド料理" />
+        </label>
+        <label style={lbl}>
+          Hero Subtitle (JA)
+          <span style={muted}>Paragraph text under the main headline</span>
+          <textarea style={{ ...inp, height: 80, resize: 'vertical', fontFamily: 'inherit' }} value={settings.heroSubJa ?? ''} onChange={set('heroSubJa')} placeholder="愛とスパイス、そして伝統に彩られた数世紀にわたるレシピを..." />
+        </label>
+      </div>
+
+      <div style={card}>
+        <h3 style={h3}>Indian Food Section (Welcome)</h3>
         <label style={lbl}>
           Title (EN)
           <input style={inp} type="text" value={settings.welcomeTitleEn ?? ''} onChange={set('welcomeTitleEn')} placeholder="Authentic Indian Flavors" />
@@ -193,16 +289,40 @@ function HomePageTab({ settings, setSettings }: { settings: Settings; setSetting
         </label>
         <label style={lbl}>
           Description (JA)
-          <textarea style={{ ...inp, height: 120, resize: 'vertical', fontFamily: 'inherit' }} value={settings.welcomeTextJa ?? ''} onChange={set('welcomeTextJa')} placeholder="スパイスの香り豊かな..." />
+          <textarea style={{ ...inp, height: 120, resize: 'vertical', fontFamily: 'inherit' }} value={settings.welcomeTextJa ?? ''} onChange={set('welcomeTextJa')} placeholder="インドの豊かな食文化と鮮やかなスパイスを体験してください..." />
         </label>
       </div>
 
       <div style={card}>
         <h3 style={h3}>Menu Explorer Section</h3>
         <label style={lbl}>
+          Section Label (JA)
+          <input style={inp} type="text" value={settings.menuExplorerLabelJa ?? ''} onChange={set('menuExplorerLabelJa')} placeholder="メニューを見る" />
+        </label>
+        <label style={lbl}>
+          Section Title (JA)
+          <span style={muted}>Supports &lt;em&gt; tags for stylized emphasis (e.g. キッチンから&lt;em&gt;お届け&lt;/em&gt;)</span>
+          <input style={inp} type="text" value={settings.menuExplorerTitleJa ?? ''} onChange={set('menuExplorerTitleJa')} placeholder="キッチンからお届け" />
+        </label>
+        <label style={lbl}>
           Subtitle (JA)
-          <span style={muted}>Shown under the "キッチンからお届け" heading on the home page.</span>
           <textarea style={{ ...inp, height: 80, resize: 'vertical', fontFamily: 'inherit' }} value={settings.aboutJa ?? ''} onChange={set('aboutJa')} placeholder="毎日手作りの新鮮な味 — 手挽きのスパイス、本格的な粘土窯（タンドール）、妥協のない調理" />
+        </label>
+      </div>
+
+      <div style={card}>
+        <h3 style={h3}>Recommended Menu Section</h3>
+        <label style={lbl}>
+          Section Label (JA)
+          <input style={inp} type="text" value={settings.recommendedLabelJa ?? ''} onChange={set('recommendedLabelJa')} placeholder="シェフの厳選" />
+        </label>
+        <label style={lbl}>
+          Section Title (JA)
+          <input style={inp} type="text" value={settings.recommendedTitleJa ?? ''} onChange={set('recommendedTitleJa')} placeholder="おすすめメニュー" />
+        </label>
+        <label style={lbl}>
+          Subtitle (JA)
+          <textarea style={{ ...inp, height: 70, resize: 'vertical', fontFamily: 'inherit' }} value={settings.recommendedSubJa ?? ''} onChange={set('recommendedSubJa')} placeholder="全店舗で愛され続けている、不動の人気メニュー" />
         </label>
       </div>
 
@@ -246,7 +366,19 @@ function HomePageTab({ settings, setSettings }: { settings: Settings; setSetting
         </label>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <div style={card}>
+        <h3 style={h3}>Newsletter Section</h3>
+        <label style={lbl}>
+          Section Title (JA)
+          <input style={inp} type="text" value={settings.newsletterTitleJa ?? ''} onChange={set('newsletterTitleJa')} placeholder="ニュースレターに登録" />
+        </label>
+        <label style={lbl}>
+          Subtitle Text (JA)
+          <textarea style={{ ...inp, height: 80, resize: 'vertical', fontFamily: 'inherit' }} value={settings.newsletterSubJa ?? ''} onChange={set('newsletterSubJa')} placeholder="最新のメニュー、シークレットレシピ、そして限定のお得な情報を..." />
+        </label>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem', marginBottom: '2rem' }}>
         <button type="submit" disabled={saving} style={saveBtn}>{saving ? 'Saving…' : 'Save Home Page'}</button>
       </div>
     </form>
@@ -261,6 +393,9 @@ function AboutPageTab({ settings, setSettings }: { settings: Settings; setSettin
     setSaving(true);
     try {
       await saveFields({
+        aboutHeroTag: settings.aboutHeroTag,
+        aboutHeroTitle: settings.aboutHeroTitle,
+        aboutHeroImage: settings.aboutHeroImage,
         aboutStoryLabelJa: settings.aboutStoryLabelJa,
         aboutStoryTitleJa: settings.aboutStoryTitleJa,
         aboutStoryJa: settings.aboutStoryJa,
@@ -278,11 +413,50 @@ function AboutPageTab({ settings, setSettings }: { settings: Settings; setSettin
     }
   };
 
+  const handleLoadDefaults = () => {
+    setSettings(DEFAULT_ABOUT_CONTENT);
+    toast.success('Loaded default About page content into form.');
+  };
+
   const set = (key: keyof Settings) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setSettings({ [key]: e.target.value });
 
   return (
     <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <div>
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: '0 0 0.25rem 0', color: '#111827' }}>About Page Content</h2>
+          <p style={{ margin: 0, color: '#6b7280', fontSize: '0.85rem' }}>Manage the story, spice philosophy, and chef introduction on the About Us page.</p>
+        </div>
+        <button
+          type="button"
+          onClick={handleLoadDefaults}
+          style={{ ...outlineBtn, padding: '0.5rem 1rem' }}
+          title="Fill in standard Japanese texts for the About page"
+        >
+          <RotateCcw size={14} /> Fill Default About Content
+        </button>
+      </div>
+
+      <div style={card}>
+        <h3 style={h3}>Hero Banner Section</h3>
+        <label style={lbl}>
+          Hero Tag (e.g. ABOUT US)
+          <input style={inp} type="text" value={settings.aboutHeroTag ?? ''} onChange={set('aboutHeroTag')} placeholder="ABOUT US" />
+        </label>
+        <label style={lbl}>
+          Hero Title (JA)
+          <span style={muted}>Supports &lt;em&gt; tags for stylized emphasis (e.g. 私たちに&lt;em&gt;ついて&lt;/em&gt;)</span>
+          <input style={inp} type="text" value={settings.aboutHeroTitle ?? ''} onChange={set('aboutHeroTitle')} placeholder="私たちについて" />
+        </label>
+        <ImageField
+          label="Hero Banner Image"
+          hint="Large banner shown at the top of the About page."
+          value={settings.aboutHeroImage ?? ''}
+          onChange={v => setSettings({ aboutHeroImage: v })}
+        />
+      </div>
+
       <div style={card}>
         <h3 style={h3}>私たちの物語 — Story Section</h3>
         <label style={lbl}>
@@ -311,7 +485,7 @@ function AboutPageTab({ settings, setSettings }: { settings: Settings; setSettin
         </label>
         <label style={lbl}>
           Description
-          <textarea style={{ ...inp, height: 100, resize: 'vertical', fontFamily: 'inherit' }} value={settings.aboutSpiceDescJa ?? ''} onChange={set('aboutSpiceDescJa')} />
+          <textarea style={{ ...inp, height: 100, resize: 'vertical', fontFamily: 'inherit' }} value={settings.aboutSpiceDescJa ?? ''} onChange={set('aboutSpiceDescJa')} placeholder="スパイスへのこだわりについて..." />
         </label>
         <ImageField
           label="Section Image"
@@ -332,7 +506,7 @@ function AboutPageTab({ settings, setSettings }: { settings: Settings; setSettin
         </label>
         <label style={lbl}>
           Description
-          <textarea style={{ ...inp, height: 100, resize: 'vertical', fontFamily: 'inherit' }} value={settings.aboutChefDescJa ?? ''} onChange={set('aboutChefDescJa')} />
+          <textarea style={{ ...inp, height: 100, resize: 'vertical', fontFamily: 'inherit' }} value={settings.aboutChefDescJa ?? ''} onChange={set('aboutChefDescJa')} placeholder="シェフの紹介や経歴について..." />
         </label>
         <ImageField
           label="Chef Photo"
@@ -341,7 +515,7 @@ function AboutPageTab({ settings, setSettings }: { settings: Settings; setSettin
         />
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem', marginBottom: '2rem' }}>
         <button type="submit" disabled={saving} style={saveBtn}>{saving ? 'Saving…' : 'Save About Page'}</button>
       </div>
     </form>
@@ -496,21 +670,109 @@ function CarouselTab() {
     }
   };
 
+  const handleMove = async (slide: Slide, direction: 'up' | 'down') => {
+    const list = [...visible];
+    const index = list.findIndex(s => s.id === slide.id);
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= list.length) return;
+    const targetSlide = list[targetIndex];
+
+    const currentOrder = slide.sortOrder;
+    const targetOrder = targetSlide.sortOrder ?? targetIndex;
+
+    setSlides(prev =>
+      prev.map(s => {
+        if (s.id === slide.id) return { ...s, sortOrder: targetOrder };
+        if (s.id === targetSlide.id) return { ...s, sortOrder: currentOrder };
+        return s;
+      }).sort((a, b) => a.sortOrder - b.sortOrder)
+    );
+
+    await Promise.all([
+      apiFetch(`/api/v1/carousels/${slide.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sortOrder: targetOrder }),
+      }),
+      apiFetch(`/api/v1/carousels/${targetSlide.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sortOrder: currentOrder }),
+      }),
+    ]);
+    fetch();
+  };
+
+  const handleRestoreDefaults = async () => {
+    if (slides.length > 0 && !window.confirm('Add default restaurant slides? Existing slides will remain.')) return;
+    setSaving(true);
+    try {
+      const DEFAULT_SLIDES = [
+        {
+          placement: 'HOME' as const,
+          imageUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1920&q=80',
+          titleEn: 'Authentic Indian Flavors',
+          titleJa: 'インドの香りを、そのままに',
+          altEn: 'Authentic Indian restaurant atmosphere with traditional dishes',
+        },
+        {
+          placement: 'HOME' as const,
+          imageUrl: 'https://images.unsplash.com/photo-1589302168068-964664d93dc0?auto=format&fit=crop&w=1920&q=80',
+          titleEn: 'Freshly Baked Naan & Curries',
+          titleJa: '焼きたてナンと本格スパイスカレー',
+          altEn: 'Freshly baked tandoori naan and rich curry bowls',
+        },
+        {
+          placement: 'HOME' as const,
+          imageUrl: 'https://images.unsplash.com/photo-1552566626-52f8b828add9?auto=format&fit=crop&w=1920&q=80',
+          titleEn: 'Traditional Charcoal Tandoor',
+          titleJa: '炭火粘土窯で焼き上げるタンドール料理',
+          altEn: 'Master chef preparing tandoori specialties in traditional clay oven',
+        },
+        {
+          placement: 'CONTACT' as const,
+          imageUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1920&q=80',
+          titleEn: 'Visit Kalpana in Kumagaya',
+          titleJa: '熊谷でお待ちしております',
+          altEn: 'Kalpana Indian Cuisine dining hall in Kumagaya',
+        },
+      ];
+      for (const slide of DEFAULT_SLIDES) {
+        await apiFetch('/api/v1/carousels', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(slide),
+        });
+      }
+      toast.success('Default carousel slides created.');
+      fetch();
+    } catch {
+      toast.error('Failed to restore slides.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const visible = filterPlacement === 'ALL' ? slides : slides.filter(s => s.placement === filterPlacement);
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           {(['ALL', 'HOME', 'CONTACT'] as const).map(p => (
             <button key={p} type="button" onClick={() => setFilterPlacement(p)} style={{ padding: '0.4rem 0.85rem', borderRadius: '6px', border: '1px solid #d1d5db', background: filterPlacement === p ? '#111' : '#fff', color: filterPlacement === p ? '#fff' : '#374151', fontWeight: 500, cursor: 'pointer', fontSize: '0.85rem' }}>
               {p}
             </button>
           ))}
         </div>
-        <button type="button" onClick={() => setAdding(true)} style={{ ...saveBtn, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-          <Plus size={15} /> Add Slide
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button type="button" onClick={handleRestoreDefaults} disabled={saving} style={{ ...outlineBtn, display: 'inline-flex', alignItems: 'center', gap: '6px' }} title="Load standard preset slides for the restaurant">
+            <RotateCcw size={14} /> Restore Default Slides
+          </button>
+          <button type="button" onClick={() => setAdding(true)} style={{ ...saveBtn, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <Plus size={15} /> Add Slide
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -518,11 +780,16 @@ function CarouselTab() {
       ) : visible.length === 0 ? (
         <div style={{ ...card, textAlign: 'center', color: '#6b7280', padding: '3rem' }}>
           <Image size={40} style={{ margin: '0 auto 0.75rem', display: 'block', opacity: 0.3 }} />
-          No slides yet. Click "Add Slide" to get started.
+          No slides yet for this placement.
+          <div style={{ marginTop: '1rem' }}>
+            <button type="button" onClick={handleRestoreDefaults} style={{ ...saveBtn, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <RotateCcw size={14} /> Load Default Slides
+            </button>
+          </div>
         </div>
       ) : (
         <div style={{ display: 'grid', gap: '1rem' }}>
-          {visible.map(slide => (
+          {visible.map((slide, index) => (
             <div key={slide.id} style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'stretch', overflow: 'hidden', opacity: slide.isActive ? 1 : 0.6 }}>
               <div style={{ width: 140, flexShrink: 0, background: '#f3f4f6' }}>
                 {slide.imageUrl ? (
@@ -541,7 +808,13 @@ function CarouselTab() {
                 </div>
                 {slide.titleJa && <div style={{ fontSize: '0.82rem', color: '#6b7280' }}>{slide.titleJa}</div>}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0 1rem', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0 1rem', flexShrink: 0 }}>
+                <button type="button" title="Move Up" disabled={index === 0} onClick={() => handleMove(slide, 'up')} style={{ ...outlineBtn, padding: '0.5rem', opacity: index === 0 ? 0.3 : 1 }}>
+                  <ArrowUp size={14} />
+                </button>
+                <button type="button" title="Move Down" disabled={index === visible.length - 1} onClick={() => handleMove(slide, 'down')} style={{ ...outlineBtn, padding: '0.5rem', opacity: index === visible.length - 1 ? 0.3 : 1 }}>
+                  <ArrowDown size={14} />
+                </button>
                 <button type="button" title={slide.isActive ? 'Hide' : 'Show'} onClick={() => handleToggleActive(slide)} style={outlineBtn}>
                   {slide.isActive ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>

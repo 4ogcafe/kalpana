@@ -27,6 +27,7 @@ export interface DeliverySettings {
 
 export type FulfillmentSettings = PickupSettings &
   DeliverySettings & {
+    orderingEnabled?: boolean | null;
     pickupNoteJa?: string | null;
     /** Set from the kitchen display when it is too busy: no new online orders until then. */
     orderingPausedUntil?: Date | null;
@@ -39,6 +40,7 @@ export function pausedUntil(settings: FulfillmentSettings, now: Date = new Date(
 }
 
 export function isEnabled(settings: FulfillmentSettings, type: Fulfillment, now: Date = new Date()): boolean {
+  if (settings.orderingEnabled === false) return false;
   if (pausedUntil(settings, now)) return false;
   return type === 'PICKUP' ? Boolean(settings.pickupEnabled) : Boolean(settings.deliveryEnabled);
 }

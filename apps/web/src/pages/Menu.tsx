@@ -14,6 +14,18 @@ const HERO_IMAGES: Record<string, string> = {
   grand: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1920&q=80'
 };
 
+const SPICE_LABELS: Record<number, string> = {
+  1: '甘口',
+  2: '中辛',
+  3: '辛口',
+  4: '激辛',
+  5: '超激辛',
+};
+
+function getSpiceLabel(level: number): string {
+  return SPICE_LABELS[level] || `辛さ Lv.${level}`;
+}
+
 const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1589302168068-964664d93dc0?auto=format&fit=crop&w=800&q=80';
 
 export default function Menu() {
@@ -114,12 +126,19 @@ export default function Menu() {
     categoriesMap.get(catId).items.push({
       id: item.id,
       name: item.nameJa || item.nameEn,
+      nameJa: item.nameJa,
+      nameEn: item.nameEn,
       desc: item.descriptionJa || item.descriptionEn,
       price: `¥${(item.price || 0).toLocaleString()}`,
       priceValue: item.price || 0,
       soldOut: Boolean(item.isSoldOut),
+      isOrderable: item.isOrderable !== false,
       recommended: Boolean(item.isRecommended),
       vegetarian: Boolean(item.isVegetarian),
+      vegan: Boolean(item.isVegan),
+      halal: Boolean(item.isHalal),
+      spiceLevel: typeof item.spiceLevel === 'number' ? item.spiceLevel : 0,
+      allergens: Array.isArray(item.allergens) ? item.allergens : [],
       img: assetUrl(item.imageUrl) || DEFAULT_IMAGE,
       categoryId: catId,
       optionGroups: resolvedGroups.length > 0 ? resolvedGroups : undefined,
@@ -266,6 +285,9 @@ export default function Menu() {
                   <div className="menu-grid">
                     {category.items.map((item: any, itemIndex: number) => {
                       const globalIndex = startIndex + itemIndex;
+                      const hasSubName = item.nameEn && item.nameJa && item.nameEn.trim().toLowerCase() !== item.nameJa.trim().toLowerCase();
+                      const isOrderActive = canOrder && item.isOrderable !== false;
+
                       return (
                         <article key={item.id} className={`menu-card${item.soldOut ? ' is-sold-out' : ''}`} onClick={() => setSelectedIndex(globalIndex)}>
                           <div className="menu-card-media">
@@ -274,23 +296,74 @@ export default function Menu() {
                               {item.soldOut && <span className="menu-badge menu-badge-dark">売り切れ</span>}
                               {!item.soldOut && item.recommended && <span className="menu-badge menu-badge-gold">おすすめ</span>}
                               {item.vegetarian && <span className="menu-badge menu-badge-green">ベジタリアン</span>}
+                              {item.spiceLevel > 0 && (
+                                <span className="menu-badge menu-badge-spice" title={`辛さ: ${getSpiceLabel(item.spiceLevel)}`}>
+                                  🌶️ {getSpiceLabel(item.spiceLevel)}
+                                </span>
+                              )}
                             </div>
                           </div>
                           <div className="menu-card-body">
-                            <div className="menu-card-head">
-                              {/* The title is the card's keyboard entry point to the details popup. */}
-                              <h3 className="menu-card-title">
-                                <button type="button" onClick={(e) => { e.stopPropagation(); setSelectedIndex(globalIndex); }}>{item.name}</button>
-                              </h3>
-                              <div className="menu-card-price">{item.price}<small>税抜</small></div>
+                            <div className="menu-card-main">
+                              <div className="menu-card-head">
+                                <h3 className="menu-card-title">
+                                  <button type="button" onClick={(e) => { e.stopPropagation(); setSelectedIndex(globalIndex); }}>
+                                    {item.name}
+                                  </button>
+                                </h3>
+                                <div className="menu-card-price">{item.price}<small>税抜</small></div>
+                              </div>
+                              {hasSubName && (
+                                <div className="menu-card-subname">{item.nameEn}</div>
+                              )}
+                              {item.desc ? (
+                                <p className="menu-card-desc">{item.desc}</p>
+                              ) : (
+                                <p className="menu-card-desc menu-card-desc-placeholder">伝統のスパイスと厳選素材で丁寧に仕上げた、当店自慢の料理です。</p>
+                              )}
                             </div>
-                            {item.desc && <p className="menu-card-desc">{item.desc}</p>}
-                            {item.rating !== null && (
-                              <div className="menu-card-rating" aria-label={`評価 ${item.rating.toFixed(1)}`}>
-                                <span aria-hidden="true">{item.stars}</span>{item.rating.toFixed(1)}
+
+                            <div className="menu-card-meta-row">
+                              {item.rating !== null && (
+                                <div className="menu-card-rating" aria-label={`評価 ${item.rating.toFixed(1)}`}>
+                                  <span aria-hidden="true">{item.stars}</span>
+                                  <strong>{item.rating.toFixed(1)}</strong>
+                                </div>
+                              )}
+                              {item.spiceLevel > 0 && (
+                                <span className="menu-meta-pill menu-meta-spice">
+                                  🌶️ {getSpiceLabel(item.spiceLevel)}
+                                </span>
+                              )}
+                              {item.vegetarian && (
+                                <span className="menu-meta-pill menu-meta-veg">
+                                  🌿 ベジ
+                                </span>
+                              )}
+                            </div>
+
+                            {isOrderActive ? (
+                              <OrderButtons item={item} onAfterAdd={handleAfterAdd} />
+                            ) : (
+                              <div className="menu-card-footer">
+                                <span className="menu-card-status">
+                                  {item.soldOut ? (
+                                    <span className="menu-card-status-pill is-sold">完売</span>
+                                  ) : (
+                                    <span className="menu-card-status-pill is-avail">
+                                      <span className="status-dot-pulse" />
+                                      店頭・店内提供
+                                    </span>
+                                  )}
+                                </span>
+                                <span className="menu-card-view-btn">
+                                  詳細を見る
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="9 18 15 12 9 6" />
+                                  </svg>
+                                </span>
                               </div>
                             )}
-                            {canOrder && <OrderButtons item={item} onAfterAdd={handleAfterAdd} />}
                           </div>
                         </article>
                       );
@@ -391,11 +464,16 @@ export default function Menu() {
               </div>
             </div>
             <div style={{ padding: '30px', textAlign: 'center' }}>
-              <h2 style={{ margin: '0 0 10px 0', color: 'var(--dark-bark)' }}>{flatItems[selectedIndex].name}</h2>
+              <h2 style={{ margin: '0 0 6px 0', color: 'var(--dark-bark)' }}>{flatItems[selectedIndex].name}</h2>
+              {flatItems[selectedIndex].nameEn && flatItems[selectedIndex].nameJa && flatItems[selectedIndex].nameEn.trim().toLowerCase() !== flatItems[selectedIndex].nameJa.trim().toLowerCase() && (
+                <div style={{ fontSize: '0.9rem', color: '#8c7e72', fontStyle: 'italic', marginBottom: '12px', fontFamily: 'serif' }}>
+                  {flatItems[selectedIndex].nameEn}
+                </div>
+              )}
               <p style={{ color: 'var(--text-muted)', lineHeight: '1.6', marginBottom: '15px' }}>{flatItems[selectedIndex].desc}</p>
               
               {flatItems[selectedIndex].rating !== null && (
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', marginBottom: '16px' }}>
                   <span aria-hidden="true" style={{ color: 'var(--gold)', letterSpacing: '2px', fontSize: '1rem' }}>{flatItems[selectedIndex].stars}</span>
                   <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{flatItems[selectedIndex].rating.toFixed(1)}</span>
                 </div>
@@ -405,7 +483,47 @@ export default function Menu() {
                 {flatItems[selectedIndex].price} <span style={{ fontSize: '1rem', color: 'var(--text-muted)', fontWeight: 'normal', fontFamily: 'sans-serif' }}>(税抜)</span>
               </div>
 
-              {canOrder && <OrderButtons item={flatItems[selectedIndex]} size="popup" onAfterAdd={handleAfterAdd} />}
+              {canOrder && flatItems[selectedIndex].isOrderable !== false ? (
+                <OrderButtons item={flatItems[selectedIndex]} size="popup" onAfterAdd={handleAfterAdd} />
+              ) : (
+                <div className="popup-dinein-box">
+                  <div className="popup-dinein-header">
+                    <span style={{ fontSize: '1.4rem' }}>🍽️</span>
+                    <div>
+                      <div style={{ fontWeight: '700', color: 'var(--dark-bark)', fontSize: '0.95rem' }}>
+                        店頭・店内にてご注文いただけます
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        現在オンライン注文は停止中です。できたての本格インド料理をお楽しみください。
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', margin: '14px 0' }}>
+                    {flatItems[selectedIndex].spiceLevel > 0 && (
+                      <span className="menu-meta-pill menu-meta-spice">
+                        🌶️ 辛さ: {getSpiceLabel(flatItems[selectedIndex].spiceLevel)}
+                      </span>
+                    )}
+                    {flatItems[selectedIndex].vegetarian && (
+                      <span className="menu-meta-pill menu-meta-veg">🌿 ベジタリアン</span>
+                    )}
+                    {flatItems[selectedIndex].vegan && (
+                      <span className="menu-meta-pill menu-meta-veg">🌱 ヴィーガン</span>
+                    )}
+                    {flatItems[selectedIndex].halal && (
+                      <span className="menu-meta-pill" style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0' }}>☪️ ハラール</span>
+                    )}
+                  </div>
+
+                  <a
+                    href="tel:0485777497"
+                    className="popup-dinein-call-btn"
+                  >
+                    📞 048-577-7497（お電話でご注文・ご予約）
+                  </a>
+                </div>
+              )}
               
             </div>
           </div>

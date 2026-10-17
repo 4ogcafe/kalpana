@@ -41,14 +41,19 @@ type Filter = 'ALL' | 'PICKUP' | 'DELIVERY';
 interface Prefs {
   sound: boolean;
   filter: Filter;
+  autoPrint: boolean;
 }
 
 function loadPrefs(): Prefs {
   try {
     const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}');
-    return { sound: saved.sound !== false, filter: ['ALL', 'PICKUP', 'DELIVERY'].includes(saved.filter) ? saved.filter : 'ALL' };
+    return {
+      sound: saved.sound !== false,
+      filter: ['ALL', 'PICKUP', 'DELIVERY'].includes(saved.filter) ? saved.filter : 'ALL',
+      autoPrint: saved.autoPrint !== false,
+    };
   } catch {
-    return { sound: true, filter: 'ALL' };
+    return { sound: true, filter: 'ALL', autoPrint: true };
   }
 }
 
@@ -73,8 +78,10 @@ export default function Kitchen() {
   const audioRef = useRef<AudioContext | null>(null);
   const knownNew = useRef<Set<string> | null>(null);
   const soundRef = useRef(prefs.sound);
+  const autoPrintRef = useRef(prefs.autoPrint);
   useEffect(() => {
     soundRef.current = prefs.sound;
+    autoPrintRef.current = prefs.autoPrint;
     try {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(prefs));
     } catch {
@@ -112,12 +119,17 @@ export default function Kitchen() {
       setOffline(false);
       setClockOffset(new Date(data.serverTime).getTime() - Date.now());
 
-      // New orders since the last check: ring and announce.
+      // New orders since the last check: ring, announce and auto-print if enabled.
       const newIds = new Set(data.active.filter(order => order.status === 'NEW').map(order => order.id));
       if (knownNew.current) {
         const arrived = data.active.filter(order => order.status === 'NEW' && !knownNew.current!.has(order.id));
         if (arrived.length > 0) {
-          for (const order of arrived) notify.success(`New order #${formatOrderNumber(order.number)} · ${isDelivery(order) ? 'Delivery' : 'Pickup'} ${clockTime(order.pickupAt)}`, { duration: 8000, id: `new-${order.id}` });
+          for (const order of arrived) {
+            notify.success(`New order #${formatOrderNumber(order.number)} · ${isDelivery(order) ? 'Delivery' : 'Pickup'} ${clockTime(order.pickupAt)}`, { duration: 8000, id: `new-${order.id}` });
+            if (autoPrintRef.current) {
+              printTicket(order, order.dietaryAlert ? alertText(order.dietaryAlert) : null);
+            }
+          }
         }
       }
       knownNew.current = newIds;
@@ -403,6 +415,23 @@ export default function Kitchen() {
               </div>
             )}
           </div>
+          <button
+            type="button"
+            className={`kd-tool${prefs.autoPrint ? ' is-active' : ''}`}
+            aria-pressed={prefs.autoPrint}
+            onClick={() => {
+              setPrefs(p => {
+                const next = !p.autoPrint;
+                notify.success(next ? '自動印刷: オン (新規注文時に自動で印刷)' : '自動印刷: オフ (手動で印刷)');
+                return { ...p, autoPrint: next };
+              });
+            }}
+            aria-label={prefs.autoPrint ? '自動印刷: オン' : '自動印刷: オフ'}
+            title={prefs.autoPrint ? '自動印刷: オン (新規注文時に自動で印刷)' : '自動印刷: オフ (手動で印刷)'}
+          >
+            <Printer size={20} />
+            <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>{prefs.autoPrint ? '印刷ON' : '印刷OFF'}</span>
+          </button>
           <button type="button" className="kd-tool" aria-pressed={prefs.sound} onClick={() => { setPrefs(p => ({ ...p, sound: !p.sound })); if (!prefs.sound) setTimeout(() => chime(1), 0); }} aria-label={prefs.sound ? 'Sound on' : 'Sound off'} title={prefs.sound ? 'Sound on' : 'Sound off'}>
             {prefs.sound ? <Bell size={20} /> : <BellOff size={20} />}
           </button>

@@ -16,6 +16,7 @@ const slideUpdateSchema = z.object({
   altEn: optionalText(300),
   imageUrl: imageUrl.optional(),
   isActive: z.boolean().optional(),
+  sortOrder: z.number().int().optional(),
 });
 
 const slideCreateSchema = z.object({

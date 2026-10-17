@@ -74,6 +74,7 @@
 .kd-tool:hover { background: #2a303b; }
 .kd-tool[aria-pressed='true'] { border-color: #6b7280; background: #2f3542; }
 .kd-tool.is-warn { background: rgba(245, 158, 11, 0.2); border-color: var(--kd-new); color: #fcd34d; }
+.kd-tool.is-active { background: rgba(16, 185, 129, 0.2); border-color: #10b981; color: #34d399; }
 .kd-pause { position: relative; }
 .kd-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; background: var(--kd-card); border: 1px solid var(--kd-line); border-radius: 12px; padding: 10px; display: grid; gap: 6px; min-width: 200px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5); }
 .kd-menu p { margin: 0 0 4px; color: var(--kd-muted); font-size: 0.85rem; }
