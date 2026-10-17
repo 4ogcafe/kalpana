@@ -17,6 +17,7 @@ import { changePoints } from '../services/points.js';
 import { loadSettings } from '../services/settings-store.js';
 import { stampCardFor } from '../services/stamps.js';
 import { stampConfig } from '../lib/stamps.js';
+import { stampEvents } from '../lib/stamp-events.js';
 
 const router = express.Router();
 
@@ -222,6 +223,38 @@ router.get('/me/orders', requireCustomer, async (req, res) => {
 router.get('/me/stamps', requireCustomer, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.json(await stampCardFor(req.customer!.id));
+});
+
+router.get('/me/stamps/live', requireCustomer, (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders?.();
+
+  const customerId = req.customer!.id;
+  res.write(`data: ${JSON.stringify({ type: 'CONNECTED' })}\n\n`);
+
+  const eventName = `stamp:${customerId}`;
+  const onStamp = async (data: unknown) => {
+    try {
+      const card = await stampCardFor(customerId);
+      res.write(`data: ${JSON.stringify({ type: 'STAMP_AWARDED', card, event: data })}\n\n`);
+    } catch {
+      res.write(`data: ${JSON.stringify({ type: 'STAMP_AWARDED', event: data })}\n\n`);
+    }
+  };
+
+  stampEvents.on(eventName, onStamp);
+
+  const heartbeat = setInterval(() => {
+    res.write(': ping\n\n');
+  }, 20000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    stampEvents.off(eventName, onStamp);
+  });
 });
 
 router.get('/me/points', requireCustomer, async (req, res) => {

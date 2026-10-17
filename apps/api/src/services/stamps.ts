@@ -11,6 +11,7 @@ import {
   type StampRewardKind,
 } from '../lib/stamps.js';
 import { loadSettings } from './settings-store.js';
+import { emitStampAwarded } from '../lib/stamp-events.js';
 
 const HISTORY_LIMIT = 50;
 
@@ -145,7 +146,13 @@ export async function awardStamp(
     });
   }
 
-  return { status: 'AWARDED', position, perCard: settings.perCard, cardCompleted, rewards };
+  const awardedResult = { status: 'AWARDED' as const, position, perCard: settings.perCard, cardCompleted, rewards };
+  try {
+    emitStampAwarded(customerId, awardedResult);
+  } catch {
+    // Non-fatal if event listener throws
+  }
+  return awardedResult;
 }
 
 const now = () => new Date();

@@ -80,3 +80,40 @@ export function readyChime() {
   }
   navigator.vibrate?.([200, 100, 200, 100, 300]);
 }
+
+/** A joyful chime and haptic tap when a stamp is stamped at the counter. */
+export function stampChime() {
+  try {
+    const audio = new AudioContext();
+    // 1. Initial soft "stamp" impact
+    const thud = audio.createOscillator();
+    const thudGain = audio.createGain();
+    thud.type = 'triangle';
+    thud.frequency.setValueAtTime(140, audio.currentTime);
+    thud.frequency.exponentialRampToValueAtTime(40, audio.currentTime + 0.12);
+    thudGain.gain.setValueAtTime(0.4, audio.currentTime);
+    thudGain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.12);
+    thud.connect(thudGain).connect(audio.destination);
+    thud.start();
+    thud.stop(audio.currentTime + 0.13);
+
+    // 2. Bright reward bell chime (C5 -> E5 -> C6)
+    [523.25, 659.25, 1046.5].forEach((freq, idx) => {
+      const osc = audio.createOscillator();
+      const gain = audio.createGain();
+      const start = audio.currentTime + 0.08 + idx * 0.12;
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, start);
+      gain.gain.setValueAtTime(0.001, start);
+      gain.gain.exponentialRampToValueAtTime(0.28, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.45);
+      osc.connect(gain).connect(audio.destination);
+      osc.start(start);
+      osc.stop(start + 0.5);
+    });
+    setTimeout(() => audio.close(), 1600);
+  } catch {
+    // Audio unavailable
+  }
+  navigator.vibrate?.([120, 60, 180]);
+}

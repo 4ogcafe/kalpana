@@ -106,6 +106,11 @@ export default function Account() {
     if (stampsData.status === 'fulfilled') setStampCard(stampsData.value);
   }, [refresh]);
 
+  const handleCardUpdate = useCallback((newCard: StampCardData) => {
+    setStampCard(newCard);
+    load();
+  }, [load]);
+
   const memberId = customer?.id;
   useEffect(() => {
     if (memberId && offers.length) announceNewOffers(offers, memberId);
@@ -203,7 +208,7 @@ export default function Account() {
                 <Link to="/menu/takeout" className="acc-btn"><ShoppingBag size={18} aria-hidden="true" />テイクアウトを注文</Link>
               </section>
 
-              {showStamps && stampCard && <StampCard card={stampCard} memberName={customer.name} />}
+              {showStamps && stampCard && <StampCard card={stampCard} memberName={customer.name} onCardUpdate={handleCardUpdate} />}
 
               <section className="acc-stats" aria-label="ご利用状況">
                 <Stat icon={Receipt} value={String(completed.length)} label="ご注文回数" />
@@ -279,7 +284,7 @@ export default function Account() {
             <>
               {showStamps && stampCard && (
                 <>
-                  <StampCard card={stampCard} memberName={customer.name} />
+                  <StampCard card={stampCard} memberName={customer.name} onCardUpdate={handleCardUpdate} />
                   <StampRewards card={stampCard} />
                 </>
               )}

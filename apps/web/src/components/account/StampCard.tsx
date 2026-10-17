@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { QrCode } from 'lucide-react';
+import { apiFetch } from '../../lib/api';
 import { formatDateTime, yen } from '../../lib/format';
+import { stampChime } from '../../lib/push';
 import MemberQrModal from './MemberQrModal';
 import type { StampCardData } from './types';
 
@@ -19,16 +21,20 @@ const readSeen = () => {
 };
 
 /** The member's stamp card, drawn like the paper one: stamps joined by a line, rewards under their stamp. */
-export default function StampCard({ card, memberName, preview = false }: {
+export default function StampCard({ card, memberName, preview = false, onCardUpdate }: {
   card: StampCardData;
   memberName: string;
   /** The admin's settings preview: no QR button, nothing remembered. */
   preview?: boolean;
+  onCardUpdate?: (newCard: StampCardData) => void;
 }) {
   const [showQr, setShowQr] = useState(false);
+  const [lastStampedPosition, setLastStampedPosition] = useState<number | null>(null);
+
   // The newest stamp is "pressed" with an animation the first time the member sees it.
   const [seenTotal] = useState(readSeen);
   const animateLatest = !preview && card.totalStamps > seenTotal && card.stamps > 0;
+
   useEffect(() => {
     if (preview) return;
     try {
@@ -37,6 +43,50 @@ export default function StampCard({ card, memberName, preview = false }: {
       // Storage may be blocked; the animation just plays again next time.
     }
   }, [card.totalStamps, preview]);
+
+  // Real-time SSE background listener on the stamp card
+  useEffect(() => {
+    if (preview) return;
+    let cancelled = false;
+    let sse: EventSource | null = null;
+
+    try {
+      sse = new EventSource('/api/v1/customers/me/stamps/live');
+      sse.onmessage = (event) => {
+        if (cancelled) return;
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'STAMP_AWARDED') {
+            if (data.card) {
+              setLastStampedPosition(data.card.stamps);
+              stampChime();
+              onCardUpdate?.(data.card);
+            } else {
+              apiFetch('/api/v1/customers/me/stamps')
+                .then(res => res.ok ? res.json() : null)
+                .then(newCard => {
+                  if (newCard && !cancelled) {
+                    setLastStampedPosition(newCard.stamps);
+                    stampChime();
+                    onCardUpdate?.(newCard);
+                  }
+                })
+                .catch(() => undefined);
+            }
+          }
+        } catch {
+          // ignore error
+        }
+      };
+    } catch {
+      // ignore
+    }
+
+    return () => {
+      cancelled = true;
+      if (sse) sse.close();
+    };
+  }, [preview, onCardUpdate]);
 
   const columns = columnsFor(card.perCard);
   const nextMilestone = card.milestones.find(milestone => milestone.at > card.stamps);
@@ -65,12 +115,14 @@ export default function StampCard({ card, memberName, preview = false }: {
           const milestone = card.milestones.find(m => m.at === position);
           const rowEnd = position % columns === 0 || position === card.perCard;
           const date = stampDates.get(position);
+          const isNewlyStamped = stamped && (animateLatest || lastStampedPosition === position);
+
           return (
             <li key={position} className={`stamp-cell${rowEnd ? ' is-row-end' : ''}`}>
               <span className="stamp-slot-wrap">
                 <span
                   role="img"
-                  className={`stamp-slot${stamped ? ' is-stamped' : ''}${stamped && animateLatest && position === card.stamps ? ' is-new' : ''}${milestone ? ' is-milestone' : ''}`}
+                  className={`stamp-slot${stamped ? ' is-stamped' : ''}${isNewlyStamped ? ' is-new' : ''}${milestone ? ' is-milestone' : ''}`}
                   aria-label={`${position}個目${stamped ? '：押印済み' : ''}`}
                 >
                   {stamped ? <StampMark date={date} /> : <img src="/site-logo-01.webp" alt="" className="stamp-ghost" />}
@@ -114,7 +166,18 @@ export default function StampCard({ card, memberName, preview = false }: {
         )}
       </div>
 
-      {showQr && <MemberQrModal code={card.memberCode} name={memberName} onClose={() => setShowQr(false)} />}
+      {showQr && (
+        <MemberQrModal
+          code={card.memberCode}
+          name={memberName}
+          currentCard={card}
+          onStampAwarded={(newCard) => {
+            setLastStampedPosition(newCard.stamps);
+            onCardUpdate?.(newCard);
+          }}
+          onClose={() => setShowQr(false)}
+        />
+      )}
     </section>
   );
 }
