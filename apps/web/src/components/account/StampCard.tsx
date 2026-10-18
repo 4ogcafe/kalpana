@@ -105,7 +105,12 @@ export default function StampCard({ card, memberName, preview = false, onCardUpd
       </div>
 
       {card.completedCards > 0 && card.stamps === 0 && (
-        <p className="stamp-card-banner">🎉 {card.completedCards}枚目のカードが満了しました！新しいカードがスタートしました。</p>
+        <p className="stamp-card-banner">
+          🎉 <strong>{card.completedCards}枚目のカードがゴール達成（満了）しました！</strong>
+          <span style={{ display: 'block', fontSize: '0.82rem', marginTop: '4px', opacity: 0.95 }}>
+            カードは自動リセットされ、{card.completedCards + 1}枚目がスタートしました。獲得した特典は各1回のみご利用いただけます。
+          </span>
+        </p>
       )}
 
       <ol className="stamp-grid" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
@@ -113,6 +118,7 @@ export default function StampCard({ card, memberName, preview = false, onCardUpd
           const position = index + 1;
           const stamped = position <= card.stamps;
           const milestone = card.milestones.find(m => m.at === position);
+          const isGoal = position === card.perCard;
           const rowEnd = position % columns === 0 || position === card.perCard;
           const date = stampDates.get(position);
           const isNewlyStamped = stamped && (animateLatest || lastStampedPosition === position);
@@ -122,16 +128,26 @@ export default function StampCard({ card, memberName, preview = false, onCardUpd
               <span className="stamp-slot-wrap">
                 <span
                   role="img"
-                  className={`stamp-slot${stamped ? ' is-stamped' : ''}${isNewlyStamped ? ' is-new' : ''}${milestone ? ' is-milestone' : ''}`}
-                  aria-label={`${position}個目${stamped ? '：押印済み' : ''}`}
+                  className={`stamp-slot${stamped ? ' is-stamped' : ''}${isNewlyStamped ? ' is-new' : ''}${milestone ? ' is-milestone' : ''}${isGoal ? ' is-goal' : ''}`}
+                  aria-label={`${position}個目${isGoal ? '（ゴール）' : ''}${stamped ? '：押印済み' : ''}`}
                 >
                   {stamped ? <StampMark date={date} /> : <img src="/site-logo-01.webp" alt="" className="stamp-ghost" />}
-                  {!stamped && milestone && <span className="stamp-gift" aria-hidden="true">🎁</span>}
+                  {!stamped && isGoal && <span className="stamp-gift" aria-hidden="true" title="ゴール">🏁</span>}
+                  {!stamped && !isGoal && milestone && <span className="stamp-gift" aria-hidden="true">🎁</span>}
                 </span>
               </span>
               {position === 1 && !milestone && <span className="stamp-start">スタート!</span>}
+              {isGoal && <span className="stamp-goal-badge">🏁 ゴール!</span>}
               {milestone && <span className="stamp-reward-label">{milestone.titleJa}</span>}
-              {milestone && <span className="stamp-reward-tag" aria-hidden="true">特典{card.milestones.indexOf(milestone) + 1}</span>}
+              {milestone && (
+                <span
+                  className="stamp-reward-tag"
+                  aria-hidden="true"
+                  style={isGoal ? { background: '#d97706' } : undefined}
+                >
+                  {isGoal ? '🏁 ゴール特典' : `特典${card.milestones.indexOf(milestone) + 1}`}
+                </span>
+              )}
             </li>
           );
         })}
@@ -139,19 +155,35 @@ export default function StampCard({ card, memberName, preview = false, onCardUpd
 
       {card.milestones.length > 0 && (
         <ul className="stamp-legend">
-          {card.milestones.map((milestone, index) => (
-            <li key={milestone.at} className={milestone.at <= card.stamps ? 'is-reached' : undefined}>
-              <span className="stamp-reward-tag">特典{index + 1}</span>
-              <span>{milestone.at}個目：{milestone.titleJa}</span>
-            </li>
-          ))}
+          {card.milestones.map((milestone, index) => {
+            const isGoal = milestone.at === card.perCard;
+            return (
+              <li key={milestone.at} className={milestone.at <= card.stamps ? 'is-reached' : undefined}>
+                <span className="stamp-reward-tag" style={isGoal ? { background: '#d97706' } : undefined}>
+                  {isGoal ? '🏁 ゴール特典' : `特典${index + 1}`}
+                </span>
+                <span>
+                  {milestone.at}個目{isGoal ? '（ゴール）' : ''}：{milestone.titleJa}
+                  <span style={{ fontSize: '0.72rem', color: '#b45309', marginLeft: '6px', fontWeight: 600 }}>
+                    （1回限り有効）
+                  </span>
+                </span>
+              </li>
+            );
+          })}
         </ul>
       )}
 
       <div className="stamp-card-foot">
         <div className="stamp-card-rules">
-          {nextMilestone && (
-            <strong>あと{nextMilestone.at - card.stamps}個で「{nextMilestone.titleJa}」</strong>
+          {nextMilestone ? (
+            <strong>
+              あと{nextMilestone.at - card.stamps}個で{nextMilestone.at === card.perCard ? 'ゴール！' : ''}「{nextMilestone.titleJa}」
+            </strong>
+          ) : (
+            <strong>
+              あと{card.perCard - card.stamps}個でゴール！（カード満了・次回自動リセット）
+            </strong>
           )}
           <span>
             {yen(card.rules.minAmount)}以上（税込）のご注文・ご来店ごとに1個

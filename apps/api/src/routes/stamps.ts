@@ -5,7 +5,7 @@ import { prisma } from '../lib/prisma.js';
 import { idParam, optionalText } from '../lib/schemas.js';
 import { MEMBER_CODE_PATTERN, normalizeMemberCode } from '../lib/stamps.js';
 import { requireStaff } from '../middleware/auth.js';
-import { awardStamp, memberCodeFor, stampCardFor, useReward } from '../services/stamps.js';
+import { awardStamp, memberCodeFor, resetStampCooldown, stampCardFor, useReward } from '../services/stamps.js';
 
 // Staff use this page to give stamps and hand over rewards at the counter.
 
@@ -13,14 +13,23 @@ const router = express.Router();
 router.use(requireStaff);
 
 const MAX_AMOUNT = 10_000_000;
-const stampSchema = z.object({ amount: z.number().int().min(0).max(MAX_AMOUNT), note: optionalText(200) });
+const stampSchema = z.object({
+  amount: z.number().int().min(0).max(MAX_AMOUNT).optional().default(0),
+  note: optionalText(200),
+  bypassCooldown: z.boolean().optional(),
+});
+
+const resetCooldownSchema = z.object({
+  lastStampAt: z.union([z.null(), z.coerce.date()]).optional(),
+  nextAt: z.union([z.null(), z.coerce.date()]).optional(),
+});
 
 async function memberByCode(rawCode: string) {
   const code = normalizeMemberCode(rawCode);
   if (!MEMBER_CODE_PATTERN.test(code)) throw new AppError(400, 'INVALID_CODE', 'That is not a member code.');
   const customer = await prisma.customer.findFirst({
     where: { memberCode: code, deletedAt: null, isActive: { not: false } },
-    select: { id: true, name: true, nameKana: true, isActive: true },
+    select: { id: true, name: true, nameKana: true, isActive: true, lastStampAt: true },
   });
   if (!customer) throw notFound('Member');
   return customer;
@@ -103,8 +112,14 @@ router.get('/member/:code', async (req, res) => {
 
 router.post('/member/:code', async (req, res) => {
   const customer = await memberByCode(String(req.params.code));
-  const { amount, note } = stampSchema.parse(req.body);
-  const result = await awardStamp(customer.id, { source: 'STAFF', amount, userId: req.user!.id, note: note ?? undefined });
+  const { amount, note, bypassCooldown } = stampSchema.parse(req.body);
+  const result = await awardStamp(customer.id, {
+    source: 'STAFF',
+    amount,
+    userId: req.user!.id,
+    note: note ?? undefined,
+    bypassCooldown: Boolean(bypassCooldown),
+  });
 
   if (result.status === 'DISABLED') throw new AppError(409, 'STAMPS_DISABLED', 'The stamp card is switched off.');
   if (result.status === 'NOT_FOUND') throw notFound('Member');
@@ -114,8 +129,28 @@ router.post('/member/:code', async (req, res) => {
   if (result.status === 'TOO_SOON') {
     throw new AppError(409, 'TOO_SOON', 'This member already got a stamp recently.', { nextAt: result.nextAt.toISOString() });
   }
-  await audit(req.user!.id, 'customer.stamp', customer.id, { amount, position: result.position, note: note ?? null });
+  await audit(req.user!.id, 'customer.stamp', customer.id, {
+    amount,
+    position: result.position,
+    note: note ?? null,
+    bypassCooldown: Boolean(bypassCooldown),
+  });
   res.status(201).json({ result, ...(await memberView(customer)) });
+});
+
+router.post('/member/:code/reset-cooldown', async (req, res) => {
+  const customer = await memberByCode(String(req.params.code));
+  const { lastStampAt, nextAt } = resetCooldownSchema.parse(req.body ?? {});
+  const result = await resetStampCooldown(customer.id, {
+    targetLastStampAt: lastStampAt,
+    nextStampAt: nextAt,
+  });
+  if (!result) throw notFound('Member');
+  await audit(req.user!.id, 'customer.stamp_cooldown_reset', customer.id, {
+    previousLastStampAt: result.previousLastStampAt,
+    newLastStampAt: result.newLastStampAt,
+  });
+  res.json({ success: true, ...(await memberView(customer)) });
 });
 
 router.post('/rewards/:id/use', async (req, res) => {

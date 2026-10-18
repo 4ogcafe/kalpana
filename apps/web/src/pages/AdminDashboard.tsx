@@ -12,6 +12,9 @@ import { GlobalSearch, NotificationBell, OrderingStatusToggle, QuickAdd, type Na
 import MenuManagementTab from '../components/admin/MenuManagementTab';
 import PageSettingsTabComponent from '../components/admin/PageSettingsTab';
 import PrinterSettings from '../components/admin/PrinterSettings';
+import ScannerSettings from '../components/admin/ScannerSettings';
+import MessagesTab from '../components/admin/MessagesTab';
+import { initScannerListener, getScannerConfig, type ScanEventDetail } from '../lib/scanner';
 import { 
   LayoutDashboard, 
   Settings, 
@@ -23,7 +26,6 @@ import {
   MessageSquare, 
   Users, 
   LogOut,
-  MoreVertical,
   ChefHat,
   X
 } from 'lucide-react';
@@ -90,6 +92,31 @@ export default function AdminDashboard() {
     return () => clearInterval(intervalId);
   }, [navigate]);
 
+  // Global Hardware QR Scanner Listener (NETUM NT-EM61 Recessed USB/TTL Scanner)
+  useEffect(() => {
+    const cleanupScanner = initScannerListener();
+
+    const handleScannedMember = (e: CustomEvent<ScanEventDetail>) => {
+      const cfg = getScannerConfig();
+      const memberCode = e.detail?.memberCode;
+      if (!memberCode) return;
+
+      // Automatically jump to Stamp Counter if configured
+      if (cfg.autoOpenStampCounter) {
+        setActiveTab('Stamps, Offers & Points');
+        setSidebarOpen(false);
+        setIntent(prev => ({ action: 'stamp', value: memberCode, nonce: (prev?.nonce ?? 0) + 1 }));
+      }
+    };
+
+    window.addEventListener('kalpana:member-scanned' as any, handleScannedMember as EventListener);
+
+    return () => {
+      cleanupScanner();
+      window.removeEventListener('kalpana:member-scanned' as any, handleScannedMember as EventListener);
+    };
+  }, []);
+
   // Top-bar search, notifications and Quick Add open a tab, optionally asking it to do something.
   const [intent, setIntent] = useState<TabIntent | null>(null);
   const navigateTo: Navigate = (tab, next) => {
@@ -106,10 +133,10 @@ export default function AdminDashboard() {
   const tabs = [
     { name: 'Overview', icon: LayoutDashboard },
     { name: 'Orders', icon: ShoppingBag },
+    { name: 'Menu Management', icon: MenuIcon },
     { name: 'Stamps, Offers & Points', icon: Gift },
     { name: 'Members', icon: UserCircle },
     { name: 'Restaurant Settings', icon: Settings },
-    { name: 'Menu Management', icon: MenuIcon },
     { name: 'Page Settings', icon: ImageIcon },
     { name: 'Contact Messages', icon: MessageSquare },
     { name: 'Staff Users', icon: Users },
@@ -257,10 +284,10 @@ export default function AdminDashboard() {
 
           {activeTab === 'Overview' && <OverviewTab isAdmin={user.role === 'ADMIN'} onNavigate={tab => navigateTo(tab)} />}
           {activeTab === 'Orders' && <OrdersTab isAdmin={user.role === 'ADMIN'} intent={intent} />}
+          {activeTab === 'Menu Management' && <MenuManagementTab intent={intent} />}
           {activeTab === 'Stamps, Offers & Points' && <OffersTab intent={intent} />}
           {activeTab === 'Members' && <CustomersTab intent={intent} />}
           {activeTab === 'Restaurant Settings' && <SettingsTab />}
-          {activeTab === 'Menu Management' && <MenuManagementTab intent={intent} />}
           {activeTab === 'Page Settings' && <PageSettingsTabComponent onOpenRestaurantSettings={() => navigateTo('Restaurant Settings')} />}
           {activeTab === 'Contact Messages' && <MessagesTab />}
           {activeTab === 'Staff Users' && <StaffUsersTab currentUserId={user.id} intent={intent} />}
@@ -457,189 +484,19 @@ function SettingsTab() {
         </div>
       </div>
 
+      {/* NETUM NT-EM61 / Hardware QR Scanner Settings */}
+      <ScannerSettings />
+
       {/* Printer & Receipt Settings */}
       <PrinterSettings storeName={settings.name} phone={settings.phone} addressJa={settings.addressJa} />
     </div>
   );
 }
 
-function MessagesTab() {
-  const [messages, setMessages] = useState<any[]>([]);
-  const [rawData, setRawData] = useState<any[]>([]);
-  const [editing, setEditing] = useState<any>(null);
 
-  const fetchMessages = () => {
-    apiFetch('/api/v1/contact')
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          setRawData(data);
-          setMessages(data.map(m => [
-            new Date(m.createdAt).toLocaleDateString(),
-            m.name,
-            m.type || 'GENERAL',
-            m.message.substring(0, 30) + '...',
-            m.isRead,
-            '',
-            m.id
-          ]));
-        }
-      })
-      .catch(console.error);
-  };
-
-  useEffect(() => {
-    fetchMessages();
-  }, []);
-
-  const handleEdit = (row: any[]) => {
-    const id = row[row.length - 1];
-    const item = rawData.find(d => d.id === id);
-    if (item) setEditing({ ...item });
-  };
-
-  const handleSave = async (e: any) => {
-    e.preventDefault();
-    try {
-      const res = await apiFetch(`/api/v1/contact/${editing.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isRead: editing.isRead })
-      });
-      if (res.ok) {
-        setEditing(null);
-        fetchMessages();
-      } else {
-        toast.error('Failed to update.');
-      }
-    } catch (err) {
-      toast.error('Network error.');
-    }
-  };
-
-  return (
-    <div style={{ position: 'relative' }}>
-      <div style={{ backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid #e5e7eb' }}>
-        <Table 
-          headers={['Date', 'Name', 'Type', 'Message Snippet', 'Status', '']}
-          rows={messages}
-          isMessages
-          onEdit={handleEdit}
-        />
-      </div>
-
-      {editing && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
-          <div style={{ backgroundColor: '#fff', padding: '2rem', borderRadius: '12px', width: '100%', maxWidth: '500px' }}>
-            <h2 style={{ marginTop: 0, marginBottom: '1.5rem', fontSize: '1.25rem' }}>View Message</h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={labelStyle}>From</label>
-                <div style={{ padding: '0.75rem', backgroundColor: '#f3f4f6', borderRadius: '8px' }}>{editing.name} ({editing.email}) - {editing.phone || 'No phone'}</div>
-              </div>
-              {editing.type === 'RESERVATION' && (
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                  <div style={{ flex: 1 }}>
-                    <label style={labelStyle}>Date & Time</label>
-                    <div style={{ padding: '0.75rem', backgroundColor: '#e0e7ff', borderRadius: '8px', fontWeight: 'bold' }}>
-                      {editing.date ? new Date(editing.date).toLocaleString('ja-JP') : 'N/A'}
-                    </div>
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <label style={labelStyle}>Guests</label>
-                    <div style={{ padding: '0.75rem', backgroundColor: '#e0e7ff', borderRadius: '8px', fontWeight: 'bold' }}>
-                      {editing.guests || 'N/A'}
-                    </div>
-                  </div>
-                </div>
-              )}
-              <div>
-                <label style={labelStyle}>Message</label>
-                <div style={{ padding: '0.75rem', backgroundColor: '#f3f4f6', borderRadius: '8px', minHeight: '100px', whiteSpace: 'pre-wrap' }}>{editing.message || 'No additional message.'}</div>
-              </div>
-              <div>
-                <label style={labelStyle}>Status</label>
-                <select value={editing.isRead ? 'true' : 'false'} onChange={e => setEditing({...editing, isRead: e.target.value === 'true'})} style={inputStyle}>
-                  <option value="false">New / Unread</option>
-                  <option value="true">Read</option>
-                </select>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
-                <button type="button" onClick={() => setEditing(null)} style={{ padding: '0.5rem 1rem', border: '1px solid #d1d5db', background: '#fff', borderRadius: '8px', cursor: 'pointer' }}>Close</button>
-                <button type="button" onClick={handleSave} style={{ padding: '0.5rem 1rem', background: '#000', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Update Status</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // --- SHARED UI COMPONENTS ---
 
 const labelStyle = { display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' };
 const inputStyle = { width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', outline: 'none', transition: 'border-color 0.2s', backgroundColor: '#f9fafb' };
 
-function Table({ headers, rows, isMessages = false, onEdit }: { headers: string[], rows: any[][], isMessages?: boolean, onEdit?: (row: any[]) => void }) {
-  return (
-    <div style={{ overflowX: 'auto' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-        <thead>
-          <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-            {headers.map((h, i) => (
-              <th key={i} style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280', fontWeight: '600', letterSpacing: '0.5px' }}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr key={i} style={{ borderBottom: '1px solid #e5e7eb', transition: 'background-color 0.15s', cursor: 'pointer' }} onMouseOver={e => e.currentTarget.style.backgroundColor = '#f9fafb'} onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}>
-              {row.map((cell, j) => {
-                if (j >= headers.length) return null;
-                if (j === headers.length - 1) { // Actions column
-                  return (
-                    <td key={j} style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onEdit?.(row);
-                        }}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}
-                      >
-                        <MoreVertical size={18} />
-                      </button>
-                    </td>
-                  );
-                }
-                if (typeof cell === 'boolean') { // Status column
-                  if (isMessages && j === headers.length - 2) {
-                    return (
-                      <td key={j} style={{ padding: '1rem 1.5rem' }}>
-                        <span style={{ backgroundColor: cell ? '#f3f4f6' : '#fee2e2', color: cell ? '#4b5563' : '#ef4444', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: '600' }}>
-                          {cell ? 'Read' : 'New'}
-                        </span>
-                      </td>
-                    );
-                  }
-                  return (
-                    <td key={j} style={{ padding: '1rem 1.5rem' }}>
-                      <span style={{ backgroundColor: cell ? '#d1fae5' : '#f3f4f6', color: cell ? '#059669' : '#6b7280', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: '600' }}>
-                        {cell ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                  );
-                }
-                return (
-                  <td key={j} style={{ padding: '1rem 1.5rem', fontSize: '0.875rem', color: j === 0 ? '#111827' : '#4b5563', fontWeight: j === 0 ? '500' : '400' }}>
-                    {cell}
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}

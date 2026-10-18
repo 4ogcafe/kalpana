@@ -71,4 +71,24 @@ router.put('/:id', requireAdmin, async (req, res) => {
   res.json({ success: true });
 });
 
+router.post('/mark-read', requireAdmin, async (req, res) => {
+  const { ids } = z.object({ ids: z.array(z.string()) }).parse(req.body);
+  await prisma.contactMessage.updateMany({
+    where: { id: { in: ids } },
+    data: { isRead: true },
+  });
+  res.json({ success: true, count: ids.length });
+});
+
+router.delete('/:id', requireAdmin, async (req, res) => {
+  const id = idParam(req.params);
+  try {
+    await prisma.contactMessage.delete({ where: { id } });
+  } catch {
+    throw notFound('Message');
+  }
+  res.json({ success: true });
+});
+
 export default router;
+

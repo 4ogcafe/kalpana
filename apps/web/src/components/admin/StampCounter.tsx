@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import { toast } from 'react-hot-toast';
-import { Camera, Gift, Search, Stamp, X } from 'lucide-react';
+import { Calendar, Camera, Clock, Gift, Search, Stamp, X, Zap } from 'lucide-react';
 import jsQR from 'jsqr';
 import { apiFetch, errorMessage } from '../../lib/api';
 import { formatMemberCode, yen } from '../../lib/format';
+import { getScannerConfig, saveScannerConfig } from '../../lib/scanner';
 import type { StampCardData } from '../account/types';
 
 interface MemberView {
@@ -30,22 +31,149 @@ const SCAN_WIDTH = 640;
 const timeLabel = (iso: string) => new Date(iso).toLocaleString('en-GB', { timeZone: 'Asia/Tokyo', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 /** Staff scan a member's QR (or type the code) to give an in-store stamp and hand over rewards. */
-export default function StampCounter({ focus }: { focus?: number }) {
+export default function StampCounter({ focus, initialCode }: { focus?: number; initialCode?: string }) {
   const [code, setCode] = useState('');
+  const [amount, setAmount] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [view, setView] = useState<MemberView | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [matches, setMatches] = useState<SearchMatch[] | null>(null);
+  const [showCustomTime, setShowCustomTime] = useState(false);
+  const [customTime, setCustomTime] = useState('');
   const codeRef = useRef<HTMLInputElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
+  const amountRef = useRef<HTMLInputElement>(null);
+
+  const [autoStamp, setAutoStamp] = useState<boolean>(() => {
+    try {
+      return getScannerConfig().autoStampOnScan ?? true;
+    } catch {
+      return true;
+    }
+  });
+  const [cooldownHours, setCooldownHours] = useState<number>(6);
+  const lastScannedRef = useRef<{ code: string; time: number }>({ code: '', time: 0 });
+
+  useEffect(() => {
+    apiFetch('/api/v1/settings')
+      .then(res => res.json())
+      .then(data => {
+        if (typeof data?.stampCooldownHours === 'number') {
+          setCooldownHours(data.stampCooldownHours);
+        }
+      })
+      .catch(console.error);
+  }, []);
+
+  const handleUpdateCooldownHours = async (newHours: number) => {
+    const val = Math.max(0, Math.min(720, newHours));
+    setCooldownHours(val);
+    try {
+      const res = await apiFetch('/api/v1/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stampCooldownHours: val }),
+      });
+      if (res.ok) {
+        toast.success(`Stamp gap timer set to ${val} hours`);
+      }
+    } catch {
+      toast.error('Failed to update timer');
+    }
+  };
+
   // Quick Add → "Give a stamp": bring the counter into view, ready for a scan or a typed code.
   useEffect(() => {
     if (!focus) return;
     sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     codeRef.current?.focus({ preventScroll: true });
   }, [focus]);
-  const [view, setView] = useState<MemberView | null>(null);
-  const [amount, setAmount] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [scanning, setScanning] = useState(false);
-  const [matches, setMatches] = useState<SearchMatch[] | null>(null);
-  const amountRef = useRef<HTMLInputElement>(null);
+
+  /** Automatically awards stamp directly when member QR is scanned at the counter */
+  const autoAwardStamp = async (memberCode: string) => {
+    const normalized = normalizeCode(memberCode);
+    const now = Date.now();
+    if (lastScannedRef.current.code === normalized && now - lastScannedRef.current.time < 2000) {
+      return; // Ignore duplicate scan within 2s
+    }
+    lastScannedRef.current = { code: normalized, time: now };
+
+    setCode(formatMemberCode(normalized));
+    setBusy(true);
+    try {
+      const res = await apiFetch(`/api/v1/stamps/member/${encodeURIComponent(normalized)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: Math.round(Number(amount) || 0),
+          bypassCooldown: false, // Respect the timer gap!
+        }),
+      });
+      const body = await res.json().catch(() => null);
+      if (res.ok) {
+        const { result } = body;
+        setView({ member: body.member, card: body.card });
+        setMatches(null);
+        setAmount('');
+        if (result.cardCompleted) {
+          toast.success(`🎉 GOAL reached! Stamp ${result.perCard}/${result.perCard} completed the card for ${body.member.name}! Card auto-reset for card #${body.card.completedCards + 1}.`, { duration: 7000 });
+        } else {
+          toast.success(`⚡ Auto-stamped! Stamp ${result.position}/${result.perCard} given to ${body.member.name}.`, { duration: 5000, icon: '🎯' });
+        }
+        for (const reward of result.rewards) {
+          toast.success(`🎁 Reward earned: ${reward.titleJa}`, { duration: 6000 });
+        }
+      } else if (body?.error?.code === 'TOO_SOON') {
+        // Within timer gap (e.g. 6 hours gap has not elapsed)
+        await openMember(normalized);
+        const nextTime = body.error.details?.nextAt ? timeLabel(body.error.details.nextAt) : '';
+        toast(`⚠️ Already stamped recently — next stamp available from ${nextTime} (${cooldownHours}h gap rule).`, {
+          icon: '⏳',
+          duration: 7000,
+        });
+      } else {
+        await openMember(normalized);
+        if (body?.error?.message) {
+          toast.error(body.error.message);
+        }
+      }
+    } catch {
+      await openMember(normalized);
+      toast.error('Network error.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (initialCode) {
+      const normalized = normalizeCode(initialCode);
+      setCode(formatMemberCode(normalized));
+      if (autoStamp) {
+        autoAwardStamp(normalized);
+      } else {
+        lookUp(initialCode);
+      }
+    }
+  }, [initialCode]);
+
+  // Hardware Scanner (NETUM NT-EM61 / USB-HID / Web Serial) listener
+  useEffect(() => {
+    const onScanned = (e: CustomEvent<{ raw: string; memberCode: string }>) => {
+      const { memberCode } = e.detail;
+      if (memberCode) {
+        const normalized = normalizeCode(memberCode);
+        setCode(formatMemberCode(normalized));
+        if (autoStamp) {
+          autoAwardStamp(normalized);
+        } else {
+          lookUp(memberCode);
+        }
+      }
+    };
+    window.addEventListener('kalpana:member-scanned' as any, onScanned as any);
+    return () => window.removeEventListener('kalpana:member-scanned' as any, onScanned as any);
+  }, [autoStamp, amount]);
 
   /** Opens a member's card by their code. Returns false if no member has that code. */
   const openMember = async (memberCode: string) => {
@@ -55,6 +183,8 @@ export default function StampCounter({ focus }: { focus?: number }) {
     setView(await res.json());
     setMatches(null);
     setAmount('');
+    setShowCustomTime(false);
+    setCustomTime('');
     setTimeout(() => amountRef.current?.focus(), 0);
     return true;
   };
@@ -89,27 +219,69 @@ export default function StampCounter({ focus }: { focus?: number }) {
     lookUp(code);
   };
 
-  const giveStamp = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!view) return;
+  const giveStamp = async (e?: FormEvent, bypassCooldown = false) => {
+    e?.preventDefault();
+    if (!view || busy) return;
+    const shouldBypass = bypassCooldown || Boolean(view.card.nextStampAt);
     setBusy(true);
     try {
       const res = await apiFetch(`/api/v1/stamps/member/${view.card.memberCode}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: Math.round(Number(amount) || 0) }),
+        body: JSON.stringify({
+          amount: Math.round(Number(amount) || 0),
+          bypassCooldown: shouldBypass,
+        }),
       });
       const body = await res.json().catch(() => null);
       if (res.ok) {
         const { result } = body;
-        setView({ member: body.member, card: body.card });
-        setAmount('');
-        toast.success(`Stamp ${result.position}/${result.perCard} given to ${body.member.name}.`);
+        if (result.cardCompleted) {
+          toast.success(`🎉 GOAL reached! Stamp ${result.perCard}/${result.perCard} completed the card for ${body.member.name}! Card auto-reset for card #${body.card.completedCards + 1}.`, { duration: 7000 });
+        } else {
+          toast.success(`Stamp ${result.position}/${result.perCard} given to ${body.member.name}.${shouldBypass ? ' (Cooldown overridden)' : ''}`);
+        }
         for (const reward of result.rewards) toast.success(`🎁 Reward earned: ${reward.titleJa}`, { duration: 6000 });
+        if (body.card && body.member) {
+          setView({ member: body.member, card: body.card });
+        } else {
+          await openMember(view.card.memberCode);
+        }
+        setAmount('');
       } else if (body?.error?.code === 'TOO_SOON') {
-        toast.error(`Already stamped recently. Next stamp from ${timeLabel(body.error.details.nextAt)}.`);
+        const nextTime = body.error.details?.nextAt ? timeLabel(body.error.details.nextAt) : '';
+        toast(`⚠️ Already stamped recently — next stamp available from ${nextTime} (${cooldownHours}h gap rule).`, { icon: '⏳', duration: 7000 });
       } else {
         toast.error(body?.error?.message ?? 'Could not give the stamp.');
+      }
+    } catch {
+      toast.error('Network error.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const setCustomCooldown = async () => {
+    if (!view || busy || !customTime) return;
+    const date = new Date(customTime);
+    if (isNaN(date.getTime())) {
+      toast.error('Please enter a valid date and time.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await apiFetch(`/api/v1/stamps/member/${view.card.memberCode}/reset-cooldown`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nextAt: date.toISOString() }),
+      });
+      const body = await res.json().catch(() => null);
+      if (res.ok) {
+        setView({ member: body.member, card: body.card });
+        setShowCustomTime(false);
+        toast.success(`Next stamp time updated for ${body.member.name}.`);
+      } else {
+        toast.error(body?.error?.message ?? 'Could not update stamp time.');
       }
     } catch {
       toast.error('Network error.');
@@ -136,14 +308,102 @@ export default function StampCounter({ focus }: { focus?: number }) {
 
   const card = view?.card;
   const minAmount = card?.rules.minAmount ?? 0;
-  const enough = (Number(amount) || 0) >= minAmount;
 
   return (
     <section ref={sectionRef} style={panelStyle} aria-labelledby="stamp-counter-heading">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
         <div>
-          <h3 id="stamp-counter-heading" style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}><Stamp size={18} /> Stamp card at the counter</h3>
-          <p style={{ margin: '0.25rem 0 0', color: '#6b7280', fontSize: '0.85rem' }}>Scan the member's QR (My page → スタンプカード → 店頭で提示), or type their member code, phone number, email or name. Online orders are stamped automatically.</p>
+          <h3 id="stamp-counter-heading" style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Stamp size={18} /> Stamp card at the counter
+          </h3>
+          <p style={{ margin: '0.25rem 0 0', color: '#6b7280', fontSize: '0.85rem' }}>
+            Scan the member's QR (My page → スタンプカード → 店頭で提示), or type their member code, phone number, email or name. Online orders are stamped automatically.
+          </p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <label
+            style={{
+              padding: '4px 10px',
+              borderRadius: '9999px',
+              background: autoStamp ? '#ecfdf5' : '#f3f4f6',
+              color: autoStamp ? '#047857' : '#4b5563',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              border: autoStamp ? '1px solid #a7f3d0' : '1px solid #d1d5db',
+              cursor: 'pointer',
+            }}
+            title="When ON: scanning QR automatically gives the stamp without requiring manual button clicks or cooldown override"
+          >
+            <input
+              type="checkbox"
+              checked={autoStamp}
+              onChange={(e) => {
+                const nextVal = e.target.checked;
+                setAutoStamp(nextVal);
+                const cfg = getScannerConfig();
+                saveScannerConfig({ ...cfg, autoStampOnScan: nextVal });
+              }}
+              style={{ accentColor: '#10b981', cursor: 'pointer' }}
+            />
+            ⚡ Auto-Stamp on Scan (自動押印)
+          </label>
+          <div
+            style={{
+              padding: '4px 10px',
+              borderRadius: '9999px',
+              background: '#f8fafc',
+              color: '#334155',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              border: '1px solid #cbd5e1',
+            }}
+            title="Timer gap required between stamps for the same member"
+          >
+            <Clock size={13} style={{ color: '#d97706' }} />
+            <span>Gap timer:</span>
+            <input
+              type="number"
+              min={0}
+              max={72}
+              value={cooldownHours}
+              onChange={(e) => handleUpdateCooldownHours(Number(e.target.value))}
+              style={{
+                width: '38px',
+                padding: '2px 4px',
+                borderRadius: '4px',
+                border: '1px solid #94a3b8',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                textAlign: 'center',
+                backgroundColor: '#fff',
+              }}
+            />
+            <span>hrs</span>
+          </div>
+          <span
+            style={{
+              padding: '4px 10px',
+              borderRadius: '9999px',
+              background: '#ecfdf5',
+              color: '#047857',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              border: '1px solid #a7f3d0',
+            }}
+            title="NETUM NT-EM61 または各種USBスキャナーからのQRコード読取に対応しています"
+          >
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }}></span>
+            NETUM Scanner Ready
+          </span>
         </div>
       </div>
 
@@ -168,8 +428,13 @@ export default function StampCounter({ focus }: { focus?: number }) {
           onClose={() => setScanning(false)}
           onCode={value => {
             setScanning(false);
-            setCode(formatMemberCode(normalizeCode(value)));
-            lookUp(value);
+            const normalized = normalizeCode(value);
+            setCode(formatMemberCode(normalized));
+            if (autoStamp) {
+              autoAwardStamp(normalized);
+            } else {
+              lookUp(value);
+            }
           }}
         />
       )}
@@ -204,30 +469,114 @@ export default function StampCounter({ focus }: { focus?: number }) {
               <button type="button" onClick={() => { setView(null); setCode(''); }} aria-label="Clear member" style={{ ...buttonStyle, padding: '0.35rem' }}><X size={16} /></button>
             </div>
             <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', margin: '0.75rem 0' }} aria-label={`${card.stamps} of ${card.perCard} stamps`}>
-              {Array.from({ length: card.perCard }, (_, i) => (
-                <span key={i} style={{ width: 22, height: 22, borderRadius: '50%', display: 'grid', placeItems: 'center', fontSize: '0.65rem', fontWeight: 700, background: i < card.stamps ? '#b3261e' : '#f3f4f6', color: i < card.stamps ? '#fff' : '#9ca3af', outline: card.milestones.some(m => m.at === i + 1) ? '2px solid #d97706' : 'none' }}>{i + 1}</span>
-              ))}
+              {Array.from({ length: card.perCard }, (_, i) => {
+                const pos = i + 1;
+                const isGoal = pos === card.perCard;
+                const isStamped = i < card.stamps;
+                return (
+                  <span
+                    key={i}
+                    title={isGoal ? `Stamp ${pos} (GOAL)` : `Stamp ${pos}`}
+                    style={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: '50%',
+                      display: 'grid',
+                      placeItems: 'center',
+                      fontSize: '0.65rem',
+                      fontWeight: 700,
+                      background: isStamped ? '#b3261e' : (isGoal ? '#fef3c7' : '#f3f4f6'),
+                      color: isStamped ? '#fff' : (isGoal ? '#b45309' : '#9ca3af'),
+                      outline: isGoal ? '2px solid #d97706' : (card.milestones.some(m => m.at === pos) ? '2px solid #d97706' : 'none'),
+                    }}
+                  >
+                    {isStamped ? pos : (isGoal ? '🏁' : pos)}
+                  </span>
+                );
+              })}
             </div>
             <div style={{ fontSize: '0.85rem', color: '#374151' }}>
-              {card.stamps}/{card.perCard} stamps · {card.completedCards} full card{card.completedCards === 1 ? '' : 's'} · {card.totalStamps} total
+              {card.stamps}/{card.perCard} stamps (Goal: {card.perCard}) · {card.completedCards} full card{card.completedCards === 1 ? '' : 's'} · {card.totalStamps} total
             </div>
             {!card.enabled ? (
               <p style={{ color: '#b91c1c', fontSize: '0.85rem' }}>The stamp card is switched off (Stamps, Offers &amp; Points tab).</p>
-            ) : card.nextStampAt ? (
-              <p style={{ margin: '0.75rem 0 0', padding: '0.5rem 0.75rem', borderRadius: '8px', background: '#fef3c7', color: '#92400e', fontSize: '0.85rem' }}>
-                Already stamped recently — next stamp from {timeLabel(card.nextStampAt)} ({card.rules.cooldownHours}h rule).
-              </p>
             ) : (
-              <form onSubmit={giveStamp} style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.8rem', fontWeight: 500, flex: '1 1 140px' }}>
-                  Bill amount (¥, incl. tax)
-                  <input ref={amountRef} type="number" inputMode="numeric" min={0} value={amount} onChange={e => setAmount(e.target.value)} placeholder={String(minAmount)} style={inputStyle} />
-                </label>
-                <button type="submit" disabled={busy || !enough} style={{ ...buttonStyle, backgroundColor: enough ? '#b3261e' : '#e5e7eb', color: enough ? '#fff' : '#6b7280', border: 'none' }}>
-                  <Stamp size={16} /> Give stamp
-                </button>
-                {amount && !enough && <span style={{ fontSize: '0.8rem', color: '#b91c1c', flexBasis: '100%' }}>A stamp needs {yen(minAmount)} or more.</span>}
-              </form>
+              <>
+                {card.nextStampAt && (
+                  <div style={{ margin: '0.75rem 0', padding: '0.75rem', borderRadius: '8px', background: '#fef3c7', border: '1px solid #fde68a', color: '#92400e', fontSize: '0.85rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Clock size={16} style={{ flexShrink: 0, color: '#d97706' }} />
+                        <span>
+                          Already stamped recently — next stamp from <strong>{timeLabel(card.nextStampAt)}</strong> ({card.rules.cooldownHours}h gap rule).
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => giveStamp(undefined, true)}
+                          title="Override cooldown and award stamp now"
+                          style={{ ...buttonStyle, padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: '#d97706', color: '#fff', border: 'none', fontWeight: 600 }}
+                        >
+                          <Zap size={14} /> Override cooldown &amp; give stamp
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => setShowCustomTime((v) => !v)}
+                          title="Manually adjust the next stamp time"
+                          style={{ ...buttonStyle, padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: '#fff', border: '1px solid #d97706', color: '#92400e' }}
+                        >
+                          <Calendar size={14} /> {showCustomTime ? 'Cancel' : 'Set custom time'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {showCustomTime && (
+                      <div style={{ marginTop: '0.65rem', paddingTop: '0.65rem', borderTop: '1px dashed #fcd34d', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <label style={{ fontSize: '0.8rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          Next stamp from:
+                          <input
+                            type="datetime-local"
+                            value={customTime}
+                            onChange={(e) => setCustomTime(e.target.value)}
+                            style={{ ...inputStyle, padding: '0.25rem 0.5rem', fontSize: '0.8rem', width: 'auto' }}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          disabled={busy || !customTime}
+                          onClick={setCustomCooldown}
+                          style={{ ...buttonStyle, padding: '0.3rem 0.65rem', fontSize: '0.8rem', background: '#d97706', color: '#fff', border: 'none' }}
+                        >
+                          Save time
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <form onSubmit={(e) => giveStamp(e, Boolean(card.nextStampAt))} style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.8rem', fontWeight: 500, flex: '1 1 140px' }}>
+                    Bill amount (¥, optional)
+                    <input ref={amountRef} type="number" inputMode="numeric" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={minAmount > 0 ? String(minAmount) : "0"} style={inputStyle} />
+                  </label>
+                  <button
+                    type="submit"
+                    disabled={busy}
+                    style={{
+                      ...buttonStyle,
+                      backgroundColor: card.nextStampAt ? '#d97706' : '#b3261e',
+                      color: '#fff',
+                      border: 'none',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {card.nextStampAt ? <Zap size={16} /> : <Stamp size={16} />} {card.nextStampAt ? 'Override cooldown & give stamp' : 'Give stamp'}
+                  </button>
+                </form>
+              </>
             )}
           </div>
 

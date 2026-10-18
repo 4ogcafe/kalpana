@@ -40,7 +40,7 @@ export const MIN_STAMPS_PER_CARD = 2;
 export const MAX_STAMPS_PER_CARD = 30;
 export const DEFAULT_STAMPS_PER_CARD = 10;
 export const DEFAULT_STAMP_MIN_AMOUNT = 1000;
-export const DEFAULT_STAMP_COOLDOWN_HOURS = 12;
+export const DEFAULT_STAMP_COOLDOWN_HOURS = 6;
 
 export const DEFAULT_STAMP_REWARDS: StampRewardRule[] = [
   { at: 5, titleJa: '次回セットのナングレードアップ無料', kind: 'PERK', amount: 0 },

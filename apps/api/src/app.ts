@@ -21,6 +21,7 @@ import stampRoutes from './routes/stamps.js';
 import reviewRoutes from './routes/reviews.js';
 import pushRoutes from './routes/push.js';
 import squareRoutes from './routes/square.js';
+import gameRoutes from './routes/game.js';
 
 const JSON_BODY_LIMIT = '100kb';
 const UPLOAD_MAX_AGE = '30d';
@@ -84,6 +85,7 @@ export function createApp() {
   app.use('/api/v1/reviews', reviewRoutes);
   app.use('/api/v1/push', pushRoutes);
   app.use('/api/v1/square', squareRoutes);
+  app.use('/api/v1/game', gameRoutes);
 
   if (fs.existsSync(path.join(config.webDistDir, 'index.html'))) {
     // Serve the built site; any other GET outside /api and /uploads is a client-side route.

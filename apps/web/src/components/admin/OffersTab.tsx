@@ -7,6 +7,7 @@ import { offerLabel } from '../../lib/format';
 import LoyaltySettings from './LoyaltySettings';
 import StampCardSettings from './StampCardSettings';
 import StampCounter from './StampCounter';
+import GameSettings from './GameSettings';
 
 interface Offer {
   id: string;
@@ -154,9 +155,13 @@ export default function OffersTab({ intent }: { intent?: TabIntent | null }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <StampCounter focus={intent?.action === 'stamp' ? intent.nonce : undefined} />
+      <StampCounter
+        focus={intent?.action === 'stamp' ? intent.nonce : undefined}
+        initialCode={intent?.action === 'stamp' ? intent.value : undefined}
+      />
       <StampCardSettings />
       <LoyaltySettings />
+      <GameSettings />
 
       <section style={panelStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', gap: '1rem', flexWrap: 'wrap' }}>

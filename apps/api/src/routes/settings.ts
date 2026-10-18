@@ -48,6 +48,18 @@ const settingsSchema = z.object({
   aboutStoryJa: text(LONG_TEXT),
   aboutStoryLabelJa: text(),
   aboutStoryTitleJa: text(),
+  aboutStoryImage: image,
+  aboutStoryWatermark: text(),
+  aboutStoryOriginTitleJa: text(),
+  aboutStoryOriginTextJa: text(LONG_TEXT),
+  aboutStoryBadgeSubJa: text(),
+  aboutStoryBadgeTitleJa: text(),
+  aboutStoryPillar1TitleJa: text(),
+  aboutStoryPillar1DescJa: text(LONG_TEXT),
+  aboutStoryPillar2TitleJa: text(),
+  aboutStoryPillar2DescJa: text(LONG_TEXT),
+  aboutStoryPillar3TitleJa: text(),
+  aboutStoryPillar3DescJa: text(LONG_TEXT),
   aboutSpiceLabelJa: text(),
   aboutSpiceTitleJa: text(),
   aboutSpiceDescJa: text(LONG_TEXT),
@@ -156,9 +168,26 @@ const settingsSchema = z.object({
     .optional(),
 });
 
+const EXT_KEYS = [
+  'aboutStoryImage',
+  'aboutStoryWatermark',
+  'aboutStoryOriginTitleJa',
+  'aboutStoryOriginTextJa',
+  'aboutStoryBadgeSubJa',
+  'aboutStoryBadgeTitleJa',
+  'aboutStoryPillar1TitleJa',
+  'aboutStoryPillar1DescJa',
+  'aboutStoryPillar2TitleJa',
+  'aboutStoryPillar2DescJa',
+  'aboutStoryPillar3TitleJa',
+  'aboutStoryPillar3DescJa',
+] as const;
+
 router.get('/', publicCache, async (_req, res) => {
   const settings = await prisma.settings.findFirst();
-  res.json(settings ?? {});
+  const extRecord = await prisma.appSecret.findUnique({ where: { id: 'PAGE_SETTINGS_EXT' } }).catch(() => null);
+  const ext = extRecord?.publicKey ? JSON.parse(extRecord.publicKey) : {};
+  res.json({ ...(settings ?? {}), ...ext });
 });
 
 router.put('/', requireAdmin, async (req, res) => {
@@ -169,10 +198,36 @@ router.put('/', requireAdmin, async (req, res) => {
     throw new AppError(400, 'VALIDATION_ERROR', `Rewards must be on stamps 1–${perCard}.`);
   }
 
+  // Handle extended page settings via AppSecret
+  const extData: Record<string, unknown> = {};
+  let hasExt = false;
+  for (const key of EXT_KEYS) {
+    if (key in (raw as Record<string, unknown>)) {
+      extData[key] = (raw as Record<string, unknown>)[key];
+      hasExt = true;
+    }
+  }
+
+  if (hasExt) {
+    const existingExt = await prisma.appSecret.findUnique({ where: { id: 'PAGE_SETTINGS_EXT' } }).catch(() => null);
+    const prev = existingExt?.publicKey ? JSON.parse(existingExt.publicKey) : {};
+    const mergedExt = { ...prev, ...extData };
+    await prisma.appSecret.upsert({
+      where: { id: 'PAGE_SETTINGS_EXT' },
+      create: { id: 'PAGE_SETTINGS_EXT', publicKey: JSON.stringify(mergedExt), privateKey: '' },
+      update: { publicKey: JSON.stringify(mergedExt) },
+    });
+  }
+
   // Map stampCardEnabled → stampsEnabled for the schema column name.
   const { stampCardEnabled, deliveryHours, deliveryNoteJa, deliveryFreeOver, ...rest } = raw as Record<string, unknown>;
   const data: Record<string, unknown> = { ...rest };
   if (stampCardEnabled !== undefined) data.stampsEnabled = stampCardEnabled;
+
+  // Clean extended keys so Prisma does not reject unknown columns
+  for (const key of EXT_KEYS) {
+    delete data[key];
+  }
 
   // Arrays that can't be stored as plain undefined go in as JSON.
   if ('pickupClosedDays' in data) data.pickupClosedDays = data.pickupClosedDays ?? null;
@@ -197,7 +252,10 @@ router.put('/', requireAdmin, async (req, res) => {
     });
   }
 
-  res.json(await prisma.settings.findFirst());
+  const updatedSettings = await prisma.settings.findFirst();
+  const finalExt = await prisma.appSecret.findUnique({ where: { id: 'PAGE_SETTINGS_EXT' } }).catch(() => null);
+  const ext = finalExt?.publicKey ? JSON.parse(finalExt.publicKey) : {};
+  res.json({ ...(updatedSettings ?? {}), ...ext });
 });
 
 export default router;

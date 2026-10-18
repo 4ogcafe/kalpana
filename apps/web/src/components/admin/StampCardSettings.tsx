@@ -27,7 +27,7 @@ const DEFAULTS: StampForm = {
   stampCardEnabled: true,
   stampsPerCard: 10,
   stampMinAmount: 1000,
-  stampCooldownHours: 12,
+  stampCooldownHours: 6,
   stampRewardValidDays: 0,
   stampRewards: [
     { at: 5, titleJa: '次回セットのナングレードアップ無料', kind: 'PERK', amount: 0 },
@@ -65,6 +65,7 @@ export default function StampCardSettings() {
   const freeStamp = () => {
     const taken = new Set(form.stampRewards.map(reward => reward.at));
     for (let at = form.stampsPerCard; at >= 1; at -= 1) if (!taken.has(at)) return at;
+    for (let at = form.stampsPerCard + 1; at <= MAX_STAMPS; at += 1) if (!taken.has(at)) return at;
     return null;
   };
 
@@ -109,7 +110,7 @@ export default function StampCardSettings() {
       <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600 }}>Stamp Card</h3>
       <p style={{ margin: '0.25rem 0 1.25rem', color: '#6b7280', fontSize: '0.875rem' }}>
         Members get one stamp when an online order is completed, or when staff scan their member QR at the counter (Stamps, Offers &amp; Points tab → Stamp card at the counter).
-        Rewards are given automatically when a member reaches that stamp; a full card starts a new one.
+        Rewards are given automatically when a member reaches that stamp. Reaching the Goal (stamp {form.stampsPerCard}) completes and auto-resets the card for the next round. Each reward can be used only once.
       </p>
 
       <div className="stamp-admin-layout">
@@ -120,7 +121,7 @@ export default function StampCardSettings() {
           </label>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))', gap: '1rem' }}>
             <label style={labelStyle}>
-              Stamps per card
+              Stamps per card (Goal = stamp {form.stampsPerCard})
               <input type="number" min={MIN_STAMPS} max={MAX_STAMPS} value={form.stampsPerCard} onChange={e => update({ stampsPerCard: clamp(Number(e.target.value), MIN_STAMPS, MAX_STAMPS) })} style={inputStyle} />
             </label>
             <label style={labelStyle}>
@@ -128,7 +129,7 @@ export default function StampCardSettings() {
               <input type="number" min={0} step={100} value={form.stampMinAmount} onChange={e => update({ stampMinAmount: Math.max(0, Number(e.target.value)) })} style={inputStyle} />
             </label>
             <label style={labelStyle}>
-              Hours between stamps
+              Hours between stamps (0 = no wait)
               <input type="number" min={0} max={720} value={form.stampCooldownHours} onChange={e => update({ stampCooldownHours: clamp(Number(e.target.value), 0, 720) })} style={inputStyle} />
             </label>
             <label style={labelStyle}>
@@ -144,7 +145,12 @@ export default function StampCardSettings() {
                 type="button"
                 onClick={() => {
                   const at = freeStamp();
-                  if (at) update({ stampRewards: [...form.stampRewards, { at, titleJa: '', kind: 'PERK', amount: 0 }] });
+                  if (at) {
+                    update({
+                      stampsPerCard: Math.max(form.stampsPerCard, at),
+                      stampRewards: [...form.stampRewards, { at, titleJa: '', kind: 'PERK', amount: 0 }],
+                    });
+                  }
                 }}
                 disabled={freeStamp() === null}
                 style={smallButton}
@@ -158,8 +164,22 @@ export default function StampCardSettings() {
                 <div key={index} className="stamp-reward-row">
                   <label style={labelStyle}>
                     At stamp
-                    <select value={reward.at} onChange={e => updateReward(index, { at: Number(e.target.value) })} style={inputStyle}>
-                      {Array.from({ length: form.stampsPerCard }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}</option>)}
+                    <select
+                      value={reward.at}
+                      onChange={e => {
+                        const newAt = Number(e.target.value);
+                        update({
+                          stampsPerCard: Math.max(form.stampsPerCard, newAt),
+                          stampRewards: form.stampRewards.map((r, i) => (i === index ? { ...r, at: newAt } : r)),
+                        });
+                      }}
+                      style={inputStyle}
+                    >
+                      {Array.from({ length: MAX_STAMPS }, (_, i) => i + 1).map(n => (
+                        <option key={n} value={n}>
+                          {n}{n === form.stampsPerCard ? ' 🏁 (Goal)' : ''}
+                        </option>
+                      ))}
                     </select>
                   </label>
                   <label style={{ ...labelStyle, minWidth: 0 }}>

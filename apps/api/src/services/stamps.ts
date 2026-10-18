@@ -56,26 +56,36 @@ export type StampResult =
  */
 export async function awardStamp(
   customerId: string,
-  input: { source: StampSource; amount: number; orderId?: string; orderNumber?: number; userId?: string; note?: string },
+  input: { source: StampSource; amount: number; orderId?: string; orderNumber?: number; userId?: string; note?: string; bypassCooldown?: boolean },
   config?: StampConfig,
   now: Date = new Date(),
 ): Promise<StampResult> {
   const settings = config ?? stampConfig(await loadSettings());
   if (!settings.enabled) return { status: 'DISABLED' };
-  if (input.amount < settings.minAmount) return { status: 'BELOW_MINIMUM', minAmount: settings.minAmount };
+  if (input.source !== 'STAFF' && input.amount < settings.minAmount) {
+    return { status: 'BELOW_MINIMUM', minAmount: settings.minAmount };
+  }
 
-  const cutoff = cooldownCutoff(settings, now);
+  // When not bypassing cooldown, atomically claim the stamp slot only when the cooldown has passed.
+  const updateWhere: {
+    id: string;
+    deletedAt: null;
+    OR?: Array<{ lastStampAt: null } | { lastStampAt: { lte: Date } }>;
+  } = {
+    id: customerId,
+    deletedAt: null,
+  };
 
-  // Atomically claim the stamp slot by updating only when the cooldown has passed.
+  if (!input.bypassCooldown) {
+    const cutoff = cooldownCutoff(settings, now);
+    updateWhere.OR = [
+      { lastStampAt: null },
+      { lastStampAt: { lte: cutoff } },
+    ];
+  }
+
   const updated = await prisma.customer.updateMany({
-    where: {
-      id: customerId,
-      deletedAt: null,
-      OR: [
-        { lastStampAt: null },
-        { lastStampAt: { lte: cutoff } },
-      ],
-    },
+    where: updateWhere,
     data: {
       stampCount: { increment: 1 },
       stampTotal: { increment: 1 },
@@ -103,6 +113,10 @@ export async function awardStamp(
   const card = (customer?.stampCardsCompleted ?? 0) + 1;
   const cardCompleted = position >= settings.perCard;
 
+  const stampNote = input.note
+    ? (input.bypassCooldown ? `${input.note} (Cooldown override)` : input.note)
+    : (input.bypassCooldown ? 'Cooldown override' : null);
+
   await prisma.stamp.create({
     data: {
       customerId,
@@ -113,7 +127,7 @@ export async function awardStamp(
       orderId: input.orderId ?? null,
       orderNumber: input.orderNumber ?? null,
       userId: input.userId ?? null,
-      note: input.note ?? null,
+      note: stampNote,
       createdAt: now,
     },
   });
@@ -167,7 +181,7 @@ export async function findUsableReward(rewardId: string, customerId: string) {
       OR: [{ expiresAt: null }, { expiresAt: { gt: now() } }],
     },
   });
-  if (!reward) throw new AppError(409, 'REWARD_UNAVAILABLE', 'このスタンプ特典はご利用いただけません。');
+  if (!reward) throw new AppError(409, 'REWARD_UNAVAILABLE', 'このスタンプ特典はご利用いただけません。スタンプカードで達成後にご利用いただけます。');
   return reward;
 }
 
@@ -263,4 +277,36 @@ export async function stampCardFor(customerId: string) {
       createdAt: stamp.createdAt,
     })),
   };
+}
+
+/**
+ * Resets or updates the stamp cooldown (lastStampAt) for a member.
+ * If targetLastStampAt is provided, sets lastStampAt directly.
+ * If nextStampAt is provided, computes lastStampAt = nextStampAt - cooldownHours so nextStampAt matches.
+ * If neither is provided, sets lastStampAt = null, completely removing the cooldown.
+ */
+export async function resetStampCooldown(
+  customerId: string,
+  options?: { targetLastStampAt?: Date | null; nextStampAt?: Date | null },
+) {
+  const customer = await prisma.customer.findFirst({
+    where: { id: customerId, deletedAt: null },
+    select: { id: true, lastStampAt: true },
+  });
+  if (!customer) return null;
+
+  let newLastStampAt: Date | null = null;
+  if (options?.nextStampAt) {
+    const settings = stampConfig(await loadSettings());
+    newLastStampAt = new Date(options.nextStampAt.getTime() - settings.cooldownHours * 60 * 60 * 1000);
+  } else if (options?.targetLastStampAt !== undefined) {
+    newLastStampAt = options.targetLastStampAt;
+  }
+
+  await prisma.customer.update({
+    where: { id: customerId },
+    data: { lastStampAt: newLastStampAt },
+  });
+
+  return { id: customerId, previousLastStampAt: customer.lastStampAt, newLastStampAt };
 }

@@ -14,17 +14,18 @@ import PointsPanel from '../components/account/PointsPanel';
 import ProfilePanel from '../components/account/ProfilePanel';
 import StampCard from '../components/account/StampCard';
 import StampRewards from '../components/account/StampRewards';
+import DailyGameBanner from '../components/account/DailyGameBanner';
 import type { MemberOffer, MemberOrder, PointEntry, StampCardData } from '../components/account/types';
 import './account.css';
 
 const TABS: { key: TabKey; label: string; title: string; icon: LucideIcon }[] = [
   { key: 'home', label: 'ホーム', title: 'ダッシュボード', icon: House },
   { key: 'orders', label: '注文履歴', title: '注文履歴', icon: Receipt },
-  { key: 'points', label: 'ポイント', title: 'ポイント', icon: Coins },
-  { key: 'offers', label: '特典', title: 'スタンプ・特典', icon: Ticket },
+  { key: 'benefits', label: 'ポイント・特典', title: 'ポイント・特典', icon: Sparkles },
   { key: 'settings', label: 'アカウント', title: 'アカウント設定', icon: UserRound },
 ];
-type TabKey = 'home' | 'orders' | 'points' | 'offers' | 'settings';
+type TabKey = 'home' | 'orders' | 'benefits' | 'settings';
+type BenefitsSection = 'all' | 'points' | 'stamps' | 'offers';
 
 const TRACKER_STEPS = ['NEW', 'CONFIRMED', 'READY', 'COMPLETED'];
 
@@ -57,7 +58,31 @@ function announceNewOffers(offers: MemberOffer[], memberId: string) {
 export default function Account() {
   const { customer, loyalty, refresh, signOut } = useCustomer();
   const [params, setParams] = useSearchParams();
-  const tab: TabKey = TABS.some(t => t.key === params.get('tab')) ? (params.get('tab') as TabKey) : 'home';
+  const rawTab = params.get('tab');
+  const tab: TabKey =
+    rawTab === 'points' || rawTab === 'offers' || rawTab === 'benefits'
+      ? 'benefits'
+      : TABS.some(t => t.key === rawTab)
+        ? (rawTab as TabKey)
+        : 'home';
+
+  const [subFilter, setSubFilter] = useState<BenefitsSection>(() => {
+    if (rawTab === 'points') return 'points';
+    if (rawTab === 'offers') return 'offers';
+    const s = params.get('section');
+    if (s === 'points' || s === 'stamps' || s === 'offers') return s;
+    return 'all';
+  });
+
+  useEffect(() => {
+    if (rawTab === 'points') setSubFilter('points');
+    else if (rawTab === 'offers') setSubFilter('offers');
+    else {
+      const s = params.get('section');
+      if (s === 'points' || s === 'stamps' || s === 'offers') setSubFilter(s);
+    }
+  }, [rawTab, params]);
+
   const [orders, setOrders] = useState<MemberOrder[] | null>(null);
   const [points, setPoints] = useState<{ balance: number; history: PointEntry[] } | null>(null);
   const [offers, setOffers] = useState<MemberOffer[]>([]);
@@ -111,6 +136,11 @@ export default function Account() {
     load();
   }, [load]);
 
+  const handleGameRewardClaimed = useCallback(() => {
+    load();
+    refresh();
+  }, [load, refresh]);
+
   const memberId = customer?.id;
   useEffect(() => {
     if (memberId && offers.length) announceNewOffers(offers, memberId);
@@ -140,11 +170,23 @@ export default function Account() {
   const showStamps = Boolean(stampCard?.enabled);
   const rewardCount = usableOffers.length + (stampCard?.rewards.length ?? 0);
   const current = TABS.find(t => t.key === tab)!;
-  const goTo = (key: TabKey) => {
-    setParams(key === 'home' ? {} : { tab: key });
-    window.scrollTo({ top: 0 });
+  const goTo = (key: TabKey, section: BenefitsSection = 'all') => {
+    const nextParams: Record<string, string> = {};
+    if (key !== 'home') nextParams.tab = key;
+    if (key === 'benefits' && section !== 'all') nextParams.section = section;
+    setParams(nextParams);
+    if (key === 'benefits') setSubFilter(section);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-  const badgeFor = (key: TabKey) => (key === 'offers' ? rewardCount : key === 'orders' ? activeOrders.length : 0);
+
+  const selectFilter = (section: BenefitsSection) => {
+    setSubFilter(section);
+    const nextParams: Record<string, string> = { tab: 'benefits' };
+    if (section !== 'all') nextParams.section = section;
+    setParams(nextParams, { replace: true });
+  };
+
+  const badgeFor = (key: TabKey) => (key === 'benefits' ? rewardCount : key === 'orders' ? activeOrders.length : 0);
 
   const navButtons = TABS.map(t => {
     const Icon = t.icon;
@@ -205,15 +247,22 @@ export default function Account() {
                     {loyalty?.enabled && ` ・ ¥100ごとに${loyalty.pointsPer100Yen}pt貯まります`}
                   </div>
                 </div>
-                <Link to="/menu/takeout" className="acc-btn"><ShoppingBag size={18} aria-hidden="true" />テイクアウトを注文</Link>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-start' }}>
+                  <Link to="/menu/takeout" className="acc-btn"><ShoppingBag size={18} aria-hidden="true" />テイクアウトを注文</Link>
+                  <button type="button" onClick={() => goTo('benefits', 'points')} className="acc-link" style={{ color: '#fff', fontSize: '0.84rem', opacity: 0.95 }}>
+                    ポイント履歴を見る<ChevronRight size={14} aria-hidden="true" />
+                  </button>
+                </div>
               </section>
+
+              <DailyGameBanner onRewardClaimed={handleGameRewardClaimed} />
 
               {showStamps && stampCard && <StampCard card={stampCard} memberName={customer.name} onCardUpdate={handleCardUpdate} />}
 
               <section className="acc-stats" aria-label="ご利用状況">
-                <Stat icon={Receipt} value={String(completed.length)} label="ご注文回数" />
+                <Stat icon={Receipt} value={String(completed.length)} label="ご注文回数" onClick={() => goTo('orders')} />
                 <Stat icon={Wallet} value={yen(totalSaved)} label="割引合計" />
-                <Stat icon={Ticket} value={String(rewardCount)} label="使える特典" onClick={() => goTo('offers')} />
+                <Stat icon={Ticket} value={String(rewardCount)} label="使える特典" onClick={() => goTo('benefits', 'offers')} />
               </section>
 
               {activeOrders.length > 0 && (
@@ -227,7 +276,7 @@ export default function Account() {
               <section aria-labelledby="offers-heading">
                 <div className="acc-section-head">
                   <h2 id="offers-heading"><Sparkles size={18} aria-hidden="true" style={{ verticalAlign: '-3px', color: 'var(--gold)' }} /> あなたへの特典</h2>
-                  {usableOffers.length > 2 && <button type="button" className="acc-link" onClick={() => goTo('offers')}>すべて見る<ChevronRight size={16} aria-hidden="true" /></button>}
+                  {usableOffers.length > 2 && <button type="button" className="acc-link" onClick={() => goTo('benefits', 'offers')}>すべて見る<ChevronRight size={16} aria-hidden="true" /></button>}
                 </div>
                 <OffersList offers={offers} limit={2} />
               </section>
@@ -279,20 +328,159 @@ export default function Account() {
             )
           )}
 
-          {tab === 'points' && <PointsPanel balance={balance} history={points?.history ?? []} loyalty={loyalty} />}
-          {tab === 'offers' && (
-            <>
-              {showStamps && stampCard && (
-                <>
+          {tab === 'benefits' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+              <DailyGameBanner onRewardClaimed={handleGameRewardClaimed} compact />
+
+              {/* Summary Cards */}
+              <div className="benefits-summary-bar">
+                <button
+                  type="button"
+                  className={`benefits-summary-item ${subFilter === 'points' ? 'is-active' : ''}`}
+                  onClick={() => selectFilter(subFilter === 'points' ? 'all' : 'points')}
+                >
+                  <div className="benefits-summary-label">
+                    <Coins size={16} style={{ color: 'var(--gold)' }} aria-hidden="true" /> カルパナポイント
+                  </div>
+                  <div className="benefits-summary-value">
+                    {balance.toLocaleString('ja-JP')}<span style={{ fontSize: '0.85rem', marginLeft: '3px' }}>pt</span>
+                  </div>
+                  <div className="benefits-summary-sub">
+                    {yen(balance * (loyalty?.pointValueYen ?? 1))}分として利用可能
+                  </div>
+                </button>
+
+                {showStamps && stampCard && (
+                  <button
+                    type="button"
+                    className={`benefits-summary-item ${subFilter === 'stamps' ? 'is-active' : ''}`}
+                    onClick={() => selectFilter(subFilter === 'stamps' ? 'all' : 'stamps')}
+                  >
+                    <div className="benefits-summary-label">
+                      <Sparkles size={16} style={{ color: 'var(--acc-accent)' }} aria-hidden="true" /> スタンプカード
+                    </div>
+                    <div className="benefits-summary-value">
+                      {stampCard.stamps} <span style={{ fontSize: '0.9rem', color: 'var(--acc-muted)' }}>/ {stampCard.perCard}個</span>
+                    </div>
+                    <div className="benefits-summary-sub">
+                      {(() => {
+                        const nextMilestone = stampCard.milestones.find(m => m.at > stampCard.stamps);
+                        return nextMilestone
+                          ? `あと${nextMilestone.at - stampCard.stamps}個で「${nextMilestone.titleJa}」`
+                          : stampCard.rewards.length > 0
+                            ? `${stampCard.rewards.length}件のスタンプ特典を獲得済み`
+                            : 'スタンプを集めて特典獲得';
+                      })()}
+                    </div>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  className={`benefits-summary-item ${subFilter === 'offers' ? 'is-active' : ''}`}
+                  onClick={() => selectFilter(subFilter === 'offers' ? 'all' : 'offers')}
+                >
+                  <div className="benefits-summary-label">
+                    <Ticket size={16} style={{ color: 'var(--spice)' }} aria-hidden="true" /> 特別オファー
+                  </div>
+                  <div className="benefits-summary-value">
+                    {usableOffers.length}<span style={{ fontSize: '0.85rem', marginLeft: '3px' }}>件</span>
+                  </div>
+                  <div className="benefits-summary-sub">
+                    {usableOffers.length > 0 ? '今すぐオンライン注文で使えます' : '新しい特典をお楽しみに'}
+                  </div>
+                </button>
+              </div>
+
+              {/* Filter Pills */}
+              <div className="benefits-pill-nav" role="tablist" aria-label="表示フィルター">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={subFilter === 'all'}
+                  className={`benefits-pill ${subFilter === 'all' ? 'is-active' : ''}`}
+                  onClick={() => selectFilter('all')}
+                >
+                  すべて
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={subFilter === 'points'}
+                  className={`benefits-pill ${subFilter === 'points' ? 'is-active' : ''}`}
+                  onClick={() => selectFilter('points')}
+                >
+                  <Coins size={15} aria-hidden="true" /> ポイント
+                </button>
+                {showStamps && (
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={subFilter === 'stamps'}
+                    className={`benefits-pill ${subFilter === 'stamps' ? 'is-active' : ''}`}
+                    onClick={() => selectFilter('stamps')}
+                  >
+                    <Sparkles size={15} aria-hidden="true" /> スタンプカード
+                  </button>
+                )}
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={subFilter === 'offers'}
+                  className={`benefits-pill ${subFilter === 'offers' ? 'is-active' : ''}`}
+                  onClick={() => selectFilter('offers')}
+                >
+                  <Ticket size={15} aria-hidden="true" /> 特別オファー
+                  {usableOffers.length > 0 && <span className="benefits-pill-badge">{usableOffers.length}</span>}
+                </button>
+              </div>
+
+              {/* 1. Points section */}
+              {(subFilter === 'all' || subFilter === 'points') && (
+                <section aria-labelledby="benefits-points-heading">
+                  {subFilter === 'all' && (
+                    <div className="acc-section-head">
+                      <h2 id="benefits-points-heading" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Coins size={18} style={{ color: 'var(--gold)' }} aria-hidden="true" /> カルパナポイント
+                      </h2>
+                    </div>
+                  )}
+                  <PointsPanel balance={balance} history={points?.history ?? []} loyalty={loyalty} />
+                </section>
+              )}
+
+              {/* 2. Stamp Card & Rewards section */}
+              {showStamps && stampCard && (subFilter === 'all' || subFilter === 'stamps') && (
+                <section aria-labelledby="benefits-stamps-heading" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {subFilter === 'all' && (
+                    <div className="acc-section-head">
+                      <h2 id="benefits-stamps-heading" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Sparkles size={18} style={{ color: 'var(--acc-accent)' }} aria-hidden="true" /> スタンプカード
+                      </h2>
+                    </div>
+                  )}
                   <StampCard card={stampCard} memberName={customer.name} onCardUpdate={handleCardUpdate} />
                   <StampRewards card={stampCard} />
-                </>
+                </section>
               )}
-              <section aria-labelledby={showStamps ? "campaign-heading" : undefined}>
-                {showStamps && <div className="acc-section-head"><h2 id="campaign-heading">キャンペーン特典</h2></div>}
-                <OffersList offers={offers} />
-              </section>
-            </>
+
+              {/* 3. Special Offers section */}
+              {(subFilter === 'all' || subFilter === 'offers') && (
+                <section aria-labelledby="benefits-offers-heading">
+                  <div className="acc-section-head">
+                    <h2 id="benefits-offers-heading" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Ticket size={18} style={{ color: 'var(--spice)' }} aria-hidden="true" /> 特別オファー・クーポン
+                    </h2>
+                    {usableOffers.length > 0 && (
+                      <span style={{ fontSize: '0.85rem', color: 'var(--acc-muted)', fontWeight: 600 }}>
+                        {usableOffers.length}件利用可能
+                      </span>
+                    )}
+                  </div>
+                  <OffersList offers={offers} />
+                </section>
+              )}
+            </div>
           )}
           {tab === 'settings' && <ProfilePanel customer={customer} />}
         </main>

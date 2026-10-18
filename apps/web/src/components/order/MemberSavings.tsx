@@ -18,6 +18,7 @@ export default function MemberSavings({ savings, onChange, quote, next }: {
   const { customer, loyalty } = useCustomer();
   const [offers, setOffers] = useState<MemberOffer[]>([]);
   const [rewards, setRewards] = useState<StampReward[]>([]);
+  const [stampCard, setStampCard] = useState<StampCardData | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -35,6 +36,7 @@ export default function MemberSavings({ savings, onChange, quote, next }: {
       ]).then(([offersData, stampData]: [MemberOffer[], StampCardData | null]) => {
         if (cancelled) return;
         setOffers(offersData);
+        setStampCard(stampData);
         setRewards(stampData?.rewards ?? []);
         setLoaded(true);
       });
@@ -88,6 +90,16 @@ export default function MemberSavings({ savings, onChange, quote, next }: {
       offerId: nextIds[0] || '',
     });
   };
+
+  // Ensure unachieved or stale rewards cannot remain selected
+  useEffect(() => {
+    if (savings.rewardId) {
+      const isAchieved = rewards.some(r => r.id === savings.rewardId);
+      if (!isAchieved) {
+        onChange({ ...savings, rewardId: '' });
+      }
+    }
+  }, [rewards, savings.rewardId]);
 
   const balance = customer?.points ?? 0;
   const pointsEnabled = Boolean(customer && loyalty?.enabled);
@@ -194,25 +206,74 @@ export default function MemberSavings({ savings, onChange, quote, next }: {
       ) : null}
 
       {/* Stamp card rewards for members */}
-      {rewards.length > 0 && (
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.9rem', fontWeight: 'bold', marginTop: '4px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Award size={16} color="var(--spice)" />
-            <span>スタンプ特典を使う</span>
+      {customer ? (
+        rewards.length > 0 ? (
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.9rem', fontWeight: 'bold', marginTop: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Award size={16} color="var(--spice)" />
+                <span>スタンプ特典を使う（獲得済み: {rewards.length}件）</span>
+              </div>
+              {stampCard && (
+                <span style={{ fontSize: '0.78rem', color: '#6b7280', fontWeight: 'normal' }}>
+                  スタンプ: {stampCard.stamps}/{stampCard.perCard}個
+                </span>
+              )}
+            </div>
+            <select
+              value={savings.rewardId}
+              onChange={e => onChange({ ...savings, rewardId: e.target.value })}
+              style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e5dbcd', fontFamily: 'inherit', fontSize: '0.95rem', backgroundColor: '#ffffff' }}
+            >
+              <option value="">使わない</option>
+              {rewards.map(reward => (
+                <option key={reward.id} value={reward.id}>
+                  {reward.titleJa}{reward.kind === 'AMOUNT_OFF' ? `（${yen(reward.amount)}引き · 1回限り）` : '（商品お渡し時に適用 · 1回限り）'}
+                </option>
+              ))}
+            </select>
+            <span style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: '2px' }}>
+              ※ スタンプカードで達成・獲得した特典のみ選択できます（1回限り有効）。
+            </span>
+          </label>
+        ) : (
+          loaded && (
+            <div style={{ padding: '10px 14px', borderRadius: '8px', backgroundColor: '#fffdf5', border: '1px solid #fed7aa', display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.88rem', fontWeight: 'bold', color: 'var(--spice)' }}>
+                <Award size={16} />
+                <span>スタンプ特典を使う（未達成）</span>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: '#78350f', lineHeight: 1.45 }}>
+                {stampCard?.milestones && stampCard.milestones.find(m => m.at > (stampCard?.stamps ?? 0)) ? (
+                  (() => {
+                    const nextM = stampCard.milestones.find(m => m.at > (stampCard?.stamps ?? 0))!;
+                    const remaining = nextM.at - (stampCard?.stamps ?? 0);
+                    return (
+                      <>
+                        スタンプ特典はカード達成後にご利用いただけます。<br />
+                        現在のスタンプ：<strong>{stampCard.stamps}/{stampCard.perCard}個</strong>（あと<strong>{remaining}個</strong>で「{nextM.titleJa}」を獲得！）
+                      </>
+                    );
+                  })()
+                ) : (
+                  <>現在ご利用可能なスタンプ特典はありません。スタンプカードの対象スタンプに達すると自動で特典が付与され、ここで利用できるようになります。</>
+                )}
+              </p>
+            </div>
+          )
+        )
+      ) : (
+        loaded && (
+          <div style={{ padding: '10px 14px', borderRadius: '8px', backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.88rem', fontWeight: 'bold', color: '#4b5563' }}>
+              <Award size={16} color="#6b7280" />
+              <span>スタンプ特典を使う</span>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.82rem', color: '#6b7280', lineHeight: 1.45 }}>
+              会員の方は<Link to={`/login?next=${encodeURIComponent(next)}`} style={{ color: 'var(--spice)', fontWeight: 600, textDecoration: 'underline' }}>ログイン</Link>すると、スタンプカードで達成・獲得した特典をご利用いただけます。
+            </p>
           </div>
-          <select
-            value={savings.rewardId}
-            onChange={e => onChange({ ...savings, rewardId: e.target.value })}
-            style={{ padding: '10px', borderRadius: '8px', border: '1px solid #e5dbcd', fontFamily: 'inherit', fontSize: '0.95rem', backgroundColor: '#ffffff' }}
-          >
-            <option value="">使わない</option>
-            {rewards.map(reward => (
-              <option key={reward.id} value={reward.id}>
-                {reward.titleJa}{reward.kind === 'AMOUNT_OFF' ? `（${yen(reward.amount)}引き）` : '（商品お渡し時に適用）'}
-              </option>
-            ))}
-          </select>
-        </label>
+        )
       )}
 
       {/* Points usage for members */}
