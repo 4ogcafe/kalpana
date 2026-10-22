@@ -1,0 +1,16 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # 1. Route API requests to PHP API gateway
+  RewriteRule ^api/(.*)$ api/index.php [QSA,L]
+
+  # 2. Don't rewrite real files or directories
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteCond %{REQUEST_FILENAME} !-l
+
+  # 3. Frontend SPA fallback
+  RewriteRule . /index.html [L]
+</IfModule>
