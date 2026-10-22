@@ -24,7 +24,27 @@ export interface GameConfig {
   cooldownHours: number;
   titleJa: string;
   subtitleJa: string;
+  requireOrderSpend?: boolean;
+  cycleSpendAmount?: number;
+  allowSingleOrderQualify?: boolean;
   prizes: GamePrize[];
+}
+
+export interface CustomerStat {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  totalSpent: number;
+  orderCount: number;
+  cyclePlaysEarned: number;
+  gamePlaysUsed: number;
+  availablePlays: number;
+  currentCycleSpent: number;
+  remainingToNextPlay: number;
+  hasQualified: boolean;
+  lastGamePlayAt?: string | null;
+  lastGamePrize?: { titleJa: string; type: string; value: number } | null;
 }
 
 const PRESET_COLORS = [
@@ -42,10 +62,27 @@ const PRESET_ICONS = ['🎁', '💎', '🍕', '🪙', '⭐', '🍛', '🎉', '�
 
 export default function GameSettings() {
   const [config, setConfig] = useState<GameConfig | null>(null);
+  const [customerStats, setCustomerStats] = useState<CustomerStat[]>([]);
+  const [loadingStats, setLoadingStats] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState(false);
   const [testPlayOpen, setTestPlayOpen] = useState(false);
+
+  const loadStats = async () => {
+    setLoadingStats(true);
+    try {
+      const res = await apiFetch('/api/v1/game/admin/stats');
+      if (res.ok) {
+        const data = await res.json();
+        setCustomerStats(data.customers || []);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingStats(false);
+    }
+  };
 
   const toggleEnabled = async (targetState?: boolean) => {
     if (!config || toggling) return;
@@ -88,6 +125,7 @@ export default function GameSettings() {
     } finally {
       setLoading(false);
     }
+    loadStats();
   };
 
   useEffect(() => {
@@ -163,6 +201,7 @@ export default function GameSettings() {
 
       if (res.ok) {
         toast.success('ミニゲーム設定を保存しました！');
+        loadStats();
       } else {
         toast.error(await errorMessage(res, '設定の保存に失敗しました。'));
       }
@@ -367,6 +406,66 @@ export default function GameSettings() {
               <option value={0}>0時間（無制限・テスト確認用）</option>
             </select>
           </div>
+        </div>
+
+        {/* Spend & Cycle Period Settings Card */}
+        <div style={{ ...cardRowStyle, marginTop: '1.25rem', backgroundColor: '#fffbeb', borderColor: '#fde68a', display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '0.95rem', color: '#92400e' }}>
+              <input
+                type="checkbox"
+                checked={config.requireOrderSpend ?? true}
+                onChange={e => update({ requireOrderSpend: e.target.checked })}
+                style={{ width: '20px', height: '20px', accentColor: '#d97706', cursor: 'pointer' }}
+              />
+              4,999円購入サイクルでゲームを解放する（注文金額条件を有効化）
+            </label>
+            <span style={{
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              padding: '2px 10px',
+              borderRadius: '9999px',
+              backgroundColor: (config.requireOrderSpend ?? true) ? '#d97706' : '#9ca3af',
+              color: '#fff',
+            }}>
+              {(config.requireOrderSpend ?? true) ? '● 4,999円サイクル適用中' : '○ 常時解放（無料）'}
+            </span>
+          </div>
+
+          {(config.requireOrderSpend ?? true) && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '8px', borderTop: '1px dashed #fcd34d' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '0.88rem', fontWeight: 600, color: '#78350f' }}>サイクル達成金額:</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <input
+                      type="number"
+                      min={100}
+                      step={100}
+                      value={config.cycleSpendAmount ?? 4999}
+                      onChange={e => update({ cycleSpendAmount: Math.max(100, Number(e.target.value)) })}
+                      style={{ ...inputStyle, width: '110px', padding: '6px 10px', fontWeight: 700 }}
+                    />
+                    <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#92400e' }}>円</span>
+                  </div>
+                </div>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: '#78350f', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={config.allowSingleOrderQualify ?? true}
+                    onChange={e => update({ allowSingleOrderQualify: e.target.checked })}
+                    style={{ width: '16px', height: '16px', accentColor: '#d97706' }}
+                  />
+                  1回のお会計が4,999円以上の場合も即時アンロック
+                </label>
+              </div>
+
+              <p style={{ margin: 0, fontSize: '0.82rem', color: '#b45309', lineHeight: 1.5 }}>
+                💡 <strong>購入サイクル仕様:</strong> 会員様が累計 <strong>{(config.cycleSpendAmount ?? 4999).toLocaleString()}円</strong> のご注文（完了済み）を達成するごとに、ミニゲームの挑戦権が1回付与されます。未達成の会員様にはマイページで進捗バー（例: あと¥2,523で解放）が表示され、注文促進につながります。当たったポイントや割引クーポンは次回以降のお会計ですぐに使えます。
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Game Mode Selector */}
@@ -594,6 +693,118 @@ export default function GameSettings() {
               </tbody>
             </table>
           </div>
+        </div>
+
+        {/* Customer Cycle Qualification Status */}
+        <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1.5px solid #e5e7eb' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '10px' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '1.2rem' }}>👥</span>
+                <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#1f2937' }}>
+                  会員の4,999円サイクル達成・ゲーム挑戦権状況
+                </h4>
+              </div>
+              <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: '#6b7280' }}>
+                4,999円購入サイクルの進捗率、利用可能な運試しプレイ回数、および直近の獲得景品を確認できます。
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={loadStats}
+              disabled={loadingStats}
+              style={{ ...secondaryButton, padding: '6px 12px', fontSize: '0.82rem' }}
+            >
+              <RefreshCw size={14} className={loadingStats ? 'animate-spin' : ''} />
+              状況を更新
+            </button>
+          </div>
+
+          {loadingStats ? (
+            <div style={{ padding: '1.5rem', textAlign: 'center', color: '#6b7280' }}>
+              <RefreshCw size={18} className="animate-spin" style={{ display: 'inline', marginRight: '6px' }} />
+              会員データを読み込み中…
+            </div>
+          ) : customerStats.length === 0 ? (
+            <div style={{ padding: '1.5rem', textAlign: 'center', color: '#9ca3af', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
+              会員データはまだありません。
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: '10px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f9fafb', color: '#4b5563', textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>
+                    <th style={thStyle}>会員名 / メール</th>
+                    <th style={thStyle}>完了注文数</th>
+                    <th style={thStyle}>累計注文金額</th>
+                    <th style={thStyle}>4,999円サイクル進捗</th>
+                    <th style={thStyle}>挑戦可能回数</th>
+                    <th style={thStyle}>ゲーム解放状態</th>
+                    <th style={thStyle}>前回の当選景品</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {customerStats.map(c => {
+                    const cycleGoal = config.cycleSpendAmount ?? 4999;
+                    const percent = Math.min(100, Math.round((c.currentCycleSpent / cycleGoal) * 100));
+                    return (
+                      <tr key={c.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                        <td style={tdStyle}>
+                          <div style={{ fontWeight: 600, color: '#111827' }}>{c.name}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{c.email}</div>
+                        </td>
+                        <td style={tdStyle}>{c.orderCount}回</td>
+                        <td style={{ ...tdStyle, fontWeight: 700, color: '#111827' }}>
+                          ¥{c.totalSpent.toLocaleString()}
+                        </td>
+                        <td style={{ ...tdStyle, minWidth: '180px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#4b5563', marginBottom: '3px' }}>
+                            <span>¥{c.currentCycleSpent.toLocaleString()} / ¥{cycleGoal.toLocaleString()}</span>
+                            <span style={{ fontWeight: 700, color: percent >= 100 ? '#059669' : '#d97706' }}>{percent}%</span>
+                          </div>
+                          <div style={{ width: '100%', height: '7px', backgroundColor: '#e5e7eb', borderRadius: '9999px', overflow: 'hidden' }}>
+                            <div style={{ width: `${percent}%`, height: '100%', backgroundColor: percent >= 100 ? '#059669' : '#d97706', borderRadius: '9999px' }} />
+                          </div>
+                        </td>
+                        <td style={tdStyle}>
+                          <span style={{
+                            fontWeight: 800,
+                            fontSize: '0.88rem',
+                            color: c.availablePlays > 0 ? '#059669' : '#6b7280',
+                            backgroundColor: c.availablePlays > 0 ? '#ecfdf5' : '#f3f4f6',
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                          }}>
+                            {c.availablePlays} 回
+                          </span>
+                        </td>
+                        <td style={tdStyle}>
+                          {c.hasQualified || c.availablePlays > 0 ? (
+                            <span style={{ color: '#047857', backgroundColor: '#ecfdf5', padding: '3px 8px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                              <CheckCircle2 size={12} /> 解放中（挑戦可能）
+                            </span>
+                          ) : (
+                            <span style={{ color: '#b45309', backgroundColor: '#fffbeb', padding: '3px 8px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 600 }}>
+                              あと ¥{c.remainingToNextPlay.toLocaleString()}
+                            </span>
+                          )}
+                        </td>
+                        <td style={tdStyle}>
+                          {c.lastGamePrize ? (
+                            <span style={{ fontSize: '0.8rem', color: '#374151', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <Gift size={13} color="#d97706" /> {c.lastGamePrize.titleJa}
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>未プレイ</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </form>
 

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'react-hot-toast';
-import { ChevronDown, ChevronRight, Edit2, Plus, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Edit2, FileSpreadsheet, GripVertical, Plus, Trash2, X } from 'lucide-react';
 import { apiFetch, assetUrl, errorMessage } from '../../lib/api';
+import MenuImportModal from './MenuImportModal';
 import type { TabIntent } from './TopBar';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -21,6 +22,13 @@ interface OptionGroup extends OptionGroupStub {
 }
 
 const MENU_TYPES = ['LUNCH', 'TAKEOUT', 'GRAND'] as const;
+export const FIXED_CATEGORY_NAMES = ['Lunch Menu', 'Takeout Menu', 'Grand Menu'];
+
+export function isFixedCategory(cat?: { nameEn?: string; parentId?: string | null } | null): boolean {
+  if (!cat || cat.parentId) return false;
+  return FIXED_CATEGORY_NAMES.map(n => n.toLowerCase()).includes((cat.nameEn || '').trim().toLowerCase());
+}
+
 const ALLERGEN_LIST = ['小麦', 'そば', '卵', '乳', '落花生', 'えび', 'かに', '牛肉', '豚肉', '鶏肉', '魚介類', 'ごま', 'ナッツ', 'Gluten', 'Nuts', 'Dairy', 'Egg', 'Soy'];
 
 function spiceIcon(level: number) {
@@ -30,13 +38,22 @@ function spiceIcon(level: number) {
 }
 
 // ─── Blank form ──────────────────────────────────────────────────────────────
-const blankForm = (categoryId = '') => ({
-  id: '', categoryId, nameEn: '', nameJa: '', descriptionEn: '', descriptionJa: '',
-  price: '', imageUrl: '', rating: '', spiceLevel: 0,
-  isRecommended: false, isVegetarian: false, isVegan: false, isHalal: false, isGlutenFree: false,
-  isSoldOut: false, isOrderable: true, isActive: true, menuTypes: [] as string[], allergens: [] as string[],
-  optionGroupIds: [] as string[], newAllergen: '',
-});
+const blankForm = (categoryId = '', cat?: Category | null) => {
+  const initialTypes: string[] = [];
+  if (cat) {
+    const name = (cat.nameEn || '').toLowerCase();
+    if (name.includes('lunch')) initialTypes.push('LUNCH');
+    if (name.includes('takeout')) initialTypes.push('TAKEOUT');
+    if (name.includes('grand')) initialTypes.push('GRAND');
+  }
+  return {
+    id: '', categoryId, nameEn: '', nameJa: '', descriptionEn: '', descriptionJa: '',
+    price: '', imageUrl: '', rating: '', spiceLevel: 0,
+    isRecommended: false, isVegetarian: false, isVegan: false, isHalal: false, isGlutenFree: false,
+    isSoldOut: false, isOrderable: true, isActive: true, menuTypes: initialTypes, allergens: [] as string[],
+    optionGroupIds: [] as string[], newAllergen: '',
+  };
+};
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 const inp: React.CSSProperties = { width: '100%', padding: '0.6rem 0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '0.875rem', boxSizing: 'border-box', background: '#f9fafb', fontFamily: 'inherit' };
@@ -61,6 +78,12 @@ export default function MenuManagementTab({ intent }: { intent: TabIntent | null
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
+  const [importOpen, setImportOpen] = useState(false);
+
+  // Drag & drop for sub-categories
+  const [draggedCatId, setDraggedCatId] = useState<string | null>(null);
+  const [dragOverCatId, setDragOverCatId] = useState<string | null>(null);
+  const [dragOverPosition, setDragOverPosition] = useState<'before' | 'after' | null>(null);
 
   // Category add/edit
   const [catForm, setCatForm] = useState({ open: false, id: '', nameEn: '', nameJa: '', parentId: '' });
@@ -122,7 +145,8 @@ export default function MenuManagementTab({ intent }: { intent: TabIntent | null
   const set = (patch: Partial<typeof form>) => setForm(f => ({ ...f, ...patch }));
 
   const openAdd = () => {
-    setForm(blankForm(selectedCatId ?? categories[0]?.id ?? ''));
+    const curCat = categories.find(c => c.id === (selectedCatId ?? categories[0]?.id));
+    setForm(blankForm(selectedCatId ?? categories[0]?.id ?? '', curCat));
     setIsEditing(true);
   };
 
@@ -219,15 +243,22 @@ export default function MenuManagementTab({ intent }: { intent: TabIntent | null
   };
 
   // ── Category CRUD ──
-  const openCatAdd = () => { setCatForm({ open: true, id: '', nameEn: '', nameJa: '', parentId: '' }); setTimeout(() => catInputRef.current?.focus(), 50); };
-  const openCatEdit = (cat: Category) => { setCatForm({ open: true, id: cat.id, nameEn: cat.nameEn, nameJa: cat.nameJa ?? '', parentId: cat.parentId ?? '' }); setTimeout(() => catInputRef.current?.focus(), 50); };
+  const openCatAdd = (defaultParentId = '') => {
+    setCatForm({ open: true, id: '', nameEn: '', nameJa: '', parentId: defaultParentId || (selectedCatId ?? '') });
+    setTimeout(() => catInputRef.current?.focus(), 50);
+  };
+  const openCatEdit = (cat: Category) => {
+    setCatForm({ open: true, id: cat.id, nameEn: cat.nameEn, nameJa: cat.nameJa ?? '', parentId: cat.parentId ?? '' });
+    setTimeout(() => catInputRef.current?.focus(), 50);
+  };
   const closeCatForm = () => setCatForm(f => ({ ...f, open: false }));
 
   const saveCat = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!catForm.nameEn.trim()) return;
+    const isFixed = isFixedCategory(categories.find(c => c.id === catForm.id));
     const body: Record<string, unknown> = { nameEn: catForm.nameEn, nameJa: catForm.nameJa || catForm.nameEn };
-    if (catForm.parentId) body.parentId = catForm.parentId;
+    if (!isFixed && catForm.parentId) body.parentId = catForm.parentId;
     const url = catForm.id ? `/api/v1/menu/categories/${catForm.id}` : '/api/v1/menu/categories';
     const method = catForm.id ? 'PUT' : 'POST';
     const res = await apiFetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -238,9 +269,13 @@ export default function MenuManagementTab({ intent }: { intent: TabIntent | null
     } else toast.error(await errorMessage(res, 'Failed.'));
   };
 
-  const deleteCat = async (id: string) => {
-    if (!confirm('Delete this category and ALL its items?')) return;
-    const res = await apiFetch(`/api/v1/menu/categories/${id}`, { method: 'DELETE' });
+  const deleteCat = async (cat: Category) => {
+    if (isFixedCategory(cat)) {
+      toast.error('Main categories (Lunch Menu, Takeout Menu, Grand Menu) cannot be deleted.');
+      return;
+    }
+    if (!confirm(`Delete category "${cat.nameEn}" and ALL its items and subcategories?`)) return;
+    const res = await apiFetch(`/api/v1/menu/categories/${cat.id}`, { method: 'DELETE' });
     if (res.ok) { toast.success('Category deleted.'); setSelectedCatId(null); fetchAll(); }
     else toast.error(await errorMessage(res, 'Failed.'));
   };
@@ -275,6 +310,12 @@ export default function MenuManagementTab({ intent }: { intent: TabIntent | null
 
   // ── Derived ──
   const selectedCat = categories.find(c => c.id === selectedCatId) ?? null;
+  // Names from the top-level category down to the selected one, used as the import default.
+  const selectedPath: string[] = [];
+  for (let c = selectedCat; c; c = c.parentId ? categories.find(p => p.id === c!.parentId) ?? null : null) {
+    selectedPath.unshift(c.nameEn);
+    if (selectedPath.length > 4) break;
+  }
   const filteredItems = items.filter(it => {
     if (it.categoryId !== selectedCatId) return false;
     if (search.trim()) return it.nameEn.toLowerCase().includes(search.toLowerCase()) || (it.nameJa ?? '').includes(search);
@@ -282,32 +323,227 @@ export default function MenuManagementTab({ intent }: { intent: TabIntent | null
   });
 
   // Category tree helpers
-  const rootCats = categories.filter(c => !c.parentId);
-  const childCats = (parentId: string) => categories.filter(c => c.parentId === parentId);
+  const rootCats = categories.filter(c => !c.parentId).sort((a, b) => a.sortOrder - b.sortOrder);
+  const childCats = (parentId: string) => categories.filter(c => c.parentId === parentId).sort((a, b) => a.sortOrder - b.sortOrder);
   const toggle = (id: string) => setExpanded(e => ({ ...e, [id]: !e[id] }));
+
+  // Helper: formatted label for category dropdowns
+  const categoryLabel = (cat: Category): string => {
+    const parent = cat.parentId ? categories.find(p => p.id === cat.parentId) : null;
+    return parent ? `${parent.nameEn} › ${cat.nameEn}` : cat.nameEn;
+  };
+
+  const handleDragStart = (e: React.DragEvent, cat: Category) => {
+    // Only allow dragging sub-categories (non-fixed categories with a parent)
+    if (!cat.parentId || isFixedCategory(cat)) {
+      e.preventDefault();
+      return;
+    }
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', cat.id);
+    setDraggedCatId(cat.id);
+  };
+
+  const handleDragOver = (e: React.DragEvent, targetCat: Category) => {
+    if (!draggedCatId || draggedCatId === targetCat.id) return;
+    const draggedCat = categories.find(c => c.id === draggedCatId);
+    // Can only reorder siblings under the same parent
+    if (!draggedCat || draggedCat.parentId !== targetCat.parentId) return;
+
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    const pos = e.clientY < midY ? 'before' : 'after';
+    if (dragOverCatId !== targetCat.id || dragOverPosition !== pos) {
+      setDragOverCatId(targetCat.id);
+      setDragOverPosition(pos);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent, targetCat: Category) => {
+    if (dragOverCatId === targetCat.id) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      if (
+        e.clientX < rect.left ||
+        e.clientX >= rect.right ||
+        e.clientY < rect.top ||
+        e.clientY >= rect.bottom
+      ) {
+        setDragOverCatId(null);
+        setDragOverPosition(null);
+      }
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetCat: Category) => {
+    e.preventDefault();
+    if (!draggedCatId || draggedCatId === targetCat.id) {
+      setDraggedCatId(null);
+      setDragOverCatId(null);
+      setDragOverPosition(null);
+      return;
+    }
+
+    const draggedCat = categories.find(c => c.id === draggedCatId);
+    if (!draggedCat || draggedCat.parentId !== targetCat.parentId || !targetCat.parentId) {
+      setDraggedCatId(null);
+      setDragOverCatId(null);
+      setDragOverPosition(null);
+      return;
+    }
+
+    // Get current sibling order
+    const siblings = categories
+      .filter(c => c.parentId === targetCat.parentId)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+
+    const oldIndex = siblings.findIndex(c => c.id === draggedCatId);
+    const targetIndex = siblings.findIndex(c => c.id === targetCat.id);
+
+    if (oldIndex === -1 || targetIndex === -1) {
+      setDraggedCatId(null);
+      setDragOverCatId(null);
+      setDragOverPosition(null);
+      return;
+    }
+
+    const newSiblings = [...siblings];
+    const [removed] = newSiblings.splice(oldIndex, 1);
+    let newIndex = newSiblings.findIndex(c => c.id === targetCat.id);
+    if (dragOverPosition === 'after') {
+      newIndex += 1;
+    }
+    newSiblings.splice(newIndex, 0, removed);
+
+    // Optimistically update categories locally
+    const orderUpdates = newSiblings.map((c, index) => ({ id: c.id, sortOrder: index + 1 }));
+    setCategories(prev =>
+      prev.map(c => {
+        const update = orderUpdates.find(u => u.id === c.id);
+        return update ? { ...c, sortOrder: update.sortOrder } : c;
+      })
+    );
+
+    setDraggedCatId(null);
+    setDragOverCatId(null);
+    setDragOverPosition(null);
+
+    // Sync to API
+    try {
+      const res = await apiFetch('/api/v1/menu/categories-reorder', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orders: orderUpdates }),
+      });
+      if (res.ok) {
+        toast.success('並び順を更新しました。');
+      } else {
+        toast.error('並び順の更新に失敗しました。');
+        fetchAll();
+      }
+    } catch {
+      toast.error('通信エラーが発生しました。');
+      fetchAll();
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedCatId(null);
+    setDragOverCatId(null);
+    setDragOverPosition(null);
+  };
 
   // ── Render category row ──
   const renderCatRow = (cat: Category, depth = 0) => {
-    const children = childCats(cat.id);
+    const children = childCats(cat.id).sort((a, b) => a.sortOrder - b.sortOrder);
     const isSelected = selectedCatId === cat.id;
     const itemCount = items.filter(it => it.categoryId === cat.id).length;
+    const isFixed = isFixedCategory(cat);
+    const isSubcategory = Boolean(cat.parentId) && !isFixed;
+    const isDragging = draggedCatId === cat.id;
+    const isDropTarget = dragOverCatId === cat.id;
+
     return (
-      <div key={cat.id}>
+      <div
+        key={cat.id}
+        style={{ position: 'relative' }}
+        onDragOver={isSubcategory ? e => handleDragOver(e, cat) : undefined}
+        onDragLeave={isSubcategory ? e => handleDragLeave(e, cat) : undefined}
+        onDrop={isSubcategory ? e => handleDrop(e, cat) : undefined}
+      >
+        {/* Drop indicators */}
+        {isDropTarget && dragOverPosition === 'before' && (
+          <div style={{ position: 'absolute', top: -2, left: `${depth * 16 + 12}px`, right: 0, height: '3px', background: '#3b82f6', borderRadius: '2px', zIndex: 10 }} />
+        )}
+        {isDropTarget && dragOverPosition === 'after' && (
+          <div style={{ position: 'absolute', bottom: -2, left: `${depth * 16 + 12}px`, right: 0, height: '3px', background: '#3b82f6', borderRadius: '2px', zIndex: 10 }} />
+        )}
+
         <div
+          draggable={isSubcategory}
+          onDragStart={isSubcategory ? e => handleDragStart(e, cat) : undefined}
+          onDragEnd={isSubcategory ? handleDragEnd : undefined}
           onClick={() => { setSelectedCatId(cat.id); setIsEditing(false); if (children.length) toggle(cat.id); }}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: `0.55rem 0.75rem 0.55rem ${depth * 16 + 12}px`, borderRadius: '8px', cursor: 'pointer', marginBottom: '2px', background: isSelected ? '#faebd7' : 'transparent', color: isSelected ? '#8b4513' : '#374151', fontWeight: isSelected ? 700 : 500, fontSize: '0.9rem', transition: 'background 0.15s' }}
-          onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#f9fafb'; }}
-          onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: `0.55rem 0.75rem 0.55rem ${depth * 16 + 12}px`,
+            borderRadius: '8px',
+            cursor: isSubcategory ? 'grab' : 'pointer',
+            marginBottom: '2px',
+            background: isSelected ? '#faebd7' : isDropTarget ? '#eff6ff' : 'transparent',
+            color: isSelected ? '#8b4513' : '#374151',
+            fontWeight: isSelected ? 700 : isFixed ? 600 : 500,
+            fontSize: '0.9rem',
+            opacity: isDragging ? 0.4 : 1,
+            transition: 'background 0.15s, opacity 0.15s',
+            border: isDropTarget ? '1px dashed #3b82f6' : '1px solid transparent',
+          }}
+          onMouseEnter={e => { if (!isSelected && !isDropTarget) e.currentTarget.style.background = '#f9fafb'; }}
+          onMouseLeave={e => { if (!isSelected && !isDropTarget) e.currentTarget.style.background = 'transparent'; }}
         >
-          {children.length > 0
-            ? <span style={{ display: 'flex', color: '#9ca3af' }}>{expanded[cat.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span>
-            : <span style={{ width: '14px' }} />}
-          <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat.nameEn}</span>
+          {/* Drag handle for subcategories */}
+          {isSubcategory ? (
+            <span
+              title="ドラッグして並び替え"
+              style={{ display: 'flex', alignItems: 'center', color: '#9ca3af', cursor: 'grab', marginRight: -2 }}
+              onClick={e => e.stopPropagation()}
+            >
+              <GripVertical size={14} />
+            </span>
+          ) : children.length > 0 ? (
+            <span style={{ display: 'flex', color: '#9ca3af' }}>{expanded[cat.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span>
+          ) : (
+            <span style={{ width: '14px' }} />
+          )}
+
+          <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {cat.nameEn}
+            {isFixed && (
+              <span style={{ marginLeft: '6px', fontSize: '0.65rem', padding: '1px 6px', background: '#e0e7ff', color: '#3730a3', borderRadius: '4px', fontWeight: 700 }}>
+                Main
+              </span>
+            )}
+          </span>
           {itemCount > 0 && <span style={{ fontSize: '0.7rem', color: '#9ca3af', marginLeft: 2 }}>{itemCount}</span>}
           {isSelected && (
             <span style={{ display: 'flex', gap: '4px', marginLeft: 4 }} onClick={e => e.stopPropagation()}>
-              <button type="button" title="Edit" onClick={() => openCatEdit(cat)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#6b7280' }}><Edit2 size={12} /></button>
-              <button type="button" title="Delete" onClick={() => deleteCat(cat.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#ef4444' }}><Trash2 size={12} /></button>
+              <button
+                type="button"
+                title={isFixed ? 'Add subcategory' : 'Edit'}
+                onClick={() => isFixed ? openCatAdd(cat.id) : openCatEdit(cat)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#6b7280' }}
+              >
+                {isFixed ? <Plus size={13} /> : <Edit2 size={12} />}
+              </button>
+              {!isFixed && (
+                <button type="button" title="Delete" onClick={() => deleteCat(cat)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#ef4444' }}>
+                  <Trash2 size={12} />
+                </button>
+              )}
             </span>
           )}
         </div>
@@ -435,7 +671,7 @@ export default function MenuManagementTab({ intent }: { intent: TabIntent | null
                 </div>
               </form>
             ) : (
-              <button type="button" onClick={openCatAdd} style={{ width: '100%', padding: '0.6rem', border: '1px dashed #d1d5db', borderRadius: '8px', background: '#fff', color: '#6b7280', fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+              <button type="button" onClick={() => openCatAdd()} style={{ width: '100%', padding: '0.6rem', border: '1px dashed #d1d5db', borderRadius: '8px', background: '#fff', color: '#6b7280', fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                 onMouseEnter={e => { e.currentTarget.style.background = '#f9fafb'; }}
                 onMouseLeave={e => { e.currentTarget.style.background = '#fff'; }}>
                 <Plus size={14} /> Add category
@@ -459,6 +695,9 @@ export default function MenuManagementTab({ intent }: { intent: TabIntent | null
                 </div>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <input type="search" placeholder="Search items…" value={search} onChange={e => setSearch(e.target.value)} style={{ ...inp, width: '180px', padding: '0.45rem 0.75rem' }} />
+                  <button type="button" id="menu-import-open" onClick={() => setImportOpen(true)} title="CSV / Excel からインポート" style={{ padding: '0.55rem 1rem', background: '#15803d', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.875rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+                    <FileSpreadsheet size={15} /> Import / サンプル雛形
+                  </button>
                   {selectedCat && (
                     <button type="button" onClick={openAdd} style={{ padding: '0.55rem 1.1rem', background: '#111827', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.875rem' }}>
                       <Plus size={15} /> Add item
@@ -590,9 +829,29 @@ export default function MenuManagementTab({ intent }: { intent: TabIntent | null
 
                 {/* Category */}
                 <label style={lbl}>Category *
-                  <select required value={form.categoryId} onChange={e => set({ categoryId: e.target.value })} style={inp}>
+                  <select
+                    required
+                    value={form.categoryId}
+                    onChange={e => {
+                      const newCatId = e.target.value;
+                      const curCat = categories.find(c => c.id === newCatId);
+                      const catName = (curCat?.nameEn || '').toLowerCase();
+                      const parentCat = curCat?.parentId ? categories.find(p => p.id === curCat.parentId) : null;
+                      const parentName = (parentCat?.nameEn || '').toLowerCase();
+                      const combined = `${parentName} ${catName}`;
+                      
+                      let nextMenuTypes = [...form.menuTypes];
+                      if (nextMenuTypes.length === 0) {
+                        if (combined.includes('lunch')) nextMenuTypes.push('LUNCH');
+                        if (combined.includes('takeout')) nextMenuTypes.push('TAKEOUT');
+                        if (combined.includes('grand')) nextMenuTypes.push('GRAND');
+                      }
+                      set({ categoryId: newCatId, menuTypes: nextMenuTypes });
+                    }}
+                    style={inp}
+                  >
                     <option value="">— select —</option>
-                    {categories.map(c => <option key={c.id} value={c.id}>{c.nameEn}</option>)}
+                    {categories.map(c => <option key={c.id} value={c.id}>{categoryLabel(c)}</option>)}
                   </select>
                 </label>
 
@@ -726,6 +985,14 @@ export default function MenuManagementTab({ intent }: { intent: TabIntent | null
             )}
           </div>
         </div>
+      )}
+      {importOpen && (
+        <MenuImportModal
+          targetCategoryId={selectedCatId}
+          categories={categories}
+          onClose={() => setImportOpen(false)}
+          onImported={fetchAll}
+        />
       )}
     </div>
   );

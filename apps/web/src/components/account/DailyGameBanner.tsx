@@ -32,9 +32,11 @@ export default function DailyGameBanner({ onRewardClaimed, compact = false }: Da
     return null;
   }
 
-  const { canPlay, nextPlayAt, config } = status;
+  const { canPlay, nextPlayAt, config, spendStatus } = status;
   const gameMode = config.mode;
   const gameIcon = gameMode === 'LUCKY_WHEEL' ? '🎯' : gameMode === 'SCRATCH_CARD' ? '🎫' : '🎰';
+  const isSpendRequired = spendStatus?.requireOrderSpend ?? false;
+  const availablePlays = spendStatus?.availablePlays ?? (canPlay ? 1 : 0);
 
   const handleClaim = () => {
     fetchStatus();
@@ -64,31 +66,71 @@ export default function DailyGameBanner({ onRewardClaimed, compact = false }: Da
           </div>
 
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
-              <span style={{
-                fontSize: '0.75rem',
-                fontWeight: 800,
-                letterSpacing: '0.5px',
-                padding: '2px 8px',
-                borderRadius: '9999px',
-                backgroundColor: canPlay ? '#fbbf24' : 'rgba(255,255,255,0.2)',
-                color: canPlay ? '#111827' : '#e5e7eb',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-              }}>
-                {canPlay ? (
-                  <>
-                    <Sparkles size={12} /> 本日無料・挑戦可能！
-                  </>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
+              {isSpendRequired ? (
+                availablePlays > 0 ? (
+                  <span style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    letterSpacing: '0.5px',
+                    padding: '2px 10px',
+                    borderRadius: '9999px',
+                    backgroundColor: '#10b981',
+                    color: '#ffffff',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}>
+                    <Sparkles size={12} /> 4,999円サイクル達成！挑戦可能（残り {availablePlays} 回）
+                  </span>
                 ) : (
                   <>
-                    <CheckCircle2 size={12} /> 本日プレイ済み
+                    <span style={{
+                      fontSize: '0.75rem',
+                      fontWeight: 800,
+                      letterSpacing: '0.5px',
+                      padding: '2px 8px',
+                      borderRadius: '9999px',
+                      backgroundColor: 'rgba(251, 191, 36, 0.2)',
+                      color: '#fbbf24',
+                      border: '1px solid rgba(251, 191, 36, 0.4)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}>
+                      🔒 4,999円購入サイクルで解放
+                    </span>
+                    <span style={{ fontSize: '0.75rem', color: '#fef08a', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      あと ¥{(spendStatus?.remainingToNextPlay ?? 4999).toLocaleString()} のご注文
+                    </span>
                   </>
-                )}
-              </span>
+                )
+              ) : (
+                <span style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 800,
+                  letterSpacing: '0.5px',
+                  padding: '2px 8px',
+                  borderRadius: '9999px',
+                  backgroundColor: canPlay ? '#fbbf24' : 'rgba(255,255,255,0.2)',
+                  color: canPlay ? '#111827' : '#e5e7eb',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}>
+                  {canPlay ? (
+                    <>
+                      <Sparkles size={12} /> 本日無料・挑戦可能！
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={12} /> 本日プレイ済み
+                    </>
+                  )}
+                </span>
+              )}
 
-              {!canPlay && nextPlayAt && (
+              {!canPlay && nextPlayAt && !isSpendRequired && (
                 <span style={{ fontSize: '0.75rem', color: '#fef08a', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                   <Clock size={12} /> 次回: {new Date(nextPlayAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}〜
                 </span>
@@ -98,8 +140,32 @@ export default function DailyGameBanner({ onRewardClaimed, compact = false }: Da
             <h3 style={{ margin: 0, fontSize: compact ? '1.05rem' : '1.25rem', fontWeight: 800, color: '#fff' }}>
               {config.titleJa}
             </h3>
-            <p style={{ margin: '3px 0 0', fontSize: '0.84rem', color: '#fde68a', opacity: 0.95, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {config.subtitleJa || 'ゲームに挑戦して、お得なポイントや割引クーポンをGET！'}
+
+            {/* Spend progress bar if spend-gated and plays === 0 */}
+            {isSpendRequired && availablePlays === 0 && spendStatus && (
+              <div style={{ marginTop: '8px', maxWidth: '360px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.73rem', color: '#fef08a', marginBottom: '3px' }}>
+                  <span>進捗: ¥{spendStatus.currentCycleSpent.toLocaleString()} / ¥{spendStatus.cycleSpendAmount.toLocaleString()}</span>
+                  <span style={{ fontWeight: 800 }}>{spendStatus.progressPercent}%</span>
+                </div>
+                <div style={{ width: '100%', height: '6px', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: '9999px', overflow: 'hidden' }}>
+                  <div style={{
+                    width: `${spendStatus.progressPercent}%`,
+                    height: '100%',
+                    background: 'linear-gradient(90deg, #f59e0b, #fbbf24)',
+                    borderRadius: '9999px',
+                    transition: 'width 0.4s ease',
+                  }} />
+                </div>
+              </div>
+            )}
+
+            <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: '#fde68a', opacity: 0.95, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {isSpendRequired
+                ? availablePlays > 0
+                  ? `おめでとうございます！運試しゲームに挑戦して、お得なポイントや割引クーポンをGETしよう！`
+                  : `4,999円のお買い物ごとに1回挑戦可能！当たったポイントやクーポンは次回のお会計で使えます`
+                : (config.subtitleJa || 'ゲームに挑戦して、お得なポイントや割引クーポンをGET！')}
             </p>
           </div>
         </div>
@@ -118,7 +184,7 @@ export default function DailyGameBanner({ onRewardClaimed, compact = false }: Da
               color: canPlay ? '#111827' : '#ffffff',
             }}
           >
-            {canPlay ? '今すぐプレイ！' : 'ゲームを見る'}
+            {canPlay ? (availablePlays > 1 ? `プレイ！(残${availablePlays}回)` : '今すぐプレイ！') : 'ゲームと景品を見る'}
             <ArrowRight size={16} />
           </button>
         </div>

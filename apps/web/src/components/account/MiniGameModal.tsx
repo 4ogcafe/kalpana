@@ -16,6 +16,19 @@ export interface GamePrize {
   descriptionJa?: string;
 }
 
+export interface SpendStatus {
+  requireOrderSpend: boolean;
+  cycleSpendAmount: number;
+  totalSpent: number;
+  currentCycleSpent: number;
+  remainingToNextPlay: number;
+  totalPlaysEarned: number;
+  gamePlaysUsed: number;
+  availablePlays: number;
+  progressPercent: number;
+  qualifyingOrderCount: number;
+}
+
 export interface GameStatusResponse {
   enabled: boolean;
   canPlay: boolean;
@@ -26,8 +39,12 @@ export interface GameStatusResponse {
     cooldownHours: number;
     titleJa: string;
     subtitleJa: string;
+    requireOrderSpend?: boolean;
+    cycleSpendAmount?: number;
+    allowSingleOrderQualify?: boolean;
     prizes: GamePrize[];
   };
+  spendStatus?: SpendStatus;
 }
 
 interface MiniGameModalProps {
@@ -255,7 +272,21 @@ export default function MiniGameModal({
               {currentMode === 'LUCKY_WHEEL' ? '🎯' : currentMode === 'SCRATCH_CARD' ? '🎫' : '🎰'}
             </span>
             <div>
-              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#fff' }}>{title}</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#fff' }}>{title}</h3>
+                {gameStatus?.spendStatus?.requireOrderSpend && (gameStatus?.spendStatus?.availablePlays ?? 0) > 0 && (
+                  <span style={{
+                    backgroundColor: '#059669',
+                    color: '#fff',
+                    padding: '2px 8px',
+                    borderRadius: '9999px',
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                  }}>
+                    残り {gameStatus.spendStatus.availablePlays} 回
+                  </span>
+                )}
+              </div>
               <p style={{ margin: 0, fontSize: '0.8rem', color: '#fbbf24' }}>{subtitle}</p>
             </div>
           </div>
@@ -280,23 +311,117 @@ export default function MiniGameModal({
               </button>
             </div>
           ) : !isAdminPreview && !gameStatus?.canPlay && gameState === 'IDLE' ? (
-            /* Cooldown Active Screen */
-            <div style={{ textAlign: 'center', padding: '2.5rem 1.5rem', color: '#fff' }}>
-              <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: 'rgba(251, 191, 36, 0.15)', display: 'grid', placeItems: 'center', margin: '0 auto 1rem', border: '1px solid #fbbf24' }}>
-                <Check size={32} color="#fbbf24" />
+            gameStatus?.spendStatus?.requireOrderSpend && (gameStatus.spendStatus.availablePlays <= 0) ? (
+              /* Spend Cycle Locked Screen */
+              <div style={{ textAlign: 'center', padding: '2rem 1.25rem', color: '#fff' }}>
+                <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: 'rgba(217, 119, 6, 0.2)', display: 'grid', placeItems: 'center', margin: '0 auto 1rem', border: '1.5px solid #f59e0b' }}>
+                  <span style={{ fontSize: '2rem' }}>🔒</span>
+                </div>
+                <div style={{ display: 'inline-block', backgroundColor: 'rgba(245, 158, 11, 0.2)', color: '#fbbf24', border: '1px solid #f59e0b', borderRadius: '9999px', padding: '3px 12px', fontSize: '0.8rem', fontWeight: 800, marginBottom: '0.75rem' }}>
+                  {(gameStatus.spendStatus.cycleSpendAmount || 4999).toLocaleString()}円購入サイクル解放条件
+                </div>
+                <h4 style={{ margin: '0 0 0.5rem', fontSize: '1.25rem', fontWeight: 800 }}>
+                  お買い物サイクル達成で挑戦可能！
+                </h4>
+                <p style={{ color: '#d1d5db', fontSize: '0.88rem', lineHeight: 1.5, margin: '0 auto 1.25rem', maxWidth: '380px' }}>
+                  累計 <strong>{(gameStatus.spendStatus.cycleSpendAmount || 4999).toLocaleString()}円</strong> のご注文（完了済み）を達成するごとに、運試しゲーム（ポイントや割引クーポンが当たるミニゲーム）の挑戦権が1回付与されます。
+                </p>
+
+                {/* Progress Card */}
+                <div style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(251, 191, 36, 0.3)',
+                  borderRadius: '14px',
+                  padding: '14px 18px',
+                  margin: '0 auto 1.5rem',
+                  maxWidth: '380px',
+                  textAlign: 'left',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '0.82rem', color: '#fbbf24', fontWeight: 700 }}>現在のサイクル進捗</span>
+                    <span style={{ fontSize: '0.88rem', color: '#fff', fontWeight: 800 }}>
+                      ¥{gameStatus.spendStatus.currentCycleSpent.toLocaleString()} / ¥{gameStatus.spendStatus.cycleSpendAmount.toLocaleString()}
+                    </span>
+                  </div>
+                  <div style={{ width: '100%', height: '9px', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: '9999px', overflow: 'hidden', marginBottom: '8px' }}>
+                    <div style={{
+                      width: `${gameStatus.spendStatus.progressPercent}%`,
+                      height: '100%',
+                      background: 'linear-gradient(90deg, #f59e0b, #fbbf24)',
+                      borderRadius: '9999px',
+                      transition: 'width 0.4s ease',
+                    }} />
+                  </div>
+                  <div style={{ fontSize: '0.82rem', color: '#fef08a', fontWeight: 700, textAlign: 'center' }}>
+                    あと <span style={{ fontSize: '1.05rem', color: '#fff', fontWeight: 900 }}>¥{gameStatus.spendStatus.remainingToNextPlay.toLocaleString()}</span> のご注文でゲームがアンロックされます！
+                  </div>
+                </div>
+
+                {/* Prizes Preview */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <span style={{ fontSize: '0.78rem', color: '#9ca3af', display: 'block', marginBottom: '8px' }}>
+                    当たった景品（ポイント・割引クーポン・ナン無料券）は次回以降のお会計ですぐに使えます！
+                  </span>
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    {prizes.slice(0, 4).map(p => (
+                      <span key={p.id} style={{
+                        backgroundColor: 'rgba(255,255,255,0.06)',
+                        border: '1px solid rgba(255,255,255,0.15)',
+                        borderRadius: '8px',
+                        padding: '4px 8px',
+                        fontSize: '0.75rem',
+                        color: '#f3f4f6',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}>
+                        <span>{p.icon || '🎁'}</span>
+                        <span>{p.titleJa}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <a
+                    href="/menu/takeout"
+                    style={{
+                      ...actionButtonStyle,
+                      backgroundColor: '#fbbf24',
+                      color: '#111827',
+                      fontWeight: 800,
+                      textDecoration: 'none',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    メニューを見て注文する <ArrowRight size={16} />
+                  </a>
+                  <button type="button" onClick={onClose} style={actionButtonStyle}>
+                    閉じる
+                  </button>
+                </div>
               </div>
-              <h4 style={{ margin: '0 0 0.5rem', fontSize: '1.25rem', fontWeight: 700 }}>本日の挑戦は完了しました</h4>
-              <p style={{ color: '#9ca3af', fontSize: '0.9rem', lineHeight: 1.6, margin: '0 0 1.5rem' }}>
-                次回は{' '}
-                <strong style={{ color: '#fbbf24' }}>
-                  {gameStatus?.nextPlayAt ? new Date(gameStatus.nextPlayAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '明日'}
-                </strong>{' '}
-                以降にまた挑戦できます！毎日アクセスしてお得な特典をゲットしてください。
-              </p>
-              <button type="button" onClick={onClose} style={actionButtonStyle}>
-                マイページに戻る
-              </button>
-            </div>
+            ) : (
+              /* Cooldown Active Screen */
+              <div style={{ textAlign: 'center', padding: '2.5rem 1.5rem', color: '#fff' }}>
+                <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: 'rgba(251, 191, 36, 0.15)', display: 'grid', placeItems: 'center', margin: '0 auto 1rem', border: '1px solid #fbbf24' }}>
+                  <Check size={32} color="#fbbf24" />
+                </div>
+                <h4 style={{ margin: '0 0 0.5rem', fontSize: '1.25rem', fontWeight: 700 }}>本日の挑戦は完了しました</h4>
+                <p style={{ color: '#9ca3af', fontSize: '0.9rem', lineHeight: 1.6, margin: '0 0 1.5rem' }}>
+                  次回は{' '}
+                  <strong style={{ color: '#fbbf24' }}>
+                    {gameStatus?.nextPlayAt ? new Date(gameStatus.nextPlayAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '明日'}
+                  </strong>{' '}
+                  以降にまた挑戦できます！毎日アクセスしてお得な特典をゲットしてください。
+                </p>
+                <button type="button" onClick={onClose} style={actionButtonStyle}>
+                  マイページに戻る
+                </button>
+              </div>
+            )
           ) : gameState === 'WON' && winningPrize ? (
             /* Win Result Screen */
             <div style={{ textAlign: 'center', padding: '2rem 1.5rem', color: '#fff', position: 'relative' }}>

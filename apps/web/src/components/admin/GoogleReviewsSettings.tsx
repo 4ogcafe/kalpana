@@ -1,68 +1,9 @@
 import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from 'react';
 import { toast } from 'react-hot-toast';
-import { AlertTriangle, CheckCircle2, MapPin, Plus, RefreshCw, Search, Star, Trash2, ArrowUp, ArrowDown, RotateCcw, Link2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, MapPin, RefreshCw, Search, Star, Link2 } from 'lucide-react';
 import { apiFetch, errorMessage } from '../../lib/api';
 
-export interface ManualReview {
-  authorName: string;
-  rating: number;
-  text: string;
-  dateLabel: string;
-}
-
-export const DEFAULT_GOOGLE_REVIEWS: ManualReview[] = [
-  {
-    authorName: '田中 健一',
-    rating: 5,
-    dateLabel: '1か月前',
-    text: '国道17号沿いにできた本格インド料理店。バターチキンカレーとチーズナンが最高！チーズが溢れるほど入っていてナンだけでも美味しくいただけます。ランチはおかわり無料でコスパも抜群。スタッフさんも笑顔でとても親切です。',
-  },
-  {
-    authorName: '佐藤 美咲',
-    rating: 5,
-    dateLabel: '2か月前',
-    text: 'ダブルカレーランチ（チキンマサラと日替わり）をいただきました。炭火タンドールで焼かれたナンは熱々で香ばしく、モッチモチで大満足！辛さも選べるので辛口にしましたが、スパイスのコクがしっかり効いていて深みがあります。',
-  },
-  {
-    authorName: '高橋 裕太',
-    rating: 5,
-    dateLabel: '3か月前',
-    text: '熊谷で一番美味しいインドカレーに出会えました。炭焼きのタンドリーチキンもジューシーで香辛料の香りがたまりません。駐車場も12台分あって入りやすく、店内も清潔で居心地が良いです。',
-  },
-  {
-    authorName: '鈴木 あゆみ',
-    rating: 5,
-    dateLabel: '3か月前',
-    text: '家族でディナーに伺いました。ビリヤニとサグチキンカレー、グリーンナンを注文。どれも本場の味わいで感動しました！スタッフの方の温かい接客にも癒やされます。テイクアウトもできるのでまた利用します。',
-  },
-  {
-    authorName: '渡辺 翔',
-    rating: 5,
-    dateLabel: '4か月前',
-    text: '加賀家食堂の隣にオープンしたカルプナさん。キーマカレーとプレーンナンを注文。ナンが大きくてびっくり！焼き立ての香ばしさとほのかな甘みがカレーと絶妙にマッチしています。チャイもスパイスが香って美味しかった。',
-  },
-  {
-    authorName: '山田 浩二',
-    rating: 5,
-    dateLabel: '4か月前',
-    text: '焼きたてナンの食べ放題（お代わり無料）が素晴らしい！超激辛（Lv5）を注文しましたが、ただ辛いだけでなくスパイスの旨みと深いコクが凝縮されていて病みつきになります。店員さんも気さくに声をかけてくれて居心地が良いです。',
-  },
-  {
-    authorName: '中村 陽菜',
-    rating: 5,
-    dateLabel: '5か月前',
-    text: '店内は明るく綺麗で、温かい照明で女性ひとりでも入りやすい落ち着いた雰囲気です。レディースセットのマンゴーラッシーとチーズナンが絶品でした！店員さんも日本語がとても上手で親切です。',
-  },
-  {
-    authorName: '小林 誠',
-    rating: 5,
-    dateLabel: '5か月前',
-    text: 'テイクアウトでチキンティッカとマトンカレーを利用しました。持ち帰りでもナンがふっくら温かく、お肉も柔らかくて感動。国道17号沿いでアクセスも良く、熊谷で本格カレー食べるなら間違いなくカルプナさんです。',
-  },
-];
-
 interface Status {
-  manual: { score: string; count: number | null; reviews: ManualReview[] };
   hasKey: boolean;
   placeId: string | null;
   minRating: number;
@@ -207,7 +148,7 @@ export default function GoogleReviewsSettings() {
   };
 
   const disconnect = async () => {
-    if (!window.confirm('Stop showing live Google reviews? The home page will show the curated reviews below.')) return;
+    if (!window.confirm('Googleビジネスプロフィールの連携を解除しますか？')) return;
     await saveSettings({ googlePlaceId: '' }).then(() => toast.success('Disconnected.')).catch(err => toast.error(err.message));
     load();
   };
@@ -235,7 +176,7 @@ export default function GoogleReviewsSettings() {
         )}
       </div>
       <p style={{ margin: '4px 0 16px', color: '#6b7280', fontSize: '0.875rem' }}>
-        Manage customer reviews and ratings displayed on the website. You can connect your live Google Business listing or curate featured reviews directly.
+        Googleビジネスプロフィールと連携して、ホームページ上にGoogleレビューと評価を表示・管理します。
       </p>
 
       {/* Referer troubleshooting box if Google blocked server request */}
@@ -265,7 +206,7 @@ export default function GoogleReviewsSettings() {
                   </div>
                 )}
                 <span style={{ fontSize: '0.78rem', color: '#6b7280' }}>
-                  ※ 現在ホームページ上では、設定済みの最新レビュー（★{status.manual.score || '4.5'}・{status.manual.count || 185}件）が正常にカルーセル表示されています。
+                  ※ Google Cloud ConsoleでAPIキーの制限を解除すると、最新の口コミと評価が自動同期されます。
                 </span>
               </div>
             </div>
@@ -280,8 +221,8 @@ export default function GoogleReviewsSettings() {
         <div style={warn}>
           <AlertTriangle size={18} style={{ flexShrink: 0, marginTop: 2 }} />
           <div>
-            <strong>Google API key needed for live sync.</strong> Add <code>GOOGLE_PLACES_API_KEY</code> to the server <code>.env</code> file
-            (Google Cloud → Places API (New) key with Application Restriction = None). Until live sync is active, the website displays the curated reviews configured below.
+            <strong>Google Places APIキーが必要です。</strong> サーバーの <code>.env</code> ファイルに <code>GOOGLE_PLACES_API_KEY</code> を設定してください。
+            （Google Cloud → Places API (New) キー、アプリケーションの制限 = なし）。
           </div>
         </div>
       ) : (
@@ -346,190 +287,7 @@ export default function GoogleReviewsSettings() {
           </div>
         </>
       )}
-
-      <ManualReviews initial={status.manual} live={live} onSaved={load} />
     </section>
-  );
-}
-
-const EMPTY_REVIEW: ManualReview = { authorName: '', rating: 5, text: '', dateLabel: '' };
-
-/** Reviews shown on the website (or used as fallback if live Google sync is disconnected). */
-function ManualReviews({ initial, live, onSaved }: { initial: Status['manual']; live: boolean; onSaved: () => void }) {
-  const [reviews, setReviews] = useState<ManualReview[]>(initial.reviews.map(review => ({ ...EMPTY_REVIEW, ...review })));
-  const [count, setCount] = useState<string>(initial.count === null ? '' : String(initial.count));
-  const [score, setScore] = useState<string>(initial.score || '4.5');
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    setReviews(initial.reviews.map(review => ({ ...EMPTY_REVIEW, ...review })));
-    setCount(initial.count === null ? '' : String(initial.count));
-    setScore(initial.score || '4.5');
-  }, [initial]);
-
-  const update = (index: number, patch: Partial<ManualReview>) => setReviews(list => list.map((review, i) => (i === index ? { ...review, ...patch } : review)));
-
-  const moveReview = (index: number, direction: -1 | 1) => {
-    const target = index + direction;
-    if (target < 0 || target >= reviews.length) return;
-    setReviews(list => {
-      const copy = [...list];
-      const temp = copy[index];
-      copy[index] = copy[target];
-      copy[target] = temp;
-      return copy;
-    });
-  };
-
-  const handleFillDefaults = () => {
-    setReviews(DEFAULT_GOOGLE_REVIEWS);
-    setCount('185');
-    setScore('4.5');
-    toast.success('Loaded 5 sample Japanese reviews into form. Click "Save reviews" to apply.');
-  };
-
-  const save = async () => {
-    const cleaned = reviews.map(review => ({ ...review, authorName: review.authorName.trim(), text: review.text.trim(), dateLabel: review.dateLabel.trim() })).filter(review => review.authorName || review.text);
-    const incomplete = cleaned.find(review => !review.authorName || !review.text);
-    if (incomplete) {
-      toast.error('Each review needs the reviewer\'s name and the review text.');
-      return;
-    }
-    setSaving(true);
-    try {
-      const res = await apiFetch('/api/v1/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          featuredReviews: cleaned,
-          storeReviewCount: count.trim() === '' ? null : Math.max(0, Math.round(Number(count)) || 0),
-          storeReviewScore: score.trim() || '4.5',
-        }),
-      });
-      if (res.ok) {
-        toast.success(cleaned.length ? `${cleaned.length} reviews saved — showing on the home page.` : 'Reviews saved.');
-        setReviews(cleaned);
-        onSaved();
-      } else toast.error(await errorMessage(res, 'Could not save the reviews.'));
-    } catch {
-      toast.error('Network error.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid #e5e7eb' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
-        <div>
-          <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 600 }}>
-            {live ? 'Featured / Fallback Reviews' : 'Customer Reviews (Displayed on Home Page)'}
-          </h4>
-          <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: '0.85rem' }}>
-            {live
-              ? 'Live Google sync is currently active. These curated reviews are used if Google sync is disconnected.'
-              : 'These reviews and ratings are displayed in the interactive review carousel on your Home page.'}
-          </p>
-        </div>
-        <button type="button" onClick={handleFillDefaults} style={{ ...btn, color: '#4b5563', fontSize: '0.82rem', padding: '0.4rem 0.75rem' }}>
-          <RotateCcw size={14} /> Fill Sample Reviews
-        </button>
-      </div>
-
-      <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', margin: '14px 0', padding: '12px 16px', background: '#f9fafb', borderRadius: '10px', border: '1px solid #e5e7eb' }}>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.85rem', fontWeight: 600 }}>
-          Rating Score (e.g. 4.5)
-          <input
-            type="text"
-            value={score}
-            onChange={e => setScore(e.target.value)}
-            placeholder="4.5"
-            maxLength={5}
-            style={{ ...input, width: '100px', flex: 'none', padding: '0.45rem 0.6rem' }}
-          />
-        </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.85rem', fontWeight: 600 }}>
-          Total Review Count (e.g. 185)
-          <input
-            type="number"
-            min={0}
-            value={count}
-            onChange={e => setCount(e.target.value)}
-            placeholder="185"
-            style={{ ...input, width: '130px', flex: 'none', padding: '0.45rem 0.6rem' }}
-          />
-        </label>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto', alignSelf: 'center', color: '#b45309', fontWeight: 700, fontSize: '1.1rem' }}>
-          <Star size={20} fill="#f4b400" color="#f4b400" />
-          <span>★ {score || '–'}</span>
-          <span style={{ fontSize: '0.85rem', color: '#6b7280', fontWeight: 400 }}>({count || '0'} reviews)</span>
-        </div>
-      </div>
-
-      {reviews.length === 0 ? (
-        <div style={{ padding: '2rem', textAlign: 'center', background: '#fafafa', borderRadius: '10px', border: '1px dashed #d1d5db', margin: '12px 0' }}>
-          <p style={{ color: '#6b7280', margin: '0 0 10px', fontSize: '0.9rem' }}>No reviews added yet. Add reviews or click below to load recommended sample reviews.</p>
-          <button type="button" onClick={handleFillDefaults} style={btn}><RotateCcw size={15} /> Load 5 Sample Reviews</button>
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gap: '12px' }}>
-          {reviews.map((review, index) => (
-            <div key={index} style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '12px 14px', display: 'grid', gap: '8px', background: '#fff', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                <span style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#b4451b', color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: '0.85rem', flexShrink: 0 }}>
-                  {review.authorName.trim().charAt(0) || '評'}
-                </span>
-                <input
-                  value={review.authorName}
-                  onChange={e => update(index, { authorName: e.target.value })}
-                  placeholder="Reviewer name (e.g. 田中 健一)"
-                  maxLength={60}
-                  aria-label="Reviewer name"
-                  style={{ ...input, flex: '1 1 180px', fontWeight: 600 }}
-                />
-                <select value={review.rating} onChange={e => update(index, { rating: Number(e.target.value) })} aria-label="Stars" style={{ ...input, flex: '0 0 auto', width: 'auto', fontWeight: 600, color: '#b45309' }}>
-                  {[5, 4, 3, 2, 1].map(n => <option key={n} value={n}>{'★'.repeat(n)} ({n} star{n > 1 ? 's' : ''})</option>)}
-                </select>
-                <input
-                  value={review.dateLabel}
-                  onChange={e => update(index, { dateLabel: e.target.value })}
-                  placeholder="When, e.g. 1か月前"
-                  maxLength={30}
-                  aria-label="When"
-                  style={{ ...input, flex: '0 1 130px' }}
-                />
-                <div style={{ display: 'flex', gap: '4px', marginLeft: 'auto' }}>
-                  <button type="button" onClick={() => moveReview(index, -1)} disabled={index === 0} title="Move up" style={{ ...btn, padding: '0.45rem', opacity: index === 0 ? 0.4 : 1 }}><ArrowUp size={15} /></button>
-                  <button type="button" onClick={() => moveReview(index, 1)} disabled={index === reviews.length - 1} title="Move down" style={{ ...btn, padding: '0.45rem', opacity: index === reviews.length - 1 ? 0.4 : 1 }}><ArrowDown size={15} /></button>
-                  <button type="button" onClick={() => setReviews(list => list.filter((_, i) => i !== index))} aria-label="Remove review" title="Delete" style={{ ...btn, color: '#b91c1c', padding: '0.45rem' }}><Trash2 size={15} /></button>
-                </div>
-              </div>
-              <textarea
-                value={review.text}
-                onChange={e => update(index, { text: e.target.value })}
-                placeholder="Review text praising dishes, service, atmosphere..."
-                rows={3}
-                maxLength={1000}
-                aria-label="Review text"
-                style={{ ...input, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6 }}
-              />
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div style={{ display: 'flex', gap: '10px', marginTop: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
-        <button type="button" onClick={() => setReviews(list => [...list, { ...EMPTY_REVIEW }])} disabled={reviews.length >= 12} style={btn}>
-          <Plus size={15} /> Add review
-        </button>
-        <button type="button" onClick={save} disabled={saving} style={{ ...darkBtn, padding: '0.6rem 1.4rem' }}>
-          {saving ? 'Saving…' : 'Save reviews'}
-        </button>
-        <span style={{ fontSize: '0.8rem', color: '#6b7280', marginLeft: 'auto' }}>
-          {reviews.length} of 12 reviews
-        </span>
-      </div>
-    </div>
   );
 }
 

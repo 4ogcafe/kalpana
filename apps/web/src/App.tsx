@@ -23,6 +23,9 @@ const Login = lazy(() => import('./pages/Login'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const Kitchen = lazy(() => import('./pages/Kitchen'));
 const NotFound = lazy(() => import('./pages/NotFound'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const RefundPolicy = lazy(() => import('./pages/RefundPolicy'));
+const Careers = lazy(() => import('./pages/Careers'));
 
 function AppContent() {
   const location = useLocation();
@@ -43,6 +46,12 @@ function AppContent() {
           <Route path="/account" element={<Account />} />
           <Route path="/account/login" element={<AccountAuth mode="login" />} />
           <Route path="/account/register" element={<AccountAuth mode="register" />} />
+          <Route path="/careers" element={<Careers />} />
+          <Route path="/jobs" element={<Careers />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/refund-policy" element={<RefundPolicy />} />
+          <Route path="/refund" element={<RefundPolicy />} />
           <Route path="/login" element={<Login />} />
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/kitchen" element={<Kitchen />} />

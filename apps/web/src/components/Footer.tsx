@@ -26,8 +26,22 @@ interface FooterSettings {
 
 const DEFAULT_LOGO = '/logo-white-01.png.webp';
 
-const SOCIALS: { key: keyof NonNullable<FooterSettings['socials']>; label: string; path: string }[] = [
-  { key: 'instagram', label: 'Instagram', path: 'M12 2.2c3.2 0 3.6 0 4.8.1 1.2.1 1.8.2 2.2.4.6.2 1 .5 1.4.9.4.4.7.8.9 1.4.2.4.4 1.1.4 2.2.1 1.3.1 1.6.1 4.8s0 3.6-.1 4.8c-.1 1.2-.2 1.8-.4 2.2-.2.6-.5 1-.9 1.4-.4.4-.8.7-1.4.9-.4.2-1.1.4-2.2.4-1.3.1-1.6.1-4.8.1s-3.6 0-4.8-.1c-1.2-.1-1.8-.2-2.2-.4-.6-.2-1-.5-1.4-.9-.4-.4-.7-.8-.9-1.4-.2-.4-.4-1.1-.4-2.2C2.2 15.6 2.2 15.2 2.2 12s0-3.6.1-4.8c.1-1.2.2-1.8.4-2.2.2-.6.5-1 .9-1.4.4-.4.8-.7 1.4-.9.4-.2 1.1-.4 2.2-.4C8.4 2.2 8.8 2.2 12 2.2zm0 4.7a5.1 5.1 0 1 0 0 10.2 5.1 5.1 0 0 0 0-10.2zm0 8.4a3.3 3.3 0 1 1 0-6.6 3.3 3.3 0 0 1 0 6.6zm5.3-9.8a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4z' },
+const formatSocialUrl = (key: keyof NonNullable<FooterSettings['socials']>, val?: string) => {
+  if (!val || !val.trim()) return '';
+  const trimmed = val.trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  const handle = trimmed.replace(/^@/, '');
+  switch (key) {
+    case 'instagram': return `https://instagram.com/${handle}`;
+    case 'facebook': return `https://facebook.com/${handle}`;
+    case 'x': return `https://x.com/${handle}`;
+    case 'youtube': return `https://youtube.com/${handle}`;
+    default: return `https://${trimmed}`;
+  }
+};
+
+const SOCIALS: { key: keyof NonNullable<FooterSettings['socials']>; label: string; path: string; fallbackUrl?: string }[] = [
+  { key: 'instagram', label: 'Instagram', path: 'M12 2.2c3.2 0 3.6 0 4.8.1 1.2.1 1.8.2 2.2.4.6.2 1 .5 1.4.9.4.4.7.8.9 1.4.2.4.4 1.1.4 2.2.1 1.3.1 1.6.1 4.8s0 3.6-.1 4.8c-.1 1.2-.2 1.8-.4 2.2-.2.6-.5 1-.9 1.4-.4.4-.8.7-1.4.9-.4.2-1.1.4-2.2.4-1.3.1-1.6.1-4.8.1s-3.6 0-4.8-.1c-1.2-.1-1.8-.2-2.2-.4-.6-.2-1-.5-1.4-.9-.4-.4-.7-.8-.9-1.4-.2-.4-.4-1.1-.4-2.2C2.2 15.6 2.2 15.2 2.2 12s0-3.6.1-4.8c.1-1.2.2-1.8.4-2.2.2-.6.5-1 .9-1.4.4-.4.8-.7 1.4-.9.4-.2 1.1-.4 2.2-.4C8.4 2.2 8.8 2.2 12 2.2zm0 4.7a5.1 5.1 0 1 0 0 10.2 5.1 5.1 0 0 0 0-10.2zm0 8.4a3.3 3.3 0 1 1 0-6.6 3.3 3.3 0 0 1 0 6.6zm5.3-9.8a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4z', fallbackUrl: 'https://instagram.com/kalpana_restro' },
   { key: 'x', label: 'X', path: 'M17.8 3h3.1l-6.8 7.7L22 21h-6.3l-4.9-6.4L5.2 21H2.1l7.3-8.3L1.8 3h6.4l4.4 5.9L17.8 3zm-1.1 16.2h1.7L7.4 4.7H5.6l11.1 14.5z' },
   { key: 'facebook', label: 'Facebook', path: 'M22 12a10 10 0 1 0-11.6 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.5h-1.3c-1.2 0-1.6.8-1.6 1.6V12h2.8l-.4 2.9h-2.3v7A10 10 0 0 0 22 12z' },
   { key: 'youtube', label: 'YouTube', path: 'M23 7.2a3 3 0 0 0-2.1-2.1C19 4.6 12 4.6 12 4.6s-7 0-8.9.5A3 3 0 0 0 1 7.2 31 31 0 0 0 .5 12a31 31 0 0 0 .5 4.8 3 3 0 0 0 2.1 2.1c1.9.5 8.9.5 8.9.5s7 0 8.9-.5a3 3 0 0 0 2.1-2.1 31 31 0 0 0 .5-4.8 31 31 0 0 0-.5-4.8zM9.8 15V9l5.8 3-5.8 3z' },
@@ -50,9 +64,21 @@ export default function Footer() {
   const s = settings ?? {};
   const name = s.name?.trim() ?? '';
   const brand = s.footerBrand?.trim() || name;
-  const links = s.footerLinks?.length ? s.footerLinks : DEFAULT_FOOTER_LINKS;
+  const rawLinks = s.footerLinks?.length ? s.footerLinks : DEFAULT_FOOTER_LINKS;
+  const links = (rawLinks || []).filter(
+    link => link &&
+            !['/privacy-policy', '/refund-policy'].includes(link.url) &&
+            !['プライバシーポリシー', '返金・キャンセルポリシー'].includes(link.label)
+  );
   const copyright = (s.footerCopyright?.trim() || `© {year} ${name || 'Kalpana'}. All Rights Reserved.`).replace(/\{year\}/g, year);
-  const socials = s.footerShowSocials === false ? [] : SOCIALS.filter(social => s.socials?.[social.key]?.trim());
+  
+  const activeSocials = s.footerShowSocials === false ? [] : SOCIALS
+    .map(social => ({
+      ...social,
+      url: formatSocialUrl(social.key, s.socials?.[social.key]) || social.fallbackUrl || '',
+    }))
+    .filter(item => Boolean(item.url));
+
   const hours = s.footerShowHours === false ? '' : s.weeklyHours?.monday?.trim() ?? '';
   const isCurrent = (url: string) => (url === '/' ? pathname === '/' : !isExternal(url) && pathname.startsWith(url.startsWith('/menu') ? '/menu' : url));
 
@@ -67,11 +93,11 @@ export default function Footer() {
             {brand && <h3 style={{ margin: 0 }}>{brand}<span>.</span></h3>}
           </div>
           <p style={{ whiteSpace: 'pre-line' }}>{settings ? s.footerTaglineJa?.trim() || DEFAULT_TAGLINE : ''}</p>
-          {socials.length > 0 && (
+          {activeSocials.length > 0 && (
             <ul className="footer-socials" aria-label="SNS">
-              {socials.map(social => (
+              {activeSocials.map(social => (
                 <li key={social.key}>
-                  <a href={s.socials![social.key]} target="_blank" rel="noopener noreferrer" aria-label={social.label}>
+                  <a href={social.url} target="_blank" rel="noopener noreferrer" aria-label={social.label}>
                     <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d={social.path} fill="currentColor" /></svg>
                   </a>
                 </li>
@@ -113,8 +139,33 @@ export default function Footer() {
         </div>
       </div>
 
-      <div style={{ maxWidth: '1200px', margin: '40px auto 0', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.1)', textAlign: 'center', fontSize: '0.85rem' }}>
-        {settings ? copyright : ''}
+      <div style={{
+        maxWidth: '1200px',
+        margin: '40px auto 0',
+        paddingTop: '20px',
+        borderTop: '1px solid rgba(255,255,255,0.1)',
+        display: 'flex',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: '12px',
+        fontSize: '0.85rem',
+        color: '#9ca3af',
+      }}>
+        <div>{settings ? copyright : ''}</div>
+        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <Link to="/privacy-policy" style={{ color: '#d1d5db', textDecoration: 'none' }} className="footer-link">
+            プライバシーポリシー
+          </Link>
+          <span style={{ opacity: 0.3 }}>|</span>
+          <Link to="/refund-policy" style={{ color: '#d1d5db', textDecoration: 'none' }} className="footer-link">
+            返金・キャンセルポリシー
+          </Link>
+          <span style={{ opacity: 0.3 }}>|</span>
+          <Link to="/careers" style={{ color: '#d1d5db', textDecoration: 'none' }} className="footer-link">
+            採用情報
+          </Link>
+        </div>
       </div>
     </footer>
   );

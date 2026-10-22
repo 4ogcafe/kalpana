@@ -19,6 +19,22 @@ export interface GameConfig {
   titleJa: string;
   subtitleJa: string;
   prizes: GamePrize[];
+  requireOrderSpend: boolean; // Must spend 4,999 yen in cycle to unlock
+  cycleSpendAmount: number;   // 4999 yen per cycle
+  allowSingleOrderQualify: boolean; // single order >= 4999 yen immediately qualifies
+}
+
+export interface CustomerSpendStatus {
+  requireOrderSpend: boolean;
+  cycleSpendAmount: number;
+  totalSpent: number;
+  currentCycleSpent: number;
+  remainingToNextPlay: number;
+  totalPlaysEarned: number;
+  gamePlaysUsed: number;
+  availablePlays: number;
+  progressPercent: number;
+  qualifyingOrderCount: number;
 }
 
 export const DEFAULT_GAME_CONFIG: GameConfig = {
@@ -27,6 +43,9 @@ export const DEFAULT_GAME_CONFIG: GameConfig = {
   cooldownHours: 24,
   titleJa: '毎日チャレンジ！ミニゲーム',
   subtitleJa: 'ゲームに挑戦して、お得なポイントや割引クーポンをGETしよう！',
+  requireOrderSpend: true,
+  cycleSpendAmount: 4999,
+  allowSingleOrderQualify: true,
   prizes: [
     { id: 'p1', titleJa: '100ポイント', type: 'POINTS', value: 100, probability: 15, color: '#e11d48', icon: 'Coins' },
     { id: 'p2', titleJa: '10% OFF クーポン', type: 'DISCOUNT_COUPON', value: 10, probability: 10, color: '#d97706', icon: 'Tag' },
@@ -64,35 +83,112 @@ export async function saveGameConfig(config: GameConfig): Promise<GameConfig> {
   return config;
 }
 
+/** Calculate customer completed order spending and cycle status towards 4,999 yen */
+export async function calculateCustomerSpendStatus(
+  customerId: string,
+  config: GameConfig,
+  prefs: Record<string, unknown>,
+): Promise<CustomerSpendStatus> {
+  const cycleAmount = Math.max(100, Number(config.cycleSpendAmount) || 4999);
+
+  if (!config.requireOrderSpend) {
+    return {
+      requireOrderSpend: false,
+      cycleSpendAmount: cycleAmount,
+      totalSpent: 0,
+      currentCycleSpent: 0,
+      remainingToNextPlay: 0,
+      totalPlaysEarned: 1,
+      gamePlaysUsed: 0,
+      availablePlays: 1,
+      progressPercent: 100,
+      qualifyingOrderCount: 0,
+    };
+  }
+
+  const orders = await prisma.pickupOrder.findMany({
+    where: {
+      customerId,
+      status: 'COMPLETED',
+    },
+    select: {
+      id: true,
+      total: true,
+      grandTotal: true,
+      completedAt: true,
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  const totalSpent = orders.reduce((sum, o) => sum + (o.grandTotal || o.total || 0), 0);
+  const singleQualifyingCount = config.allowSingleOrderQualify
+    ? orders.filter(o => (o.grandTotal || o.total || 0) >= cycleAmount).length
+    : 0;
+
+  const cyclePlays = Math.floor(totalSpent / cycleAmount);
+  const totalPlaysEarned = Math.max(cyclePlays, singleQualifyingCount);
+
+  const gamePlaysUsed = typeof prefs.gamePlaysUsed === 'number'
+    ? prefs.gamePlaysUsed
+    : (prefs.lastGamePlayAt ? Math.min(totalPlaysEarned, 1) : 0);
+
+  const availablePlays = Math.max(0, totalPlaysEarned - gamePlaysUsed);
+  const currentCycleSpent = totalSpent % cycleAmount;
+  const remainingToNextPlay = availablePlays > 0 ? 0 : Math.max(0, cycleAmount - currentCycleSpent);
+  const progressPercent = Math.min(100, Math.round((currentCycleSpent / cycleAmount) * 100));
+
+  return {
+    requireOrderSpend: true,
+    cycleSpendAmount: cycleAmount,
+    totalSpent,
+    currentCycleSpent,
+    remainingToNextPlay,
+    totalPlaysEarned,
+    gamePlaysUsed,
+    availablePlays,
+    progressPercent,
+    qualifyingOrderCount: orders.length,
+  };
+}
+
 /** Check if customer is eligible to play */
 export async function getCustomerGameStatus(customerId: string): Promise<{
   enabled: boolean;
   canPlay: boolean;
   nextPlayAt: string | null;
   config: Omit<GameConfig, 'prizes'> & { prizes: Array<Omit<GamePrize, 'probability'>> };
+  spendStatus: CustomerSpendStatus;
 }> {
   const config = await getGameConfig();
-  if (!config.enabled) {
-    return {
-      enabled: false,
-      canPlay: false,
-      nextPlayAt: null,
-      config: sanitizeConfig(config),
-    };
-  }
-
   const customer = await prisma.customer.findUnique({
     where: { id: customerId },
     select: { preferences: true },
   });
 
   const prefs = (customer?.preferences as Record<string, unknown> | null) ?? {};
-  const lastPlayIso = typeof prefs.lastGamePlayAt === 'string' ? prefs.lastGamePlayAt : null;
+  const spendStatus = await calculateCustomerSpendStatus(customerId, config, prefs);
 
+  if (!config.enabled) {
+    return {
+      enabled: false,
+      canPlay: false,
+      nextPlayAt: null,
+      config: sanitizeConfig(config),
+      spendStatus,
+    };
+  }
+
+  const lastPlayIso = typeof prefs.lastGamePlayAt === 'string' ? prefs.lastGamePlayAt : null;
   let canPlay = true;
   let nextPlayAt: string | null = null;
 
-  if (lastPlayIso && config.cooldownHours > 0) {
+  if (config.requireOrderSpend) {
+    if (spendStatus.availablePlays <= 0) {
+      canPlay = false;
+    }
+  }
+
+  if (canPlay && lastPlayIso && config.cooldownHours > 0) {
     const lastTime = new Date(lastPlayIso).getTime();
     const unlockTime = lastTime + config.cooldownHours * 60 * 60 * 1000;
     if (Date.now() < unlockTime) {
@@ -106,13 +202,14 @@ export async function getCustomerGameStatus(customerId: string): Promise<{
     canPlay,
     nextPlayAt,
     config: sanitizeConfig(config),
+    spendStatus,
   };
 }
 
 /**
  * Executes a game play for the customer.
  * Uses probability weights to pick the prize, applies point/reward mutations,
- * and updates lastGamePlayAt.
+ * and updates lastGamePlayAt and gamePlaysUsed.
  */
 export async function playCustomerGame(customerId: string): Promise<{
   prizeIndex: number;
@@ -120,6 +217,8 @@ export async function playCustomerGame(customerId: string): Promise<{
   pointsAdded: number;
   newPointsBalance?: number;
   nextPlayAt: string;
+  availablePlays: number;
+  spendStatus: CustomerSpendStatus;
 }> {
   const config = await getGameConfig();
   if (!config.enabled) {
@@ -133,8 +232,15 @@ export async function playCustomerGame(customerId: string): Promise<{
   if (!customer) throw new Error('Customer not found');
 
   const prefs = (customer.preferences as Record<string, unknown> | null) ?? {};
-  const lastPlayIso = typeof prefs.lastGamePlayAt === 'string' ? prefs.lastGamePlayAt : null;
+  const spendStatus = await calculateCustomerSpendStatus(customerId, config, prefs);
 
+  if (config.requireOrderSpend && spendStatus.availablePlays <= 0) {
+    throw new Error(
+      `ミニゲームの解放条件（${spendStatus.cycleSpendAmount.toLocaleString()}円購入サイクル）に達していません。あと ¥${spendStatus.remainingToNextPlay.toLocaleString()} のご注文で挑戦できます。`
+    );
+  }
+
+  const lastPlayIso = typeof prefs.lastGamePlayAt === 'string' ? prefs.lastGamePlayAt : null;
   if (lastPlayIso && config.cooldownHours > 0) {
     const unlockTime = new Date(lastPlayIso).getTime() + config.cooldownHours * 60 * 60 * 1000;
     if (Date.now() < unlockTime) {
@@ -191,13 +297,15 @@ export async function playCustomerGame(customerId: string): Promise<{
 
   const now = new Date();
   const nextPlayAt = new Date(now.getTime() + config.cooldownHours * 60 * 60 * 1000).toISOString();
+  const newPlaysUsed = spendStatus.gamePlaysUsed + 1;
 
-  // Save lastGamePlayAt in customer preferences
+  // Save lastGamePlayAt and increment gamePlaysUsed in customer preferences
   await prisma.customer.update({
     where: { id: customerId },
     data: {
       preferences: {
         ...prefs,
+        gamePlaysUsed: newPlaysUsed,
         lastGamePlayAt: now.toISOString(),
         lastGamePrize: {
           id: prize.id,
@@ -210,12 +318,20 @@ export async function playCustomerGame(customerId: string): Promise<{
     },
   });
 
+  const updatedSpendStatus: CustomerSpendStatus = {
+    ...spendStatus,
+    gamePlaysUsed: newPlaysUsed,
+    availablePlays: Math.max(0, spendStatus.totalPlaysEarned - newPlaysUsed),
+  };
+
   return {
     prizeIndex: index,
     prize,
     pointsAdded,
     newPointsBalance,
     nextPlayAt,
+    availablePlays: updatedSpendStatus.availablePlays,
+    spendStatus: updatedSpendStatus,
   };
 }
 
@@ -246,6 +362,9 @@ export function sanitizeConfig(config: GameConfig): Omit<GameConfig, 'prizes'> &
     cooldownHours: config.cooldownHours,
     titleJa: config.titleJa,
     subtitleJa: config.subtitleJa,
+    requireOrderSpend: config.requireOrderSpend ?? true,
+    cycleSpendAmount: config.cycleSpendAmount ?? 4999,
+    allowSingleOrderQualify: config.allowSingleOrderQualify ?? true,
     prizes: config.prizes.map(({ probability: _prob, ...rest }) => rest),
   };
 }

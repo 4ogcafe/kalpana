@@ -43,6 +43,8 @@ export default function Menu() {
   const [optionGroupMap, setOptionGroupMap] = useState<Map<string, any>>(new Map());
   const cart = useCart();
 
+  const [allCategories, setAllCategories] = useState<any[]>([]);
+
   useEffect(() => {
     getPublic<any>('/api/v1/menu/items')
       .then(data => {
@@ -53,6 +55,12 @@ export default function Menu() {
         console.error(err);
         setLoading(false);
       });
+
+    getPublic<any[]>('/api/v1/menu/categories')
+      .then(data => {
+        if (Array.isArray(data)) setAllCategories(data);
+      })
+      .catch(console.error);
 
     getPublic<any>('/api/v1/carousels')
       .then(data => {
@@ -89,31 +97,54 @@ export default function Menu() {
     takeout: assetUrl(settings.menuTakeoutHeroImage) || HERO_IMAGES.takeout,
     grand: assetUrl(settings.menuGrandHeroImage) || HERO_IMAGES.grand
   };
+
+  // Find the top-level main category for this page: "Lunch Menu", "Takeout Menu", "Grand Menu"
+  const mainCategory = allCategories.find(c => {
+    if (c.parentId) return false;
+    const name = (c.nameEn || '').toLowerCase();
+    if (menuTypeEnum === 'LUNCH') return name.includes('lunch') && !name.includes('takeout');
+    if (menuTypeEnum === 'TAKEOUT') return name.includes('takeout');
+    if (menuTypeEnum === 'GRAND') return name.includes('grand');
+    return false;
+  });
+
+  // Helper to test if a category strictly descends from this page's mainCategory
+  const categoryBelongsToPage = (catId?: string | null): boolean => {
+    if (!catId) return false;
+    let curr = allCategories.find(c => c.id === catId);
+    while (curr) {
+      if (mainCategory && curr.id === mainCategory.id) return true;
+      const name = (curr.nameEn || '').toLowerCase();
+      if (menuTypeEnum === 'LUNCH' && name === 'lunch menu') return true;
+      if (menuTypeEnum === 'TAKEOUT' && name === 'takeout menu') return true;
+      if (menuTypeEnum === 'GRAND' && name === 'grand menu') return true;
+      curr = curr.parentId ? allCategories.find(p => p.id === curr!.parentId) : null;
+    }
+    return false;
+  };
   
-  // Filter items by menu type (GRAND, LUNCH, TAKEOUT)
+  // Filter items that belong strictly to this menu page's category hierarchy
   const filteredItems = menuItems.filter(item => {
-    if (item.menuTypes && item.menuTypes.includes(menuTypeEnum)) {
+    // If the item's category is under this page's main category
+    if (categoryBelongsToPage(item.categoryId)) {
       return true;
     }
-    const catName = (item.category?.nameEn || '').toLowerCase();
-    if (menuTypeEnum === 'LUNCH') {
-      return catName.includes('lunch') && !catName.includes('takeout');
-    }
-    if (menuTypeEnum === 'TAKEOUT') {
-      return catName.includes('takeout');
-    }
-    if (menuTypeEnum === 'GRAND') {
-      return !catName.includes('lunch') && !catName.includes('takeout');
+    // Or if item has explicit category with no parent but belongs to this page
+    const itemCat = allCategories.find(c => c.id === item.categoryId) || item.category;
+    if (itemCat && categoryBelongsToPage(itemCat.id)) {
+      return true;
     }
     return false;
   });
 
-  // Group items by category
+  // Group items by category (if item is in main category with no subcategory, group under main; otherwise subcategory)
   const categoriesMap = new Map<string, any>();
   filteredItems.forEach(item => {
-    const catName = item.category?.nameJa || item.category?.nameEn || 'Other';
-    const catId = item.category?.id || 'other';
-    const sortOrder = item.category?.sortOrder || 0;
+    let cat = allCategories.find(c => c.id === item.categoryId) || item.category;
+    // If the category is the main category itself and there are items in it
+    const catName = cat?.nameJa || cat?.nameEn || (mainCategory?.nameJa || mainCategory?.nameEn || 'Other');
+    const catId = cat?.id || (mainCategory?.id || 'main');
+    const sortOrder = cat?.sortOrder ?? 0;
     
     if (!categoriesMap.has(catId)) {
       categoriesMap.set(catId, { id: catId, name: catName, icon: '🍛', sortOrder, items: [] });
@@ -142,7 +173,6 @@ export default function Menu() {
       img: assetUrl(item.imageUrl) || DEFAULT_IMAGE,
       categoryId: catId,
       optionGroups: resolvedGroups.length > 0 ? resolvedGroups : undefined,
-      // Only show a rating the restaurant actually entered; never invent one.
       rating: typeof item.rating === 'number' ? item.rating : null,
       stars: typeof item.rating === 'number' ? '★'.repeat(Math.round(item.rating)) + '☆'.repeat(5 - Math.round(item.rating)) : ''
     });

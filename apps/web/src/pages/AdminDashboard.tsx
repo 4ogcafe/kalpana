@@ -14,6 +14,7 @@ import PageSettingsTabComponent from '../components/admin/PageSettingsTab';
 import PrinterSettings from '../components/admin/PrinterSettings';
 import ScannerSettings from '../components/admin/ScannerSettings';
 import MessagesTab from '../components/admin/MessagesTab';
+import CareersTab from '../components/admin/CareersTab';
 import { initScannerListener, getScannerConfig, type ScanEventDetail } from '../lib/scanner';
 import { 
   LayoutDashboard, 
@@ -27,6 +28,7 @@ import {
   Users, 
   LogOut,
   ChefHat,
+  Briefcase,
   X
 } from 'lucide-react';
 
@@ -136,6 +138,7 @@ export default function AdminDashboard() {
     { name: 'Menu Management', icon: MenuIcon },
     { name: 'Stamps, Offers & Points', icon: Gift },
     { name: 'Members', icon: UserCircle },
+    { name: 'Careers', icon: Briefcase },
     { name: 'Restaurant Settings', icon: Settings },
     { name: 'Page Settings', icon: ImageIcon },
     { name: 'Contact Messages', icon: MessageSquare },
@@ -287,6 +290,7 @@ export default function AdminDashboard() {
           {activeTab === 'Menu Management' && <MenuManagementTab intent={intent} />}
           {activeTab === 'Stamps, Offers & Points' && <OffersTab intent={intent} />}
           {activeTab === 'Members' && <CustomersTab intent={intent} />}
+          {activeTab === 'Careers' && <CareersTab />}
           {activeTab === 'Restaurant Settings' && <SettingsTab />}
           {activeTab === 'Page Settings' && <PageSettingsTabComponent onOpenRestaurantSettings={() => navigateTo('Restaurant Settings')} />}
           {activeTab === 'Contact Messages' && <MessagesTab />}
