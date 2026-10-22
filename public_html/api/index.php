@@ -239,12 +239,237 @@ if ($method === 'GET' && ($subPath === '/offers' || $subPath === '/offers/')) {
     exit;
 }
 
+// Helper: JWT verification & creation (HS256)
+$jwtSecret = 'kalpana-dev-secret-change-in-production-32chars!!';
+
+function base64UrlEncode($data) {
+    return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+}
+
+function base64UrlDecode($data) {
+    return base64_decode(strtr($data, '-_', '+/'));
+}
+
+function createJwt($payload, $secret, $ttlSeconds = 28800) {
+    $header = ['typ' => 'JWT', 'alg' => 'HS256'];
+    $now = time();
+    $payload['iat'] = $now;
+    $payload['exp'] = $now + $ttlSeconds;
+    $segments = [
+        base64UrlEncode(json_encode($header)),
+        base64UrlEncode(json_encode($payload))
+    ];
+    $signingInput = implode('.', $segments);
+    $signature = hash_hmac('sha256', $signingInput, $secret, true);
+    $segments[] = base64UrlEncode($signature);
+    return implode('.', $segments);
+}
+
+function verifyJwt($jwt, $secret) {
+    $parts = explode('.', $jwt);
+    if (count($parts) !== 3) return null;
+    list($headb64, $bodyb64, $sigb64) = $parts;
+    $sig = base64UrlDecode($sigb64);
+    $expectedSig = hash_hmac('sha256', "$headb64.$bodyb64", $secret, true);
+    if (!hash_equals($sig, $expectedSig)) return null;
+    $payload = json_decode(base64UrlDecode($bodyb64), true);
+    if (!$payload || !isset($payload['exp']) || $payload['exp'] < time()) return null;
+    return $payload;
+}
+
+function getBearerOrCookie($cookieName) {
+    if (!empty($_COOKIE[$cookieName])) {
+        return $_COOKIE[$cookieName];
+    }
+    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+    if (preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
+        return trim($matches[1]);
+    }
+    return null;
+}
+
+// -------------------------------------------------------------
+// Endpoint: POST /auth/login
+// -------------------------------------------------------------
+if ($method === 'POST' && ($subPath === '/auth/login' || $subPath === '/auth/login/')) {
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+    $email = trim($input['email'] ?? '');
+    $password = $input['password'] ?? '';
+
+    if (empty($email) || empty($password)) {
+        http_response_code(400);
+        echo json_encode(['error' => ['code' => 'VALIDATION_FAILED', 'message' => 'Email and password required']]);
+        exit;
+    }
+
+    $stmt = $pdo->prepare('SELECT id, name, email, role, passwordHash, isActive FROM User WHERE email = ? LIMIT 1');
+    $stmt->execute([$email]);
+    $user = $stmt->fetch();
+
+    $verified = $user && !empty($user['passwordHash']) && password_verify($password, $user['passwordHash']);
+    if (!$user || !$verified || !$user['isActive']) {
+        http_response_code(401);
+        echo json_encode(['error' => ['code' => 'INVALID_CREDENTIALS', 'message' => 'Invalid email or password']]);
+        exit;
+    }
+
+    $sessionUser = [
+        'id' => $user['id'],
+        'name' => $user['name'],
+        'email' => $user['email'],
+        'role' => $user['role'],
+    ];
+
+    $ttl = ($user['role'] === 'KITCHEN') ? 57600 : 28800; // 16h for kitchen, 8h for staff
+    $token = createJwt(['sub' => $user['id'], 'role' => $user['role']], $jwtSecret, $ttl);
+
+    setcookie('kalpana_session', $token, [
+        'expires' => time() + $ttl,
+        'path' => '/',
+        'domain' => '',
+        'secure' => true,
+        'httponly' => true,
+        'samesite' => 'Strict',
+    ]);
+
+    echo json_encode(['user' => $sessionUser, 'token' => $token]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: POST /auth/logout
+// -------------------------------------------------------------
+if ($method === 'POST' && ($subPath === '/auth/logout' || $subPath === '/auth/logout/')) {
+    setcookie('kalpana_session', '', [
+        'expires' => time() - 3600,
+        'path' => '/',
+        'domain' => '',
+        'secure' => true,
+        'httponly' => true,
+        'samesite' => 'Strict',
+    ]);
+    http_response_code(204);
+    exit;
+}
+
 // -------------------------------------------------------------
 // Endpoint: GET /auth/me
 // -------------------------------------------------------------
 if ($method === 'GET' && ($subPath === '/auth/me' || $subPath === '/auth/me/')) {
-    http_response_code(401);
-    echo json_encode(['error' => ['code' => 'UNAUTHORIZED', 'message' => 'Not authenticated']]);
+    $token = getBearerOrCookie('kalpana_session');
+    if (!$token) {
+        http_response_code(401);
+        echo json_encode(['error' => ['code' => 'UNAUTHORIZED', 'message' => 'Not authenticated']]);
+        exit;
+    }
+
+    $payload = verifyJwt($token, $jwtSecret);
+    if (!$payload || empty($payload['sub']) || isset($payload['aud'])) {
+        http_response_code(401);
+        echo json_encode(['error' => ['code' => 'UNAUTHORIZED', 'message' => 'Invalid or expired session']]);
+        exit;
+    }
+
+    $stmt = $pdo->prepare('SELECT id, name, email, role, isActive FROM User WHERE id = ? LIMIT 1');
+    $stmt->execute([$payload['sub']]);
+    $user = $stmt->fetch();
+
+    if (!$user || !$user['isActive']) {
+        http_response_code(401);
+        echo json_encode(['error' => ['code' => 'UNAUTHORIZED', 'message' => 'Account inactive or deleted']]);
+        exit;
+    }
+
+    echo json_encode([
+        'user' => [
+            'id' => $user['id'],
+            'name' => $user['name'],
+            'email' => $user['email'],
+            'role' => $user['role'],
+        ]
+    ]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: POST /customers/login
+// -------------------------------------------------------------
+if ($method === 'POST' && ($subPath === '/customers/login' || $subPath === '/customers/login/')) {
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+    $email = trim($input['email'] ?? '');
+    $password = $input['password'] ?? '';
+
+    $stmt = $pdo->prepare('SELECT * FROM Customer WHERE email = ? LIMIT 1');
+    $stmt->execute([$email]);
+    $customer = $stmt->fetch();
+
+    $verified = $customer && !empty($customer['passwordHash']) && password_verify($password, $customer['passwordHash']);
+    if (!$customer || !$verified || (isset($customer['isActive']) && !$customer['isActive'])) {
+        http_response_code(401);
+        echo json_encode(['error' => ['code' => 'INVALID_CREDENTIALS', 'message' => 'メールアドレスまたはパスワードが正しくありません。']]);
+        exit;
+    }
+
+    $ttl = 30 * 86400; // 30 days
+    $token = createJwt(['sub' => $customer['id'], 'aud' => 'customer'], $jwtSecret, $ttl);
+
+    setcookie('kalpana_customer', $token, [
+        'expires' => time() + $ttl,
+        'path' => '/',
+        'domain' => '',
+        'secure' => true,
+        'httponly' => true,
+        'samesite' => 'Strict',
+    ]);
+
+    unset($customer['passwordHash']);
+    echo json_encode(['customer' => $customer, 'token' => $token]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: GET /customers/me
+// -------------------------------------------------------------
+if ($method === 'GET' && ($subPath === '/customers/me' || $subPath === '/customers/me/')) {
+    $token = getBearerOrCookie('kalpana_customer');
+    if (!$token) {
+        echo json_encode(['customer' => null, 'loyalty' => null]);
+        exit;
+    }
+
+    $payload = verifyJwt($token, $jwtSecret);
+    if (!$payload || empty($payload['sub']) || ($payload['aud'] ?? '') !== 'customer') {
+        echo json_encode(['customer' => null, 'loyalty' => null]);
+        exit;
+    }
+
+    $stmt = $pdo->prepare('SELECT * FROM Customer WHERE id = ? LIMIT 1');
+    $stmt->execute([$payload['sub']]);
+    $customer = $stmt->fetch();
+
+    if (!$customer || (isset($customer['isActive']) && !$customer['isActive'])) {
+        echo json_encode(['customer' => null, 'loyalty' => null]);
+        exit;
+    }
+
+    unset($customer['passwordHash']);
+    echo json_encode(['customer' => $customer, 'loyalty' => ['enabled' => true, 'pointsPer100Yen' => 1, 'pointValueYen' => 1]]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: POST /customers/logout
+// -------------------------------------------------------------
+if ($method === 'POST' && ($subPath === '/customers/logout' || $subPath === '/customers/logout/')) {
+    setcookie('kalpana_customer', '', [
+        'expires' => time() - 3600,
+        'path' => '/',
+        'domain' => '',
+        'secure' => true,
+        'httponly' => true,
+        'samesite' => 'Strict',
+    ]);
+    http_response_code(204);
     exit;
 }
 
