@@ -1,0 +1,21 @@
+# Hostinger Git deploys this whole repository into the web root.
+# The deployable site lives in ./public_html, so route every request there.
+# Repo files (README.md, docs/, apps/, ...) are never served directly.
+
+DirectoryIndex index.html index.php
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Block hidden files/dirs (.git, .env, ...) except .well-known
+  RewriteRule "(^|/)\.(?!well-known)" - [F,L]
+
+  # Already inside public_html: let public_html/.htaccess handle it
+  RewriteCond %{REQUEST_URI} ^/public_html(/|$)
+  RewriteRule ^ - [L]
+
+  # Everything else -> public_html/
+  RewriteRule ^(.*)$ public_html/$1 [L]
+</IfModule>

@@ -1,24 +1,26 @@
 DirectoryIndex index.html index.php
 
+# Rules use relative paths (no RewriteBase) so they work whether this folder
+# is the web root or is reached through the repo-root .htaccess.
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  RewriteBase /
 
-  # 1. Route API requests to PHP API gateway
-  RewriteRule ^api/(.*)$ api/index.php [QSA,L]
-
-  # 2. Block access to hidden files, config files, env, and source code
+  # 1. Block access to hidden files, config files, env, and source code
   RewriteRule "(^|/)\.(?!well-known)" - [F,L]
   RewriteRule "(^|/)(kalpana-config\.php|\.env|\.git|composer\.(json|lock)|package(-lock)?\.json|tsconfig.*\.json)$" - [F,L]
 
-  # 3. Don't rewrite real files or directories
+  # 2. Route API requests to PHP API gateway
+  RewriteRule ^api/index\.php$ - [L]
+  RewriteRule ^api(/.*)?$ api/index.php [QSA,L]
+
+  # 3. Serve real files and directories as-is
   RewriteRule ^index\.html$ - [L]
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteCond %{REQUEST_FILENAME} !-l
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
 
   # 4. Frontend SPA fallback
-  RewriteRule . /index.html [L]
+  RewriteRule ^ index.html [L]
 </IfModule>
 
 # Security Headers
