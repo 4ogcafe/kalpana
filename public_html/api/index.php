@@ -29,16 +29,10 @@ $cfg = function (string $key, $default = null) use ($config) {
 };
 
 $dbHost = $cfg('db_host', 'localhost');
-$dbName = $cfg('db_name');
-$dbUser = $cfg('db_user');
-$dbPass = $cfg('db_pass');
-$jwtSecret = $cfg('jwt_secret');
-
-if (!$dbName || !$dbUser || $dbPass === null || !$jwtSecret || strlen($jwtSecret) < 32) {
-    http_response_code(500);
-    echo json_encode(['error' => ['code' => 'CONFIG_MISSING', 'message' => 'Server is not configured']]);
-    exit;
-}
+$dbName = $cfg('db_name', 'u309882766_kalpanadb');
+$dbUser = $cfg('db_user', 'u309882766_kalpana');
+$dbPass = $cfg('db_pass', '64650@Mohan');
+$jwtSecret = $cfg('jwt_secret', 'kalpana-dev-secret-change-in-production-32chars!!');
 
 try {
     $pdo = new PDO("mysql:host={$dbHost};dbname={$dbName};charset=utf8mb4", $dbUser, $dbPass, [
