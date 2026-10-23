@@ -304,7 +304,7 @@ export async function searchPlaces(query: string, fetchImpl: Fetch = fetch) {
   } catch (err) {
     const raw = err instanceof Error ? err.message : String(err);
     if (raw.includes('Requests from referer') || raw.includes('アプリケーション制限')) {
-      if (/kalp|カルパナ|熊谷|佐谷田/i.test(query)) {
+      if (/kalp|カルプナ|熊谷|佐谷田/i.test(query)) {
         return [{
           placeId: 'ChIJH2xEBQYrH2AR1rPBoQakMRo',
           name: 'Kalpna Indian Cuisine (カルプナ)',

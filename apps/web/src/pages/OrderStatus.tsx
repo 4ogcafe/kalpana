@@ -151,7 +151,7 @@ export default function OrderStatus() {
 
   return (
     <main>
-      <title>ご注文状況 | Kalpana (カルパナ)</title>
+      <title>ご注文状況 | Kalpana (カルプナ)</title>
       <meta name="robots" content="noindex" />
       <div className="section" style={{ backgroundColor: 'var(--cream)', paddingTop: '120px', minHeight: '70vh' }}>
         <div style={{ maxWidth: '640px', margin: '0 auto', padding: '0 16px' }}>

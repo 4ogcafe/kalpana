@@ -47,7 +47,7 @@ beforeAll(async () => {
     passwordHash: await bcrypt.hash(PASSWORD, 4), createdAt: now, updatedAt: now,
   });
   adminCookie = cookieOf(await request(app).post('/api/v1/auth/login').send({ email: 'admin@test.local', password: PASSWORD }));
-  await request(app).put('/api/v1/settings').set('Cookie', adminCookie).send({ name: 'カルパナ', pickupEnabled: true, pickupHours: '00:00-23:45', pickupLeadMinutes: 0, diningEnabled: true }).expect(200);
+  await request(app).put('/api/v1/settings').set('Cookie', adminCookie).send({ name: 'カルプナ', pickupEnabled: true, pickupHours: '00:00-23:45', pickupLeadMinutes: 0, diningEnabled: true }).expect(200);
   itemId = (await request(app).post('/api/v1/menu/items').set('Cookie', adminCookie).send({ nameEn: 'Curry', price: 1000, categoryName: 'Curry' }).expect(201)).body.id;
   slot = (await request(app).get('/api/v1/orders/slots')).body.slots[0].at;
   memberCookie = cookieOf(await request(app).post('/api/v1/customers/register').send({ name: 'Hanako', email: 'push@test.local', password: 'member-pass-1' }).expect(201));
@@ -69,8 +69,8 @@ describe('ready notifications', () => {
     expect(isPushEndpoint('https://web.push.apple.com/abc')).toBe(true);
     expect(isPushEndpoint('https://evil.example/fcm.googleapis.com')).toBe(false);
     expect(isPushEndpoint('http://fcm.googleapis.com/x')).toBe(false);
-    expect(readyMessage({ number: 7, fulfillment: 'PICKUP' }, 'カルパナ').body).toContain('#007');
-    expect(readyMessage({ number: 7, fulfillment: 'DELIVERY' }, 'カルパナ').title).toContain('配達');
+    expect(readyMessage({ number: 7, fulfillment: 'PICKUP' }, 'カルプナ').body).toContain('#007');
+    expect(readyMessage({ number: 7, fulfillment: 'DELIVERY' }, 'カルプナ').title).toContain('配達');
   });
 
   it('tells the customer their food is ready, once, when staff mark it ready', async () => {
@@ -92,7 +92,7 @@ describe('ready notifications', () => {
     await moveTo(id, 'READY');
     await wait();
     expect(sent).toHaveLength(1);
-    expect(sent[0].payload).toMatchObject({ title: 'カルパナ：ご注文の準備ができました 🎉', url: `/order/${placed.body.token}` });
+    expect(sent[0].payload).toMatchObject({ title: 'カルプナ：ご注文の準備ができました 🎉', url: `/order/${placed.body.token}` });
     expect(sent[0].payload.body).toContain('店頭でお受け取りください');
   });
 

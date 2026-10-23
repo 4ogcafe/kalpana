@@ -278,7 +278,7 @@ function ensureDefaultDatabaseData(PDO $pdo): array {
                 ['slide_1', 'HOME', '/bg-hero-img.webp', 'Authentic Indian Curry and Naan', '本格インド料理と焼きたてナン', 'Authentic Indian Flavors', '本格スパイスが香る、伝統のインド料理', 'Handcrafted curries and tandoori specials.', 'タンドール窯で焼き上げるナンと極上のスパイスカレー', 1],
                 ['slide_2', 'HOME', '/bg-hero-img.webp', 'Freshly baked tandoori naan and rich curry bowls', '焼きたてナンと本格スパイスカレー', 'Freshly Baked Naan & Curries', '焼きたてナンと本格スパイスカレー', 'Fresh from our charcoal tandoor oven.', '炭火粘土窯で焼き上げるタンドール料理', 2],
                 ['slide_3', 'HOME', '/bg-hero-img.webp', 'Master chef preparing tandoori specialties in traditional clay oven', '熟練シェフの本格タンドール料理', 'Traditional Charcoal Tandoor', '伝統のタンドール炭火焼料理', 'Finest spices blended with culinary passion.', '長年磨き上げたスパイスの魔法', 3],
-                ['slide_4', 'CONTACT', '/bg-hero-img.webp', 'Kalpana Indian Cuisine dining hall in Kumagaya', 'カルパナ熊谷店', 'Visit Kalpana in Kumagaya', '熊谷でお待ちしております', 'Conveniently located with parking available.', '国道17号沿い・駐車場12台完備', 1]
+                ['slide_4', 'CONTACT', '/bg-hero-img.webp', 'Kalpana Indian Cuisine dining hall in Kumagaya', 'カルプナ熊谷店', 'Visit Kalpana in Kumagaya', '熊谷でお待ちしております', 'Conveniently located with parking available.', '国道17号沿い・駐車場12台完備', 1]
             ];
             foreach ($slides as $sl) {
                 $slideIns->execute($sl);
@@ -808,6 +808,16 @@ function runDatabaseMigrations(PDO $pdo): array {
 
     // Seed initial data
     $seedStatus = ensureDefaultDatabaseData($pdo);
+
+    // Update any existing database records from カルパナ to カルプナ
+    try {
+        $pdo->exec("UPDATE `CarouselSlide` SET `titleJa` = REPLACE(`titleJa`, 'カルパナ', 'カルプナ') WHERE `titleJa` LIKE '%カルパナ%'");
+        $pdo->exec("UPDATE `CarouselSlide` SET `subtitleJa` = REPLACE(`subtitleJa`, 'カルパナ', 'カルプナ') WHERE `subtitleJa` LIKE '%カルパナ%'");
+        $pdo->exec("UPDATE `Settings` SET `name` = REPLACE(`name`, 'カルパナ', 'カルプナ') WHERE `name` LIKE '%カルパナ%'");
+        $pdo->exec("UPDATE `Settings` SET `aboutJa` = REPLACE(`aboutJa`, 'カルパナ', 'カルプナ') WHERE `aboutJa` LIKE '%カルパナ%'");
+        $pdo->exec("UPDATE `Settings` SET `featuredReviews` = REPLACE(`featuredReviews`, 'カルパナ', 'カルプナ') WHERE `featuredReviews` LIKE '%カルパナ%'");
+        $pdo->exec("UPDATE `AppSecret` SET `publicKey` = REPLACE(`publicKey`, 'カルパナ', 'カルプナ') WHERE `id` = 'PAGE_SETTINGS_EXT' AND `publicKey` LIKE '%カルパナ%'");
+    } catch (Exception $e) {}
 
     return [
         'status' => 'completed',

@@ -256,7 +256,7 @@ export default function GoogleReviewsSettings() {
               <Search size={15} /> Connect Google Business Listing
             </div>
             <form onSubmit={search} style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
-              <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search restaurant name, e.g. カルパナ 熊谷" aria-label="Find restaurant on Google" style={input} />
+              <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search restaurant name, e.g. カルプナ 熊谷" aria-label="Find restaurant on Google" style={input} />
               <button type="submit" disabled={busy !== null || query.trim().length < 2} style={darkBtn}><Search size={15} /> {busy === 'search' ? 'Searching…' : 'Search Google'}</button>
             </form>
 

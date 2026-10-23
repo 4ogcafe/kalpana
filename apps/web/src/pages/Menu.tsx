@@ -240,8 +240,8 @@ export default function Menu() {
 
   return (
     <main>
-      <title>{`${menuInfo.title} | Kalpana (カルパナ)`}</title>
-      <meta name="description" content={`熊谷の本格インド料理店カルパナの${menuInfo.title}。カレー、ナン、タンドール料理などを価格とともにご紹介します。`} />
+      <title>{`${menuInfo.title} | Kalpana (カルプナ)`}</title>
+      <meta name="description" content={`熊谷の本格インド料理店カルプナの${menuInfo.title}。カレー、ナン、タンドール料理などを価格とともにご紹介します。`} />
       {/* Hero Section */}
       <div className="home-hero" style={{ height: '40vh', minHeight: '300px' }}>
         <img src={dynamicHeroImages[menuType]} alt="" fetchPriority="high" className="slide-bg-img" style={{ opacity: 0.5, objectFit: 'cover' }} />

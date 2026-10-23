@@ -94,7 +94,7 @@ export default function Navbar() {
               <img src="/site-logo-01.webp" alt="Kalpana" width={40} height={40} style={{ height: '100%', width: 'auto', objectFit: 'contain' }} />
             </div>
             <div>
-              <div className="nav-logo-text">カルパナ<span>.</span></div>
+              <div className="nav-logo-text">カルプナ<span>.</span></div>
               <span className="nav-logo-sub">本格インド料理店 ・ 熊谷</span>
             </div>
           </Link>

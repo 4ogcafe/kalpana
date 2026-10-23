@@ -446,10 +446,10 @@ export default function MiniGameModal({
                     textAlign: 'left',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#34d399', fontWeight: 800, fontSize: '0.92rem' }}>
-                      <Coins size={17} /> カルパナポイント加算完了
+                      <Coins size={17} /> カルプナポイント加算完了
                     </div>
                     <div style={{ fontSize: '0.84rem', color: '#d1fae5', marginTop: '4px', lineHeight: 1.5 }}>
-                      <strong>+{pointsWon}pt</strong> がカルパナポイント残高に追加されました！「ポイント履歴」にゲーム当選の詳細が記録されています。
+                      <strong>+{pointsWon}pt</strong> がカルプナポイント残高に追加されました！「ポイント履歴」にゲーム当選の詳細が記録されています。
                     </div>
                   </div>
                 ) : (
@@ -466,7 +466,7 @@ export default function MiniGameModal({
                 onClick={onClose}
                 style={{ ...actionButtonStyle, backgroundColor: '#fbbf24', color: '#111827', fontWeight: 800 }}
               >
-                {winningPrize.type === 'POINTS' ? 'カルパナポイントを確認する' : 'マイページで特典を確認する'} <ArrowRight size={16} />
+                {winningPrize.type === 'POINTS' ? 'カルプナポイントを確認する' : 'マイページで特典を確認する'} <ArrowRight size={16} />
               </button>
             </div>
           ) : (

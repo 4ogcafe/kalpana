@@ -214,14 +214,14 @@ export default function StampCard({ card, memberName, preview = false, onCardUpd
   );
 }
 
-/** A red "カルパナ" seal, like the rubber stamp at the counter. */
+/** A red "カルプナ" seal, like the rubber stamp at the counter. */
 function StampMark({ date }: { date?: string }) {
   const label = date ? new Date(date).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo' }) : '';
   return (
     <svg viewBox="0 0 100 100" className="stamp-mark" aria-hidden="true">
       <circle cx="50" cy="50" r="44" fill="#fffdf6" stroke="currentColor" strokeWidth="7" />
       <circle cx="50" cy="50" r="35" fill="none" stroke="currentColor" strokeWidth="2" />
-      <text x="50" y={label ? 52 : 58} textAnchor="middle" fontSize="19" fontWeight="900" fill="currentColor" letterSpacing="-1">カルパナ</text>
+      <text x="50" y={label ? 52 : 58} textAnchor="middle" fontSize="19" fontWeight="900" fill="currentColor" letterSpacing="-1">カルプナ</text>
       {label && <text x="50" y="72" textAnchor="middle" fontSize="12" fontWeight="700" fill="currentColor">{label}</text>}
     </svg>
   );

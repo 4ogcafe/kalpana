@@ -112,8 +112,8 @@ export default function Home() {
 
   return (
     <main>
-      <title>Kalpana (カルパナ) | 熊谷の本格インド料理</title>
-      <meta name="description" content="埼玉・熊谷の本格インド料理店カルパナ。タンドール窯で焼き上げるナン、スパイス香るカレー、ランチ・テイクアウト・グランドメニューをご案内します。" />
+      <title>Kalpana (カルプナ) | 熊谷の本格インド料理</title>
+      <meta name="description" content="埼玉・熊谷の本格インド料理店カルプナ。タンドール窯で焼き上げるナン、スパイス香るカレー、ランチ・テイクアウト・グランドメニューをご案内します。" />
       {/* Hero Slider */}
       <div className="home-hero">
         {heroImages.slice(0, loadedSlides).map((img, index) => (

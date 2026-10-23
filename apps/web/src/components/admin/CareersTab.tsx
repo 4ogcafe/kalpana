@@ -777,7 +777,7 @@ export default function CareersTab() {
                     <Phone size={14} /> 電話をかける
                   </a>
                   <a
-                    href={`mailto:${selectedApp.email}?subject=${encodeURIComponent('【カルパナ】求人へのご応募ありがとうございます')}`}
+                    href={`mailto:${selectedApp.email}?subject=${encodeURIComponent('【カルプナ】求人へのご応募ありがとうございます')}`}
                     style={{ ...secondaryButton, padding: '6px 12px', fontSize: '0.85rem', textDecoration: 'none' }}
                   >
                     <Mail size={14} /> メール送信

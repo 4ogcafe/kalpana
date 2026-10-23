@@ -128,7 +128,7 @@ export async function notifyOrderReady(order: Record<string, unknown>): Promise<
 
     const [keys, settings] = await Promise.all([vapidKeys(), loadSettings() as Promise<{ name?: string; email?: string | null }>]);
     const subject = process.env.VAPID_SUBJECT || (settings.email ? `mailto:${settings.email}` : 'mailto:noreply@kalpana.invalid');
-    const shopName = (settings.name as string | undefined)?.trim() || 'カルパナ';
+    const shopName = (settings.name as string | undefined)?.trim() || 'カルプナ';
     const url = `/order/${String(order.token)}`;
     const payload = JSON.stringify({ ...readyMessage(order, shopName), url, tag: `order-${orderId}` });
 

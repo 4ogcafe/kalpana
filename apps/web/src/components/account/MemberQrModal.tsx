@@ -155,7 +155,7 @@ export default function MemberQrModal({
                 <svg viewBox="0 0 100 100" className="stamp-mark" aria-hidden="true" style={{ width: '100%', height: '100%', animation: 'stamp-press 0.6s cubic-bezier(0.2, 1.4, 0.4, 1) both' }}>
                   <circle cx="50" cy="50" r="44" fill="#fffdf6" stroke="#b91c1c" strokeWidth="7" />
                   <circle cx="50" cy="50" r="35" fill="none" stroke="#b91c1c" strokeWidth="2" />
-                  <text x="50" y={52} textAnchor="middle" fontSize="19" fontWeight="900" fill="#b91c1c" letterSpacing="-1">カルパナ</text>
+                  <text x="50" y={52} textAnchor="middle" fontSize="19" fontWeight="900" fill="#b91c1c" letterSpacing="-1">カルプナ</text>
                   <text x="50" y={72} textAnchor="middle" fontSize="12" fontWeight="700" fill="#b91c1c">STAMP</text>
                 </svg>
               </div>

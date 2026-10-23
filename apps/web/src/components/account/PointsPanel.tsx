@@ -47,7 +47,7 @@ export default function PointsPanel({ balance, history, loyalty }: { balance: nu
         <section style={cardStyle} aria-labelledby="how-heading">
           <h2 id="how-heading" style={headingStyle}>ポイントのしくみ</h2>
           <ul style={{ margin: 0, paddingLeft: '1.2em', lineHeight: 1.9 }}>
-            <li>毎日1回無料の「ミニゲーム（ルーレット・スクラッチ・スロット）」で遊ぶと、最大100pt以上のボーナスポイントが即時カルパナポイントに加算されます！</li>
+            <li>毎日1回無料の「ミニゲーム（ルーレット・スクラッチ・スロット）」で遊ぶと、最大100pt以上のボーナスポイントが即時カルプナポイントに加算されます！</li>
             <li>お支払い金額¥100ごとに{loyalty.pointsPer100Yen}ptが貯まります（商品のお受け取り時に加算）。</li>
             <li>1pt = {yen(loyalty.pointValueYen)}として、次回のご注文時にお使いいただけます。</li>
             <li>ご注文をキャンセルした場合、利用したポイントはお戻しします。</li>
@@ -91,7 +91,7 @@ export default function PointsPanel({ balance, history, loyalty }: { balance: nu
                           </span>
                         </div>
                         <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
-                          {formatDateTime(entry.createdAt)} ・ カルパナポイント即時加算
+                          {formatDateTime(entry.createdAt)} ・ カルプナポイント即時加算
                         </div>
                       </div>
                     ) : (

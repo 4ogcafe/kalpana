@@ -15,7 +15,7 @@ const cookieOf = (res: request.Response) => res.headers['set-cookie'] as unknown
 
 const PLACE = {
   id: 'ChIJtest123',
-  displayName: { text: 'カルパナ' },
+  displayName: { text: 'カルプナ' },
   rating: 4.6,
   userRatingCount: 128,
   googleMapsUri: 'https://maps.google.com/?cid=1',
@@ -31,7 +31,7 @@ function googleStub(details: unknown = PLACE, ok = true) {
   return vi.fn(async (url: string | URL) => {
     const href = String(url);
     if (href.includes('searchText')) {
-      return new Response(JSON.stringify({ places: [{ id: 'ChIJtest123', displayName: { text: 'カルパナ' }, formattedAddress: '埼玉県熊谷市', rating: 4.6, userRatingCount: 128 }] }), { status: 200 });
+      return new Response(JSON.stringify({ places: [{ id: 'ChIJtest123', displayName: { text: 'カルプナ' }, formattedAddress: '埼玉県熊谷市', rating: 4.6, userRatingCount: 128 }] }), { status: 200 });
     }
     return new Response(JSON.stringify(ok ? details : { error: { message: 'API key not valid' } }), { status: ok ? 200 : 403 });
   });
@@ -60,7 +60,7 @@ afterAll(async () => {
 describe('google review rules', () => {
   it('keeps what the website needs and refreshes monthly', () => {
     const cache = toCache('ChIJtest123', PLACE, new Date('2026-10-01T00:00:00Z'));
-    expect(cache).toMatchObject({ rating: 4.6, userRatingCount: 128, name: 'カルパナ' });
+    expect(cache).toMatchObject({ rating: 4.6, userRatingCount: 128, name: 'カルプナ' });
     expect(cache.reviews[0]).toMatchObject({ authorName: '山田', rating: 5, text: 'ナンが最高！', relativeTime: '1 週間前' });
     expect(isStale(cache, 'ChIJtest123', new Date('2026-10-20T00:00:00Z'))).toBe(false);
     expect(isStale(cache, 'ChIJtest123', new Date('2026-11-01T00:00:00Z'))).toBe(true);
@@ -88,7 +88,7 @@ describe('reviews on the website', () => {
     const google = googleStub();
     vi.stubGlobal('fetch', google);
 
-    const found = await request(app).post('/api/v1/reviews/admin/search').set('Cookie', adminCookie).send({ query: 'カルパナ 熊谷' }).expect(200);
+    const found = await request(app).post('/api/v1/reviews/admin/search').set('Cookie', adminCookie).send({ query: 'カルプナ 熊谷' }).expect(200);
     expect(found.body[0]).toMatchObject({ placeId: 'ChIJtest123', address: '埼玉県熊谷市' });
     // The key goes to Google in a header, never in the URL.
     expect(String(google.mock.calls[0][0])).not.toContain('test-key');

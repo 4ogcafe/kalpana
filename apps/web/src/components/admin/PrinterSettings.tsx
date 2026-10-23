@@ -220,7 +220,7 @@ export default function PrinterSettings({ storeName, phone, addressJa }: Printer
 
       {/* Feature Badges */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '1rem' }}>
-        <span style={badgeStyle}><CheckCircle2 size={14} color="#059669" /> カルパナ公式ブランドロゴ 高精細印字</span>
+        <span style={badgeStyle}><CheckCircle2 size={14} color="#059669" /> カルプナ公式ブランドロゴ 高精細印字</span>
         <span style={badgeStyle}><CheckCircle2 size={14} color="#059669" /> インボイス制度対応（適格請求書 登録番号印字）</span>
         <span style={badgeStyle}><CheckCircle2 size={14} color="#059669" /> 軽減税率8%・標準税率10% 消費税自動計算</span>
         <span style={badgeStyle}><CheckCircle2 size={14} color="#059669" /> 高速ベクターSVG QRコード</span>
@@ -294,7 +294,7 @@ export default function PrinterSettings({ storeName, phone, addressJa }: Printer
                 value={config.storeNameJa || ''}
                 onChange={e => setConfig(prev => ({ ...prev, storeNameJa: e.target.value }))}
                 style={inputStyle}
-                placeholder="本格インド料理 カルパナ"
+                placeholder="本格インド料理 カルプナ"
               />
             </div>
 
@@ -338,7 +338,7 @@ export default function PrinterSettings({ storeName, phone, addressJa }: Printer
                 value={config.customFooter || ''}
                 onChange={e => setConfig(prev => ({ ...prev, customFooter: e.target.value }))}
                 style={inputStyle}
-                placeholder="毎度本格インド料理カルパナをご利用いただき、誠にありがとうございます。"
+                placeholder="毎度本格インド料理カルプナをご利用いただき、誠にありがとうございます。"
               />
             </div>
           </div>

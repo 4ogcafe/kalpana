@@ -12,12 +12,12 @@ export default function About() {
       .catch(console.error);
   }, []);
 
-  const storyParagraphs = (settings.aboutStoryJa || 'Kalpana（カルパナ）は、サンスクリット語で「想像」や「創造」を意味します。\n私たちは、インドの伝統的なスパイスと製法を守りながら、日本の皆さまの味覚に寄り添う新しいインディアン・ダイニングを創造しています。\n\n本場インドのホテルで腕を磨いたシェフが、厳選された数十種類のスパイスを巧みにブレンド。\n特注のタンドール（土窯）で焼き上げる備長炭の香ばしいナンやタンドリーチキンは、多くのお客様に愛されています。').split('\n').filter((p: string) => p.trim().length > 0);
+  const storyParagraphs = (settings.aboutStoryJa || 'Kalpana（カルプナ）は、サンスクリット語で「想像」や「創造」を意味します。\n私たちは、インドの伝統的なスパイスと製法を守りながら、日本の皆さまの味覚に寄り添う新しいインディアン・ダイニングを創造しています。\n\n本場インドのホテルで腕を磨いたシェフが、厳選された数十種類のスパイスを巧みにブレンド。\n特注のタンドール（土窯）で焼き上げる備長炭の香ばしいナンやタンドリーチキンは、多くのお客様に愛されています。').split('\n').filter((p: string) => p.trim().length > 0);
 
   return (
     <main>
-      <title>私たちについて | Kalpana (カルパナ)</title>
-      <meta name="description" content="熊谷の本格インド料理店カルパナの物語、スパイスへのこだわり、シェフをご紹介します。" />
+      <title>私たちについて | Kalpana (カルプナ)</title>
+      <meta name="description" content="熊谷の本格インド料理店カルプナの物語、スパイスへのこだわり、シェフをご紹介します。" />
 
       {/* About Hero */}
       <div className="home-hero" style={{ height: '50vh', minHeight: '400px' }}>
@@ -63,7 +63,7 @@ export default function About() {
             lineHeight: 1,
           }}
         >
-          {settings.aboutStoryWatermark || 'カルパナ'}
+          {settings.aboutStoryWatermark || 'カルプナ'}
         </div>
 
         <div style={{ maxWidth: '1180px', margin: '0 auto', position: 'relative', zIndex: 2 }}>
@@ -147,7 +147,7 @@ export default function About() {
                 }}
               >
                 <Quote size={16} />
-                <span>{settings.aboutStoryOriginTitleJa || '店名「Kalpana（カルパナ）」に込めた想い'}</span>
+                <span>{settings.aboutStoryOriginTitleJa || '店名「Kalpana（カルプナ）」に込めた想い'}</span>
               </div>
               <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--dark-bark)', lineHeight: 1.65 }}>
                 {settings.aboutStoryOriginTextJa || 'サンスクリット語で「想像」や「創造」を意味します。インド何千年の食の知恵を受け継ぎ、日本の皆さまの心を満たす新しい美味しさを創り出します。'}

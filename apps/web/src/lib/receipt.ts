@@ -72,7 +72,7 @@ export interface ReceiptSettings {
 }
 
 export const DEFAULT_STORE_SETTINGS: Required<ReceiptSettings> = {
-  storeNameJa: '本格インド料理 カルパナ',
+  storeNameJa: '本格インド料理 カルプナ',
   storeNameEn: 'Kalpana Indian Cuisine',
   phone: '048-577-7497',
   addressJa: '〒360-0023 埼玉県熊谷市佐谷田2081（国道17号沿い・加賀家食堂隣）',
@@ -80,7 +80,7 @@ export const DEFAULT_STORE_SETTINGS: Required<ReceiptSettings> = {
   timezone: 'Asia/Tokyo',
   googleMapsLink: 'https://www.google.com/maps/place/Kalpna+Indian+Cuisine/@36.1250995,138.8116637,10z/data=!4m6!3m5!1s0x601f2b0605446c1f:0x1a31a406a1c1b3d6!8m2!3d36.1250995!4d139.4214049!16s%2Fg%2F11mf64qypb?entry=ttu',
   storeReviewLink: 'https://www.google.com/maps/place/Kalpna+Indian+Cuisine/@36.1250995,138.8116637,10z/data=!4m6!3m5!1s0x601f2b0605446c1f:0x1a31a406a1c1b3d6!8m2!3d36.1250995!4d139.4214049!16s%2Fg%2F11mf64qypb?entry=ttu',
-  customFooter: '毎度本格インド料理カルパナをご利用いただき、誠にありがとうございます。またのご来店・ご注文を心よりお待ちしております。',
+  customFooter: '毎度本格インド料理カルプナをご利用いただき、誠にありがとうございます。またのご来店・ご注文を心よりお待ちしております。',
   paperWidth: '80mm',
   autoCut: true,
 };
@@ -820,7 +820,7 @@ export function generateKitchenTicketHtml(order: ReceiptOrder, allergyLine?: str
   ${totalAmount !== null ? `<div style="font-size: 15px; font-weight: 900; text-align: right; border-top: 1px solid #000; padding-top: 4px;">お会計合計: ¥${totalAmount.toLocaleString()}</div>` : ''}
 
   <div class="k-footer">
-    印字日時: ${new Date().toLocaleString('ja-JP', { timeZone })} · 本格インド料理 カルパナ
+    印字日時: ${new Date().toLocaleString('ja-JP', { timeZone })} · 本格インド料理 カルプナ
   </div>
 </body>
 </html>`;

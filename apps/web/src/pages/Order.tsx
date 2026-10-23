@@ -307,7 +307,7 @@ export default function Order() {
 
   return (
     <main>
-      <title>ご注文 | Kalpana (カルパナ)</title>
+      <title>ご注文 | Kalpana (カルプナ)</title>
       <meta name="robots" content="noindex" />
       <div className="section" style={{ backgroundColor: 'var(--cream)', paddingTop: '120px', minHeight: '70vh' }}>
         <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '0 16px' }}>

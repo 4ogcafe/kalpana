@@ -7,10 +7,10 @@ self.addEventListener('push', event => {
   try {
     data = event.data ? event.data.json() : {};
   } catch {
-    data = { title: 'カルパナ', body: event.data ? event.data.text() : '' };
+    data = { title: 'カルプナ', body: event.data ? event.data.text() : '' };
   }
   event.waitUntil(
-    self.registration.showNotification(data.title || 'カルパナ', {
+    self.registration.showNotification(data.title || 'カルプナ', {
       body: data.body || 'ご注文の準備ができました。',
       icon: '/site-logo-01.webp',
       badge: '/site-logo-01.webp',

@@ -117,8 +117,8 @@ export default function Careers() {
 
   return (
     <main style={{ backgroundColor: '#faf7f2', minHeight: '100vh', color: '#1f2937' }}>
-      <title>採用情報・求人募集 (Careers) | Kalpana (カルパナ)</title>
-      <meta name="description" content="本格インド料理カルパナの求人・採用情報です。ホール、キッチン（カレーシェフ）、デリバリースタッフを募集中。絶品まかない無料、ビザサポートあり！" />
+      <title>採用情報・求人募集 (Careers) | Kalpana (カルプナ)</title>
+      <meta name="description" content="本格インド料理カルプナの求人・採用情報です。ホール、キッチン（カレーシェフ）、デリバリースタッフを募集中。絶品まかない無料、ビザサポートあり！" />
 
       {/* Hero Section */}
       <div style={{
@@ -160,7 +160,7 @@ export default function Careers() {
             letterSpacing: '-0.5px',
             margin: '0 0 1rem',
           }}>
-            スパイス香るカルパナで、<br />
+            スパイス香るカルプナで、<br />
             <span style={{ color: '#fbbf24' }}>私たちと一緒に働きませんか？</span>
           </h1>
 
@@ -202,7 +202,7 @@ export default function Careers() {
               CALTURE & BENEFITS
             </span>
             <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#111827', margin: '0.35rem 0 0' }}>
-              カルパナで働く5つの魅力
+              カルプナで働く5つの魅力
             </h2>
           </div>
 

@@ -484,7 +484,7 @@ export default function ScannerSettings() {
                     fontWeight: 800,
                   }}
                 >
-                  {testResult.valid ? '✓ 有効なカルパナ会員コード' : '⚠️ 不明なQRコード'}
+                  {testResult.valid ? '✓ 有効なカルプナ会員コード' : '⚠️ 不明なQRコード'}
                 </span>
               </div>
               <div style={{ display: 'flex', gap: '12px', alignItems: 'baseline', marginTop: '4px' }}>

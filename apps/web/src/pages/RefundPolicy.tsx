@@ -20,13 +20,13 @@ export default function RefundPolicy() {
       .catch(() => {});
   }, []);
 
-  const restaurantName = info.name || '本格インド料理 カルパナ (Kalpana)';
+  const restaurantName = info.name || '本格インド料理 カルプナ (Kalpana)';
   const phoneClean = info.phone ? info.phone.replace(/[^\d+]/g, '') : '';
 
   return (
     <main style={{ backgroundColor: '#faf7f2', minHeight: '100vh', color: '#1f2937' }}>
       <title>返金・キャンセルポリシー (特定商取引法に基づく表記) | Kalpana</title>
-      <meta name="description" content="本格インド料理カルパナの返金・キャンセルポリシーです。テイクアウト、デリバリー、お席のご予約に関するキャンセルや返金基準をご案内します。" />
+      <meta name="description" content="本格インド料理カルプナの返金・キャンセルポリシーです。テイクアウト、デリバリー、お席のご予約に関するキャンセルや返金基準をご案内します。" />
 
       {/* Hero Header */}
       <div style={{
@@ -171,7 +171,7 @@ export default function RefundPolicy() {
               万が一、食材の予期せぬ品切れ、天災、荒天、機器トラブル、配達員の突発事故等により、ご注文をお受けできない状況が発生した場合は、速やかにお客様へお電話またはメールにてご連絡し、<strong>全額（100%）返金</strong>いたします。
             </p>
             <p style={{ fontSize: '0.88rem', color: '#6b7280' }}>
-              ※ ご利用いただいた割引クーポンやカルパナポイントも、即座にお客様の会員アカウントへ返還（ロールバック）されますのでご安心ください。
+              ※ ご利用いただいた割引クーポンやカルプナポイントも、即座にお客様の会員アカウントへ返還（ロールバック）されますのでご安心ください。
             </p>
           </section>
 
@@ -211,7 +211,7 @@ export default function RefundPolicy() {
                   <td style={{ padding: '10px', color: '#6b7280' }}>カード会社所定の締め日または数日以内</td>
                 </tr>
                 <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
-                  <td style={{ padding: '10px', fontWeight: 600 }}>カルパナポイント利用分</td>
+                  <td style={{ padding: '10px', fontWeight: 600 }}>カルプナポイント利用分</td>
                   <td style={{ padding: '10px' }}>会員アカウントへ自動ポイント返還</td>
                   <td style={{ padding: '10px', color: '#059669', fontWeight: 700 }}>即時</td>
                 </tr>
