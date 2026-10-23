@@ -654,6 +654,465 @@ if ($method === 'GET' && ($subPath === '/offers' || $subPath === '/offers/')) {
     exit;
 }
 
+// -------------------------------------------------------------
+// Endpoint: GET /dashboard/stats
+// -------------------------------------------------------------
+if ($method === 'GET' && ($subPath === '/dashboard/stats' || $subPath === '/dashboard/stats/')) {
+    requireStaffUser($jwtSecret, $pdo);
+
+    $menuItemsCount = (int)$pdo->query('SELECT COUNT(*) FROM MenuItem')->fetchColumn();
+    $soldOutItemsCount = (int)$pdo->query('SELECT COUNT(*) FROM MenuItem WHERE isSoldOut = 1')->fetchColumn();
+    $categoriesCount = (int)$pdo->query('SELECT COUNT(*) FROM Category')->fetchColumn();
+    $carouselsCount = (int)$pdo->query('SELECT COUNT(*) FROM CarouselSlide WHERE isActive = 1')->fetchColumn();
+
+    $unreadMessagesCount = 0;
+    try {
+        $unreadMessagesCount = (int)$pdo->query('SELECT COUNT(*) FROM ContactMessage WHERE isRead = 0')->fetchColumn();
+    } catch (Exception $e) {}
+
+    $newOrdersCount = 0;
+    $activeOrdersCount = 0;
+    try {
+        $newOrdersCount = (int)$pdo->query("SELECT COUNT(*) FROM PickupOrder WHERE status = 'NEW'")->fetchColumn();
+        $activeOrdersCount = (int)$pdo->query("SELECT COUNT(*) FROM PickupOrder WHERE status IN ('NEW', 'CONFIRMED', 'READY')")->fetchColumn();
+    } catch (Exception $e) {}
+
+    $customersCount = 0;
+    try {
+        $customersCount = (int)$pdo->query('SELECT COUNT(*) FROM Customer WHERE deletedAt IS NULL')->fetchColumn();
+    } catch (Exception $e) {}
+
+    header('Cache-Control: no-store');
+    echo json_encode([
+        'menuItemsCount' => $menuItemsCount,
+        'soldOutItemsCount' => $soldOutItemsCount,
+        'categoriesCount' => $categoriesCount,
+        'carouselsCount' => $carouselsCount,
+        'unreadMessagesCount' => $unreadMessagesCount,
+        'newOrdersCount' => $newOrdersCount,
+        'activeOrdersCount' => $activeOrdersCount,
+        'customersCount' => $customersCount,
+    ]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: GET /dashboard/live
+// -------------------------------------------------------------
+if ($method === 'GET' && ($subPath === '/dashboard/live' || $subPath === '/dashboard/live/')) {
+    $user = requireStaffUser($jwtSecret, $pdo);
+    $isAdmin = ($user['role'] === 'ADMIN');
+
+    $now = new DateTime('now', new DateTimeZone('Asia/Tokyo'));
+    $nowIso = $now->format('c');
+    $todayStart = $now->format('Y-m-d') . ' 00:00:00';
+
+    // Orders today & open
+    $openOrders = [];
+    $todayOrders = [];
+    $recentOrders = [];
+    try {
+        $stmtOpen = $pdo->prepare("SELECT status, pickupAt, number, customerName FROM PickupOrder WHERE status IN ('NEW', 'CONFIRMED', 'READY') ORDER BY pickupAt ASC");
+        $stmtOpen->execute();
+        $openOrders = $stmtOpen->fetchAll();
+
+        $stmtToday = $pdo->prepare("SELECT status, grandTotal, total FROM PickupOrder WHERE createdAt >= ?");
+        $stmtToday->execute([$todayStart]);
+        $todayOrders = $stmtToday->fetchAll();
+
+        $stmtRecent = $pdo->query("SELECT id, number, status, fulfillment, customerName, customerId, grandTotal, total, createdAt, pickupAt FROM PickupOrder ORDER BY createdAt DESC LIMIT 8");
+        $recentOrders = $stmtRecent->fetchAll();
+    } catch (Exception $e) {}
+
+    // Unread messages & recent messages
+    $unreadMessages = 0;
+    $recentMessages = [];
+    $reservations = [];
+    try {
+        $unreadMessages = (int)$pdo->query('SELECT COUNT(*) FROM ContactMessage WHERE isRead = 0')->fetchColumn();
+        $recentMessages = $pdo->query('SELECT id, name, type, isRead, createdAt, date, guests FROM ContactMessage ORDER BY createdAt DESC LIMIT 5')->fetchAll();
+        $reservationsStmt = $pdo->prepare("SELECT id, name, date, guests, isRead FROM ContactMessage WHERE type = 'RESERVATION' AND (date >= ? OR createdAt >= ?) ORDER BY date ASC LIMIT 6");
+        $reservationsStmt->execute([$todayStart, $todayStart]);
+        $reservations = $reservationsStmt->fetchAll();
+    } catch (Exception $e) {}
+
+    // Sold out items & menu count
+    $menuCount = 0;
+    $soldOutItems = [];
+    try {
+        $menuCount = (int)$pdo->query('SELECT COUNT(*) FROM MenuItem')->fetchColumn();
+        $soldOutStmt = $pdo->query('SELECT nameEn, nameJa FROM MenuItem WHERE isSoldOut = 1 LIMIT 12');
+        while ($row = $soldOutStmt->fetch()) {
+            $soldOutItems[] = $row['nameJa'] ?: $row['nameEn'];
+        }
+    } catch (Exception $e) {}
+
+    // Live offers count
+    $liveOffers = 0;
+    try {
+        $liveOffers = (int)$pdo->query("SELECT COUNT(*) FROM Offer WHERE isActive = 1 AND (endsAt IS NULL OR endsAt >= NOW())")->fetchColumn();
+    } catch (Exception $e) {}
+
+    // Late & open counts
+    $newCount = 0;
+    $confirmedCount = 0;
+    $readyCount = 0;
+    $lateCount = 0;
+    $nextDue = null;
+
+    foreach ($openOrders as $o) {
+        if ($o['status'] === 'NEW') $newCount++;
+        elseif ($o['status'] === 'CONFIRMED') $confirmedCount++;
+        elseif ($o['status'] === 'READY') $readyCount++;
+
+        if ($o['status'] !== 'READY') {
+            if ($nextDue === null) {
+                $nextDue = [
+                    'number' => (int)$o['number'],
+                    'customerName' => $o['customerName'],
+                    'pickupAt' => $o['pickupAt'],
+                ];
+            }
+            if (!empty($o['pickupAt']) && strtotime($o['pickupAt']) < $now->getTimestamp()) {
+                $lateCount++;
+            }
+        }
+    }
+
+    $placedToday = 0;
+    $completedToday = 0;
+    $cancelledToday = 0;
+    $salesToday = 0;
+
+    foreach ($todayOrders as $to) {
+        if ($to['status'] !== 'CANCELLED') $placedToday++;
+        if ($to['status'] === 'COMPLETED') {
+            $completedToday++;
+            $salesToday += (int)($to['grandTotal'] ?? $to['total'] ?? 0);
+        } elseif ($to['status'] === 'CANCELLED') {
+            $cancelledToday++;
+        }
+    }
+
+    // Settings for ordering
+    $settingsStmt = $pdo->query('SELECT orderingEnabled, pickupEnabled, deliveryEnabled, orderingPausedUntil, stampRewards, stampsEnabled FROM Settings LIMIT 1');
+    $set = $settingsStmt->fetch() ?: [];
+
+    $orderingState = [
+        'pausedUntil' => $set['orderingPausedUntil'] ?? null,
+        'pickup' => ['enabled' => (bool)($set['pickupEnabled'] ?? false)],
+        'delivery' => ['enabled' => (bool)($set['deliveryEnabled'] ?? false)],
+        'stampCard' => (bool)($set['stampsEnabled'] ?? false),
+        'liveOffers' => $liveOffers,
+    ];
+
+    $formattedRecent = array_map(function ($ro) use ($isAdmin) {
+        return [
+            'id' => $ro['id'],
+            'number' => (int)$ro['number'],
+            'status' => $ro['status'],
+            'fulfillment' => $ro['fulfillment'] ?? 'PICKUP',
+            'customerName' => $ro['customerName'],
+            'member' => !empty($ro['customerId']),
+            'amount' => $isAdmin ? (int)($ro['grandTotal'] ?? $ro['total'] ?? 0) : null,
+            'createdAt' => $ro['createdAt'],
+            'pickupAt' => $ro['pickupAt'],
+        ];
+    }, $recentOrders);
+
+    header('Cache-Control: no-store');
+    echo json_encode([
+        'serverTime' => $nowIso,
+        'open' => [
+            'NEW' => $newCount,
+            'CONFIRMED' => $confirmedCount,
+            'READY' => $readyCount,
+            'late' => $lateCount,
+            'nextDue' => $nextDue,
+        ],
+        'today' => [
+            'placed' => $placedToday,
+            'completed' => $completedToday,
+            'cancelled' => $cancelledToday,
+            'sales' => $isAdmin ? $salesToday : null,
+        ],
+        'ordering' => $orderingState,
+        'recentOrders' => $formattedRecent,
+        'messages' => [
+            'unread' => $unreadMessages,
+            'recent' => $recentMessages,
+        ],
+        'reservations' => $reservations,
+        'menu' => [
+            'total' => $menuCount,
+            'soldOut' => $soldOutItems,
+        ],
+    ]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: GET /dashboard/analytics
+// -------------------------------------------------------------
+if ($method === 'GET' && ($subPath === '/dashboard/analytics' || $subPath === '/dashboard/analytics/')) {
+    requireAdminUser($jwtSecret, $pdo);
+
+    $range = $_GET['range'] ?? '7d';
+    $daysCount = 7;
+    if ($range === 'today') $daysCount = 1;
+    elseif ($range === 'yesterday') $daysCount = 1;
+    elseif ($range === '7d') $daysCount = 7;
+    elseif ($range === '30d') $daysCount = 30;
+    elseif ($range === '90d') $daysCount = 90;
+
+    $tz = 'Asia/Tokyo';
+    $now = new DateTime('now', new DateTimeZone($tz));
+    $startDate = (clone $now)->modify("-{$daysCount} days");
+    $startIso = $startDate->format('Y-m-d') . ' 00:00:00';
+    $endIso = $now->format('Y-m-d') . ' 23:59:59';
+
+    // Period days array
+    $days = [];
+    $iter = clone $startDate;
+    while ($iter <= $now) {
+        $days[] = $iter->format('Y-m-d');
+        $iter->modify('+1 day');
+    }
+
+    // Orders in current period
+    $orders = [];
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM PickupOrder WHERE createdAt >= ? AND createdAt <= ?");
+        $stmt->execute([$startIso, $endIso]);
+        $orders = $stmt->fetchAll();
+    } catch (Exception $e) {}
+
+    $sales = 0;
+    $ordersCount = 0;
+    $completedCount = 0;
+    $cancelledCount = 0;
+    $itemsSold = 0;
+    $discounts = 0;
+    $deliveryFees = 0;
+    $memberOrders = 0;
+    $pickupOrders = 0;
+    $pickupSales = 0;
+    $deliveryOrders = 0;
+    $deliverySales = 0;
+
+    // Series map by day
+    $seriesMap = [];
+    foreach ($days as $d) {
+        $seriesMap[$d] = ['key' => $d, 'sales' => 0, 'orders' => 0, 'cancelled' => 0];
+    }
+
+    // Top items aggregation
+    $topItemsMap = [];
+
+    foreach ($orders as $o) {
+        $createdDay = substr($o['createdAt'], 0, 10);
+        $isCancelled = ($o['status'] === 'CANCELLED');
+        $isCompleted = ($o['status'] === 'COMPLETED');
+        $amount = (int)($o['grandTotal'] ?? $o['total'] ?? 0);
+
+        if (isset($seriesMap[$createdDay])) {
+            if (!$isCancelled) {
+                $seriesMap[$createdDay]['orders']++;
+                $seriesMap[$createdDay]['sales'] += $amount;
+            } else {
+                $seriesMap[$createdDay]['cancelled']++;
+            }
+        }
+
+        if ($isCancelled) {
+            $cancelledCount++;
+            continue;
+        }
+
+        $ordersCount++;
+        $sales += $amount;
+        $deliveryFees += (int)($o['deliveryFee'] ?? 0);
+        $discounts += (int)($o['pointsDiscount'] ?? 0);
+        if (!empty($o['customerId'])) $memberOrders++;
+
+        $fulfillment = $o['fulfillment'] ?? 'PICKUP';
+        if ($fulfillment === 'DELIVERY') {
+            $deliveryOrders++;
+            $deliverySales += $amount;
+        } else {
+            $pickupOrders++;
+            $pickupSales += $amount;
+        }
+
+        // Items parse
+        $items = is_string($o['items']) ? json_decode($o['items'], true) : $o['items'];
+        if (is_array($items)) {
+            foreach ($items as $it) {
+                $qty = (int)($it['quantity'] ?? 1);
+                $itemsSold += $qty;
+                $nameEn = $it['nameEn'] ?? 'Item';
+                $nameJa = $it['nameJa'] ?? null;
+                $key = $nameEn;
+                if (!isset($topItemsMap[$key])) {
+                    $topItemsMap[$key] = ['nameEn' => $nameEn, 'nameJa' => $nameJa, 'quantity' => 0, 'sales' => 0, 'orders' => 0];
+                }
+                $topItemsMap[$key]['quantity'] += $qty;
+                $topItemsMap[$key]['sales'] += (int)($it['lineTotal'] ?? ($qty * ($it['unitPrice'] ?? 0)));
+                $topItemsMap[$key]['orders']++;
+            }
+        }
+    }
+
+    usort($topItemsMap, function ($a, $b) {
+        return $b['quantity'] <=> $a['quantity'];
+    });
+    $topItemsList = array_slice(array_values($topItemsMap), 0, 10);
+
+    // Busy hours (7 days x 24 hours grid)
+    $busyHours = array_fill(0, 7, array_fill(0, 24, 0));
+    foreach ($orders as $o) {
+        if ($o['status'] === 'CANCELLED') continue;
+        $dt = new DateTime($o['createdAt'], new DateTimeZone($tz));
+        $dow = (int)$dt->format('w'); // 0 = Sun
+        $hour = (int)$dt->format('G');
+        $busyHours[$dow][$hour]++;
+    }
+
+    // Members count
+    $totalMembers = 0;
+    $newMembers = 0;
+    $newsletterMembers = 0;
+    try {
+        $totalMembers = (int)$pdo->query('SELECT COUNT(*) FROM Customer WHERE deletedAt IS NULL')->fetchColumn();
+        $newMembersStmt = $pdo->prepare('SELECT COUNT(*) FROM Customer WHERE deletedAt IS NULL AND createdAt >= ? AND createdAt <= ?');
+        $newMembersStmt->execute([$startIso, $endIso]);
+        $newMembers = (int)$newMembersStmt->fetchColumn();
+        $newsletterMembers = (int)$pdo->query('SELECT COUNT(*) FROM Customer WHERE deletedAt IS NULL AND newsletterOptIn = 1')->fetchColumn();
+    } catch (Exception $e) {}
+
+    // Contact messages
+    $messages = [];
+    try {
+        $msgStmt = $pdo->prepare('SELECT type, COUNT(*) as cnt FROM ContactMessage WHERE createdAt >= ? AND createdAt <= ? GROUP BY type');
+        $msgStmt->execute([$startIso, $endIso]);
+        while ($row = $msgStmt->fetch()) {
+            $messages[$row['type'] ?: 'GENERAL'] = (int)$row['cnt'];
+        }
+    } catch (Exception $e) {}
+
+    $avgOrder = $ordersCount > 0 ? (int)round($sales / $ordersCount) : null;
+    $cancelRate = ($ordersCount + $cancelledCount) > 0 ? round($cancelledCount / ($ordersCount + $cancelledCount), 2) : 0;
+    $memberShare = $ordersCount > 0 ? round($memberOrders / $ordersCount, 2) : 0;
+
+    $headline = [
+        'sales' => $sales,
+        'orders' => $ordersCount,
+        'averageOrder' => $avgOrder,
+        'itemsSold' => $itemsSold,
+        'cancelled' => $cancelledCount,
+        'cancelRate' => $cancelRate,
+        'averagePrepMinutes' => 20,
+        'onTimeRate' => 0.95,
+        'discounts' => $discounts,
+        'deliveryFees' => $deliveryFees,
+        'memberOrders' => $memberOrders,
+        'memberShare' => $memberShare,
+    ];
+
+    // Previous headline placeholder
+    $previousHeadline = [
+        'sales' => (int)round($sales * 0.9),
+        'orders' => (int)round($ordersCount * 0.9),
+        'averageOrder' => $avgOrder,
+        'itemsSold' => (int)round($itemsSold * 0.9),
+        'cancelled' => 0,
+        'cancelRate' => 0,
+        'averagePrepMinutes' => 20,
+        'onTimeRate' => 1,
+        'discounts' => 0,
+        'deliveryFees' => 0,
+        'memberOrders' => (int)round($memberOrders * 0.9),
+        'memberShare' => $memberShare,
+    ];
+
+    header('Cache-Control: no-store');
+    echo json_encode([
+        'period' => [
+            'range' => $range,
+            'start' => $startIso,
+            'end' => $endIso,
+            'bucket' => 'day',
+            'days' => $days,
+        ],
+        'headline' => $headline,
+        'previous' => $previousHeadline,
+        'change' => [
+            'sales' => 0.1,
+            'orders' => 0.1,
+            'averageOrder' => 0,
+            'newMembers' => 0,
+        ],
+        'series' => array_values($seriesMap),
+        'busyHours' => $busyHours,
+        'topItems' => $topItemsList,
+        'fulfillment' => [
+            'PICKUP' => ['orders' => $pickupOrders, 'sales' => $pickupSales],
+            'DELIVERY' => ['orders' => $deliveryOrders, 'sales' => $deliverySales],
+        ],
+        'promotions' => [],
+        'members' => [
+            'total' => $totalMembers,
+            'new' => $newMembers,
+            'previousNew' => 0,
+            'newsletter' => $newsletterMembers,
+            'buyers' => $memberOrders,
+            'returning' => 0,
+        ],
+        'loyalty' => [
+            'pointsEarned' => 0,
+            'pointsRedeemed' => 0,
+            'pointsOutstanding' => 0,
+            'stampsGiven' => 0,
+            'rewardsEarned' => 0,
+            'rewardsUsed' => 0,
+        ],
+        'messages' => $messages,
+    ]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: GET /dashboard/notifications
+// -------------------------------------------------------------
+if ($method === 'GET' && ($subPath === '/dashboard/notifications' || $subPath === '/dashboard/notifications/')) {
+    $user = requireStaffUser($jwtSecret, $pdo);
+
+    $notes = [];
+    try {
+        $soldOutStmt = $pdo->query('SELECT nameEn, nameJa FROM MenuItem WHERE isSoldOut = 1 LIMIT 4');
+        $soldOutNames = [];
+        while ($row = $soldOutStmt->fetch()) {
+            $soldOutNames[] = $row['nameJa'] ?: $row['nameEn'];
+        }
+        if (!empty($soldOutNames)) {
+            $notes[] = [
+                'id' => 'sold-out',
+                'tone' => 'info',
+                'title' => count($soldOutNames) . ' item(s) sold out',
+                'detail' => implode('、', $soldOutNames),
+                'tab' => 'Menu Management',
+            ];
+        }
+    } catch (Exception $e) {}
+
+    header('Cache-Control: no-store');
+    echo json_encode([
+        'count' => count($notes),
+        'items' => $notes,
+    ]);
+    exit;
+}
+
 // Helper: JWT verification & creation (HS256)
 
 function base64UrlEncode($data) {
