@@ -655,6 +655,227 @@ if ($method === 'GET' && ($subPath === '/offers' || $subPath === '/offers/')) {
 }
 
 // -------------------------------------------------------------
+// Shared: Game Configuration Helpers (AppSecret: MINI_GAME_CONFIG)
+// -------------------------------------------------------------
+function getDefaultGameConfig() {
+    return [
+        'enabled' => true,
+        'mode' => 'LUCKY_WHEEL',
+        'cooldownHours' => 24,
+        'titleJa' => '毎日チャレンジ！ミニゲーム',
+        'subtitleJa' => 'ゲームに挑戦して、お得なポイントや割引クーポンをGETしよう！',
+        'requireOrderSpend' => true,
+        'cycleSpendAmount' => 4999,
+        'allowSingleOrderQualify' => true,
+        'prizes' => [
+            ['id' => 'p1', 'titleJa' => '100ポイント', 'type' => 'POINTS', 'value' => 100, 'probability' => 15, 'color' => '#e11d48', 'icon' => 'Coins'],
+            ['id' => 'p2', 'titleJa' => '10% OFF クーポン', 'type' => 'DISCOUNT_COUPON', 'value' => 10, 'probability' => 10, 'color' => '#d97706', 'icon' => 'Tag'],
+            ['id' => 'p3', 'titleJa' => '50ポイント', 'type' => 'POINTS', 'value' => 50, 'probability' => 25, 'color' => '#2563eb', 'icon' => 'Sparkles'],
+            ['id' => 'p4', 'titleJa' => 'チーズナン無料券', 'type' => 'PERK', 'value' => 0, 'probability' => 10, 'color' => '#7c3aed', 'icon' => 'Gift'],
+            ['id' => 'p5', 'titleJa' => '20ポイント', 'type' => 'POINTS', 'value' => 20, 'probability' => 25, 'color' => '#059669', 'icon' => 'Smile'],
+            ['id' => 'p6', 'titleJa' => '残念！また明日', 'type' => 'NO_PRIZE', 'value' => 0, 'probability' => 15, 'color' => '#64748b', 'icon' => 'Frown'],
+        ],
+    ];
+}
+
+function getAppSecretConfig($pdo, $key, $default) {
+    try {
+        $stmt = $pdo->prepare('SELECT publicKey FROM AppSecret WHERE id = ? LIMIT 1');
+        $stmt->execute([$key]);
+        $row = $stmt->fetch();
+        if ($row && !empty($row['publicKey'])) {
+            $parsed = json_decode($row['publicKey'], true);
+            if (is_array($parsed)) {
+                return array_merge($default, $parsed);
+            }
+        }
+    } catch (Exception $e) {}
+    return $default;
+}
+
+function saveAppSecretConfig($pdo, $key, $data) {
+    $json = json_encode($data, JSON_UNESCAPED_UNICODE);
+    $stmt = $pdo->prepare('INSERT INTO AppSecret (id, publicKey, privateKey) VALUES (?, ?, "") ON DUPLICATE KEY UPDATE publicKey = ?');
+    $stmt->execute([$key, $json, $json]);
+    return $data;
+}
+
+// -------------------------------------------------------------
+// Endpoint: GET /game/admin/config
+// -------------------------------------------------------------
+if ($method === 'GET' && ($subPath === '/game/admin/config' || $subPath === '/game/admin/config/')) {
+    requireAdminUser($jwtSecret, $pdo);
+    $config = getAppSecretConfig($pdo, 'MINI_GAME_CONFIG', getDefaultGameConfig());
+    header('Cache-Control: no-store');
+    echo json_encode($config);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: PUT /game/admin/config
+// -------------------------------------------------------------
+if ($method === 'PUT' && ($subPath === '/game/admin/config' || $subPath === '/game/admin/config/')) {
+    requireAdminUser($jwtSecret, $pdo);
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+    $current = getAppSecretConfig($pdo, 'MINI_GAME_CONFIG', getDefaultGameConfig());
+    $merged = array_merge($current, $input);
+    saveAppSecretConfig($pdo, 'MINI_GAME_CONFIG', $merged);
+    echo json_encode($merged);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: PATCH /game/admin/toggle
+// -------------------------------------------------------------
+if ($method === 'PATCH' && ($subPath === '/game/admin/toggle' || $subPath === '/game/admin/toggle/')) {
+    requireAdminUser($jwtSecret, $pdo);
+    $config = getAppSecretConfig($pdo, 'MINI_GAME_CONFIG', getDefaultGameConfig());
+    $config['enabled'] = empty($config['enabled']);
+    saveAppSecretConfig($pdo, 'MINI_GAME_CONFIG', $config);
+    echo json_encode(['enabled' => $config['enabled']]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: GET /game/admin/stats
+// -------------------------------------------------------------
+if ($method === 'GET' && ($subPath === '/game/admin/stats' || $subPath === '/game/admin/stats/')) {
+    requireAdminUser($jwtSecret, $pdo);
+    $config = getAppSecretConfig($pdo, 'MINI_GAME_CONFIG', getDefaultGameConfig());
+    $cycleAmount = max(100, (int)($config['cycleSpendAmount'] ?? 4999));
+
+    $customers = [];
+    try {
+        $customers = $pdo->query('SELECT id, name, email, phone, preferences, createdAt FROM Customer WHERE isActive = 1')->fetchAll();
+    } catch (Exception $e) {}
+
+    $spentByCustomer = [];
+    $ordersByCustomer = [];
+    try {
+        $orders = $pdo->query("SELECT customerId, total, grandTotal FROM PickupOrder WHERE status = 'COMPLETED' AND customerId IS NOT NULL")->fetchAll();
+        foreach ($orders as $o) {
+            $cid = $o['customerId'];
+            if (!$cid) continue;
+            $amt = (int)($o['grandTotal'] ?: $o['total'] ?: 0);
+            $spentByCustomer[$cid] = ($spentByCustomer[$cid] ?? 0) + $amt;
+            $ordersByCustomer[$cid] = ($ordersByCustomer[$cid] ?? 0) + 1;
+        }
+    } catch (Exception $e) {}
+
+    $customerStats = [];
+    foreach ($customers as $c) {
+        $cid = $c['id'];
+        $totalSpent = $spentByCustomer[$cid] ?? 0;
+        $orderCount = $ordersByCustomer[$cid] ?? 0;
+        $prefs = !empty($c['preferences']) && is_string($c['preferences']) ? (json_decode($c['preferences'], true) ?: []) : [];
+
+        $cyclePlays = (int)floor($totalSpent / $cycleAmount);
+        $gamePlaysUsed = isset($prefs['gamePlaysUsed']) && is_numeric($prefs['gamePlaysUsed']) ? (int)$prefs['gamePlaysUsed'] : (!empty($prefs['lastGamePlayAt']) ? 1 : 0);
+        $availablePlays = max(0, $cyclePlays - $gamePlaysUsed);
+        $currentCycleSpent = $totalSpent % $cycleAmount;
+        $remainingToNextPlay = $availablePlays > 0 ? 0 : max(0, $cycleAmount - $currentCycleSpent);
+
+        $customerStats[] = [
+            'id' => $c['id'],
+            'name' => $c['name'],
+            'email' => $c['email'],
+            'phone' => $c['phone'],
+            'totalSpent' => $totalSpent,
+            'orderCount' => $orderCount,
+            'cyclePlaysEarned' => $cyclePlays,
+            'gamePlaysUsed' => $gamePlaysUsed,
+            'availablePlays' => $availablePlays,
+            'currentCycleSpent' => $currentCycleSpent,
+            'remainingToNextPlay' => $remainingToNextPlay,
+            'hasQualified' => ($totalSpent >= $cycleAmount),
+            'lastGamePlayAt' => $prefs['lastGamePlayAt'] ?? null,
+            'lastGamePrize' => $prefs['lastGamePrize'] ?? null,
+        ];
+    }
+
+    header('Cache-Control: no-store');
+    echo json_encode([
+        'cycleSpendAmount' => $cycleAmount,
+        'requireOrderSpend' => (bool)($config['requireOrderSpend'] ?? true),
+        'customers' => $customerStats,
+    ]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: GET /game/status
+// -------------------------------------------------------------
+if ($method === 'GET' && ($subPath === '/game/status' || $subPath === '/game/status/')) {
+    $customer = requireCustomerUser($jwtSecret, $pdo);
+    $config = getAppSecretConfig($pdo, 'MINI_GAME_CONFIG', getDefaultGameConfig());
+    $cycleAmount = max(100, (int)($config['cycleSpendAmount'] ?? 4999));
+
+    $prefs = !empty($customer['preferences']) && is_string($customer['preferences']) ? (json_decode($customer['preferences'], true) ?: []) : [];
+
+    // Calculate customer spend
+    $totalSpent = 0;
+    $qualifyingOrderCount = 0;
+    try {
+        $stmt = $pdo->prepare("SELECT total, grandTotal FROM PickupOrder WHERE status = 'COMPLETED' AND customerId = ?");
+        $stmt->execute([$customer['id']]);
+        while ($row = $stmt->fetch()) {
+            $totalSpent += (int)($row['grandTotal'] ?: $row['total'] ?: 0);
+            $qualifyingOrderCount++;
+        }
+    } catch (Exception $e) {}
+
+    $cyclePlays = (int)floor($totalSpent / $cycleAmount);
+    $gamePlaysUsed = isset($prefs['gamePlaysUsed']) && is_numeric($prefs['gamePlaysUsed']) ? (int)$prefs['gamePlaysUsed'] : (!empty($prefs['lastGamePlayAt']) ? 1 : 0);
+    $availablePlays = max(0, $cyclePlays - $gamePlaysUsed);
+    $currentCycleSpent = $totalSpent % $cycleAmount;
+    $remainingToNextPlay = $availablePlays > 0 ? 0 : max(0, $cycleAmount - $currentCycleSpent);
+    $progressPercent = min(100, round(($currentCycleSpent / $cycleAmount) * 100));
+
+    // Check cooldown
+    $lastPlay = !empty($prefs['lastGamePlayAt']) ? strtotime($prefs['lastGamePlayAt']) : 0;
+    $cooldownSec = ((int)($config['cooldownHours'] ?? 24)) * 3600;
+    $canPlayCooldown = (time() - $lastPlay) >= $cooldownSec;
+
+    $canPlay = !empty($config['enabled']) && $canPlayCooldown && (!$config['requireOrderSpend'] || $availablePlays > 0);
+
+    // Filter out prize weights for security
+    $safePrizes = array_map(function ($p) {
+        return [
+            'id' => $p['id'],
+            'titleJa' => $p['titleJa'],
+            'type' => $p['type'],
+            'value' => (int)($p['value'] ?? 0),
+            'color' => $p['color'] ?? '#2563eb',
+            'icon' => $p['icon'] ?? null,
+            'descriptionJa' => $p['descriptionJa'] ?? null,
+        ];
+    }, $config['prizes'] ?? []);
+
+    echo json_encode([
+        'enabled' => (bool)$config['enabled'],
+        'mode' => $config['mode'] ?? 'LUCKY_WHEEL',
+        'titleJa' => $config['titleJa'],
+        'subtitleJa' => $config['subtitleJa'],
+        'canPlay' => $canPlay,
+        'availablePlays' => $availablePlays,
+        'prizes' => $safePrizes,
+        'spendStatus' => [
+            'requireOrderSpend' => (bool)($config['requireOrderSpend'] ?? true),
+            'cycleSpendAmount' => $cycleAmount,
+            'totalSpent' => $totalSpent,
+            'currentCycleSpent' => $currentCycleSpent,
+            'remainingToNextPlay' => $remainingToNextPlay,
+            'totalPlaysEarned' => $cyclePlays,
+            'gamePlaysUsed' => $gamePlaysUsed,
+            'availablePlays' => $availablePlays,
+            'progressPercent' => $progressPercent,
+            'qualifyingOrderCount' => $qualifyingOrderCount,
+        ],
+    ]);
+    exit;
+}
+
+// -------------------------------------------------------------
 // Endpoint: GET /dashboard/stats
 // -------------------------------------------------------------
 if ($method === 'GET' && ($subPath === '/dashboard/stats' || $subPath === '/dashboard/stats/')) {
@@ -1200,6 +1421,30 @@ function requireAdminUser($secret, $pdo) {
         exit;
     }
     return $user;
+}
+
+function requireCustomerUser($secret, $pdo) {
+    $token = getBearerOrCookie('kalpana_customer');
+    if (!$token) {
+        http_response_code(401);
+        echo json_encode(['error' => ['code' => 'UNAUTHORIZED', 'message' => 'Customer login required']]);
+        exit;
+    }
+    $payload = verifyJwt($token, $secret);
+    if (!$payload || empty($payload['sub']) || ($payload['aud'] ?? '') !== 'customer') {
+        http_response_code(401);
+        echo json_encode(['error' => ['code' => 'UNAUTHORIZED', 'message' => 'Invalid or expired customer session']]);
+        exit;
+    }
+    $stmt = $pdo->prepare('SELECT * FROM Customer WHERE id = ? LIMIT 1');
+    $stmt->execute([$payload['sub']]);
+    $customer = $stmt->fetch();
+    if (!$customer || (isset($customer['isActive']) && !$customer['isActive'])) {
+        http_response_code(401);
+        echo json_encode(['error' => ['code' => 'UNAUTHORIZED', 'message' => 'Customer account is inactive or not found']]);
+        exit;
+    }
+    return $customer;
 }
 
 // -------------------------------------------------------------
