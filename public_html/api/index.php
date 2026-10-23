@@ -72,11 +72,37 @@ try {
 }
 
 // Auto-seed baseline restaurant data if tables are empty
-function ensureDefaultDatabaseData(PDO $pdo) {
+function ensureDefaultDatabaseData(PDO $pdo): array {
+    $seeded = [];
+    $now = date('Y-m-d H:i:s');
+
+    // 1. User
     try {
-        $stmt = $pdo->query('SELECT COUNT(*) FROM Settings');
+        $stmt = $pdo->query('SELECT COUNT(*) FROM `User`');
         if ($stmt && (int)$stmt->fetchColumn() === 0) {
-            $now = date('Y-m-d H:i:s');
+            $adminHash = password_hash('admin123', PASSWORD_BCRYPT);
+            $userIns = $pdo->prepare('INSERT INTO `User` (id, email, passwordHash, name, role, isActive, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, 1, ?, ?)');
+            $userIns->execute(['usr_admin_default', 'admin@example.com', $adminHash, 'Kalpana Admin', 'ADMIN', $now, $now]);
+            $seeded['user'] = 1;
+        }
+    } catch (Exception $e) {}
+
+    // 2. Menu
+    try {
+        $stmt = $pdo->query('SELECT COUNT(*) FROM `Menu`');
+        if ($stmt && (int)$stmt->fetchColumn() === 0) {
+            $menuIns = $pdo->prepare('INSERT INTO `Menu` (id, type, nameEn, nameJa, isActive) VALUES (?, ?, ?, ?, 1)');
+            $menuIns->execute(['menu_lunch', 'LUNCH', 'Lunch Menu', 'ランチメニュー']);
+            $menuIns->execute(['menu_takeout', 'TAKEOUT', 'Takeout Menu', 'テイクアウトメニュー']);
+            $menuIns->execute(['menu_grand', 'GRAND', 'Grand Menu', 'グランドメニュー']);
+            $seeded['menu'] = 3;
+        }
+    } catch (Exception $e) {}
+
+    // 3. Settings
+    try {
+        $stmt = $pdo->query('SELECT COUNT(*) FROM `Settings`');
+        if ($stmt && (int)$stmt->fetchColumn() === 0) {
             $hours = json_encode([
                 'monday' => 'ランチ 11:30–15:00 / ディナー 17:00–22:00',
                 'tuesday' => '定休日',
@@ -87,11 +113,52 @@ function ensureDefaultDatabaseData(PDO $pdo) {
                 'sunday' => 'ランチ 11:30–15:00 / ディナー 17:00–22:00',
             ], JSON_UNESCAPED_UNICODE);
             $holidays = json_encode(['regular' => '火曜日'], JSON_UNESCAPED_UNICODE);
-            $ins = $pdo->prepare('INSERT INTO Settings (
+            $featuredReviews = json_encode([
+                [
+                    'authorName' => '田中 健一',
+                    'rating' => 5,
+                    'dateLabel' => '1か月前',
+                    'text' => '国道17号沿いにできた本格インド料理店。バターチキンカレーとチーズナンが最高！チーズが溢れるほど入っていてナンだけでも美味しくいただけます。ランチはおかわり無料でコスパも抜群。スタッフさんも笑顔でとても親切です。',
+                ],
+                [
+                    'authorName' => '佐藤 美咲',
+                    'rating' => 5,
+                    'dateLabel' => '2か月前',
+                    'text' => 'ダブルカレーランチ（チキンマサラと日替わり）をいただきました。炭火タンドールで焼かれたナンは熱々で香ばしく、モッチモチで大満足！辛さも選べるので辛口にしましたが、スパイスのコクがしっかり効いていて深みがあります。',
+                ],
+                [
+                    'authorName' => '高橋 裕太',
+                    'rating' => 5,
+                    'dateLabel' => '3か月前',
+                    'text' => '熊谷で一番美味しいインドカレーに出会えました。炭焼きのタンドリーチキンもジューシーで香辛料の香りがたまりません。駐車場も12台分あって入りやすく、店内も清潔で居心地が良いです。',
+                ],
+                [
+                    'authorName' => '鈴木 あゆみ',
+                    'rating' => 5,
+                    'dateLabel' => '3か月前',
+                    'text' => '家族でディナーに伺いました。ビリヤニとサグチキンカレー、グリーンナンを注文。どれも本場の味わいで感動しました！スタッフの方の温かい接客にも癒やされます。テイクアウトもできるのでまた利用します。',
+                ],
+            ], JSON_UNESCAPED_UNICODE);
+
+            $ins = $pdo->prepare('INSERT INTO `Settings` (
                 id, name, addressEn, addressJa, phone, email, mapUrl, googleMapsLink,
                 weeklyHours, holidays, orderingEnabled, pickupEnabled, deliveryEnabled,
-                pointsEnabled, stampCardEnabled, aboutEn, aboutJa, createdAt, updatedAt
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, 0, 1, 1, ?, ?, ?, ?)');
+                pointsEnabled, stampsEnabled, aboutEn, aboutJa, heroTagJa, heroSubJa,
+                welcomeTitleEn, welcomeTitleJa, welcomeTextJa, menuExplorerLabelJa, menuExplorerTitleJa,
+                recommendedLabelJa, recommendedTitleJa, recommendedSubJa,
+                storeSectionLabelJa, storeSectionTitleJa, storeSectionSubJa, storeLocationJa, storeBadgeJa,
+                storeReviewScore, storeReviewCount, storeReviewText, storeReviewLink,
+                featuredReviews, createdAt, updatedAt
+            ) VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, 1, 1, 0,
+                1, 1, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?,
+                ?, ?, ?,
+                ?, ?, ?, ?, ?,
+                ?, ?, ?, ?,
+                ?, ?, ?
+            )');
             $ins->execute([
                 'default',
                 'Kalpna Indian Cuisine',
@@ -104,33 +171,72 @@ function ensureDefaultDatabaseData(PDO $pdo) {
                 $hours,
                 $holidays,
                 'Authentic Indian Cuisine in Kumagaya, Saitama.',
-                '埼玉・熊谷の本格インド料理店カルパナ。タンドール窯で焼き上げるナン、スパイス香るカレー、ランチ・テイクアウト・グランドメニューをご案内します。',
+                '毎日手作りの新鮮な味 — 手挽きのスパイス、本格的な粘土窯（タンドール）、妥協のない調理',
+                '埼玉・熊谷で味わう、本場のインド料理',
+                "愛とスパイス、そして伝統に彩られた数世紀にわたるレシピを。\nKalpna Indian Cuisineで皆様をお待ちしております。",
+                'Authentic Indian Flavors',
+                '本格インドの味わい',
+                'インドの豊かな食文化と鮮やかなスパイスを体験してください。熟練のシェフが伝統的なタンドール窯と新鮮な食材を使用し、すべての料理をゼロから手作りしています。忘れられない特別なひとときをお届けします。',
+                'メニューを見る',
+                'キッチンからお届け',
+                'シェフの厳選',
+                'おすすめメニュー',
+                '全店舗で愛され続けている、不動の人気メニュー',
+                '店舗を探す',
+                '私たちの店舗',
+                '店舗を選択して、住所、営業時間、地図をご確認ください。',
+                '埼玉県熊谷市佐谷田2081（国道17号沿い・加賀家食堂隣）',
+                '🍛 インド料理',
+                '4.5',
+                185,
+                'Googleでレビューを見る',
+                'https://maps.app.goo.gl/92p48n6Zc4X9Nq518',
+                $featuredReviews,
                 $now,
                 $now
             ]);
+            $seeded['settings'] = 1;
         }
     } catch (Exception $e) {}
 
+    // 4. Categories
     try {
-        $stmt = $pdo->query('SELECT COUNT(*) FROM Category');
+        $stmt = $pdo->query('SELECT COUNT(*) FROM `Category`');
         if ($stmt && (int)$stmt->fetchColumn() === 0) {
-            $catIns = $pdo->prepare('INSERT INTO Category (id, nameEn, nameJa, sortOrder, dineIn, parentId) VALUES (?, ?, ?, ?, ?, ?)');
-            $catIns->execute(['cat_lunch', 'Lunch Menu', 'ランチメニュー', 1, 1, null]);
-            $catIns->execute(['cat_takeout', 'Takeout Menu', 'テイクアウトメニュー', 2, 0, null]);
-            $catIns->execute(['cat_grand', 'Grand Menu', 'グランドメニュー', 3, 1, null]);
+            $catIns = $pdo->prepare('INSERT INTO `Category` (id, nameEn, nameJa, sortOrder, parentId) VALUES (?, ?, ?, ?, ?)');
+            $catIns->execute(['cat_lunch', 'Lunch Menu', 'ランチメニュー', 1, null]);
+            $catIns->execute(['cat_takeout', 'Takeout Menu', 'テイクアウトメニュー', 2, null]);
+            $catIns->execute(['cat_grand', 'Grand Menu', 'グランドメニュー', 3, null]);
 
-            $catIns->execute(['cat_curry', 'Chicken Curries', 'チキンカレー', 1, 1, 'cat_grand']);
-            $catIns->execute(['cat_mutton', 'Mutton Curries', 'マトンカレー', 2, 1, 'cat_grand']);
-            $catIns->execute(['cat_bread', 'Breads & Naan', 'ナン・ライス', 3, 1, 'cat_grand']);
-            $catIns->execute(['cat_lunch_set', 'Lunch Sets', 'ランチセット', 1, 1, 'cat_lunch']);
+            $catIns->execute(['cat_curry', 'Chicken Curries', 'チキンカレー', 1, 'cat_grand']);
+            $catIns->execute(['cat_mutton', 'Mutton Curries', 'マトンカレー', 2, 'cat_grand']);
+            $catIns->execute(['cat_bread', 'Breads & Naan', 'ナン・ライス', 3, 'cat_grand']);
+            $catIns->execute(['cat_lunch_set', 'Lunch Sets', 'ランチセット', 1, 'cat_lunch']);
+            $seeded['categories'] = 7;
         }
     } catch (Exception $e) {}
 
+    // 5. _CategoryToMenu
     try {
-        $stmt = $pdo->query('SELECT COUNT(*) FROM MenuItem');
+        $stmt = $pdo->query('SELECT COUNT(*) FROM `_CategoryToMenu`');
         if ($stmt && (int)$stmt->fetchColumn() === 0) {
-            $now = date('Y-m-d H:i:s');
-            $itemIns = $pdo->prepare('INSERT INTO MenuItem (
+            $c2m = $pdo->prepare('INSERT IGNORE INTO `_CategoryToMenu` (A, B) VALUES (?, ?)');
+            $c2m->execute(['cat_lunch', 'menu_lunch']);
+            $c2m->execute(['cat_takeout', 'menu_takeout']);
+            $c2m->execute(['cat_grand', 'menu_grand']);
+            $c2m->execute(['cat_curry', 'menu_grand']);
+            $c2m->execute(['cat_mutton', 'menu_grand']);
+            $c2m->execute(['cat_bread', 'menu_grand']);
+            $c2m->execute(['cat_lunch_set', 'menu_lunch']);
+            $seeded['_CategoryToMenu'] = 7;
+        }
+    } catch (Exception $e) {}
+
+    // 6. Menu Items
+    try {
+        $stmt = $pdo->query('SELECT COUNT(*) FROM `MenuItem`');
+        if ($stmt && (int)$stmt->fetchColumn() === 0) {
+            $itemIns = $pdo->prepare('INSERT INTO `MenuItem` (
                 id, categoryId, nameEn, nameJa, descriptionEn, descriptionJa,
                 price, imageUrl, spiceLevel, isRecommended, isVegetarian, isVegan,
                 isHalal, isGlutenFree, isSoldOut, isOrderable, isActive, sortOrder,
@@ -155,28 +261,570 @@ function ensureDefaultDatabaseData(PDO $pdo) {
                     $now, $now
                 ]);
             }
+            $seeded['menu_items'] = count($samples);
         }
     } catch (Exception $e) {}
 
+    // 7. Carousel Slides
     try {
-        $stmt = $pdo->query('SELECT COUNT(*) FROM CarouselSlide');
+        $stmt = $pdo->query('SELECT COUNT(*) FROM `CarouselSlide`');
         if ($stmt && (int)$stmt->fetchColumn() === 0) {
-            $slideIns = $pdo->prepare('INSERT INTO CarouselSlide (
+            $slideIns = $pdo->prepare('INSERT INTO `CarouselSlide` (
                 id, placement, imageUrl, altEn, altJa, titleEn, titleJa,
                 subtitleEn, subtitleJa, sortOrder, isActive
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)');
-            $slideIns->execute([
-                'slide_1', 'HOME', '/bg-hero-img.webp',
-                'Authentic Indian Curry and Naan', '本格インド料理と焼きたてナン',
-                'Authentic Indian Flavors', '本格スパイスが香る、伝統のインド料理',
-                'Handcrafted curries and tandoori specials.', 'タンドール窯で焼き上げるナンと極上のスパイスカレー',
-                1
-            ]);
+
+            $slides = [
+                ['slide_1', 'HOME', '/bg-hero-img.webp', 'Authentic Indian Curry and Naan', '本格インド料理と焼きたてナン', 'Authentic Indian Flavors', '本格スパイスが香る、伝統のインド料理', 'Handcrafted curries and tandoori specials.', 'タンドール窯で焼き上げるナンと極上のスパイスカレー', 1],
+                ['slide_2', 'HOME', '/bg-hero-img.webp', 'Freshly baked tandoori naan and rich curry bowls', '焼きたてナンと本格スパイスカレー', 'Freshly Baked Naan & Curries', '焼きたてナンと本格スパイスカレー', 'Fresh from our charcoal tandoor oven.', '炭火粘土窯で焼き上げるタンドール料理', 2],
+                ['slide_3', 'HOME', '/bg-hero-img.webp', 'Master chef preparing tandoori specialties in traditional clay oven', '熟練シェフの本格タンドール料理', 'Traditional Charcoal Tandoor', '伝統のタンドール炭火焼料理', 'Finest spices blended with culinary passion.', '長年磨き上げたスパイスの魔法', 3],
+                ['slide_4', 'CONTACT', '/bg-hero-img.webp', 'Kalpana Indian Cuisine dining hall in Kumagaya', 'カルパナ熊谷店', 'Visit Kalpana in Kumagaya', '熊谷でお待ちしております', 'Conveniently located with parking available.', '国道17号沿い・駐車場12台完備', 1]
+            ];
+            foreach ($slides as $sl) {
+                $slideIns->execute($sl);
+            }
+            $seeded['carousel_slides'] = count($slides);
         }
     } catch (Exception $e) {}
+
+    return $seeded;
 }
 
-ensureDefaultDatabaseData($pdo);
+// Full database migration runner: idempotent table creation and schema sync
+function runDatabaseMigrations(PDO $pdo): array {
+    $tables = [
+        'User' => "CREATE TABLE IF NOT EXISTS `User` (
+            `id` VARCHAR(191) NOT NULL,
+            `email` VARCHAR(191) NOT NULL,
+            `passwordHash` VARCHAR(191) NOT NULL,
+            `name` VARCHAR(191) NOT NULL,
+            `role` ENUM('ADMIN', 'STAFF', 'KITCHEN') NOT NULL DEFAULT 'STAFF',
+            `isActive` BOOLEAN NOT NULL DEFAULT true,
+            `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            `updatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+            UNIQUE INDEX `User_email_key`(`email`),
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+
+        'Menu' => "CREATE TABLE IF NOT EXISTS `Menu` (
+            `id` VARCHAR(191) NOT NULL,
+            `type` ENUM('LUNCH', 'TAKEOUT', 'GRAND') NOT NULL,
+            `nameEn` VARCHAR(191) NOT NULL,
+            `nameJa` VARCHAR(191) NULL,
+            `descriptionEn` TEXT NULL,
+            `descriptionJa` TEXT NULL,
+            `servingHours` JSON NULL,
+            `notesEn` TEXT NULL,
+            `notesJa` TEXT NULL,
+            `pdfUrl` VARCHAR(191) NULL,
+            `isActive` BOOLEAN NOT NULL DEFAULT true,
+            UNIQUE INDEX `Menu_type_key`(`type`),
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+
+        'Category' => "CREATE TABLE IF NOT EXISTS `Category` (
+            `id` VARCHAR(191) NOT NULL,
+            `nameEn` VARCHAR(191) NOT NULL,
+            `nameJa` VARCHAR(191) NULL,
+            `sortOrder` INTEGER NOT NULL DEFAULT 0,
+            `parentId` VARCHAR(191) NULL,
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+
+        'MenuItem' => "CREATE TABLE IF NOT EXISTS `MenuItem` (
+            `id` VARCHAR(191) NOT NULL,
+            `categoryId` VARCHAR(191) NOT NULL,
+            `menuTypes` JSON NOT NULL,
+            `nameEn` VARCHAR(191) NOT NULL,
+            `nameJa` VARCHAR(191) NULL,
+            `descriptionEn` TEXT NULL,
+            `descriptionJa` TEXT NULL,
+            `price` INTEGER NOT NULL,
+            `imageUrl` VARCHAR(191) NULL,
+            `rating` DOUBLE NULL,
+            `spiceLevel` INTEGER NOT NULL DEFAULT 0,
+            `isVegetarian` BOOLEAN NOT NULL DEFAULT false,
+            `isVegan` BOOLEAN NOT NULL DEFAULT false,
+            `isHalal` BOOLEAN NOT NULL DEFAULT false,
+            `isGlutenFree` BOOLEAN NOT NULL DEFAULT false,
+            `allergens` JSON NOT NULL,
+            `isRecommended` BOOLEAN NOT NULL DEFAULT false,
+            `isSoldOut` BOOLEAN NOT NULL DEFAULT false,
+            `isOrderable` BOOLEAN NOT NULL DEFAULT true,
+            `isActive` BOOLEAN NOT NULL DEFAULT true,
+            `sortOrder` INTEGER NOT NULL DEFAULT 0,
+            `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            `updatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+            INDEX `MenuItem_categoryId_sortOrder_idx`(`categoryId`, `sortOrder`),
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+
+        'ItemVariant' => "CREATE TABLE IF NOT EXISTS `ItemVariant` (
+            `id` VARCHAR(191) NOT NULL,
+            `itemId` VARCHAR(191) NOT NULL,
+            `labelEn` VARCHAR(191) NOT NULL,
+            `labelJa` VARCHAR(191) NULL,
+            `price` INTEGER NOT NULL,
+            `sortOrder` INTEGER NOT NULL DEFAULT 0,
+            INDEX `ItemVariant_itemId_idx`(`itemId`),
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+
+        'OptionGroup' => "CREATE TABLE IF NOT EXISTS `OptionGroup` (
+            `id` VARCHAR(191) NOT NULL,
+            `nameJa` VARCHAR(191) NOT NULL,
+            `nameEn` VARCHAR(191) NOT NULL,
+            `type` VARCHAR(191) NOT NULL DEFAULT 'RADIO',
+            `required` BOOLEAN NOT NULL DEFAULT true,
+            `options` JSON NOT NULL,
+            `sortOrder` INTEGER NOT NULL DEFAULT 0,
+            `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            `updatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+
+        'CarouselSlide' => "CREATE TABLE IF NOT EXISTS `CarouselSlide` (
+            `id` VARCHAR(191) NOT NULL,
+            `placement` ENUM('HOME', 'CONTACT') NOT NULL,
+            `imageUrl` VARCHAR(191) NOT NULL,
+            `altEn` VARCHAR(191) NOT NULL,
+            `altJa` VARCHAR(191) NULL,
+            `titleEn` VARCHAR(191) NULL,
+            `titleJa` VARCHAR(191) NULL,
+            `subtitleEn` VARCHAR(191) NULL,
+            `subtitleJa` VARCHAR(191) NULL,
+            `ctaLabelEn` VARCHAR(191) NULL,
+            `ctaLabelJa` VARCHAR(191) NULL,
+            `ctaLink` VARCHAR(191) NULL,
+            `sortOrder` INTEGER NOT NULL DEFAULT 0,
+            `startAt` DATETIME(3) NULL,
+            `endAt` DATETIME(3) NULL,
+            `isActive` BOOLEAN NOT NULL DEFAULT true,
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+
+        'Settings' => "CREATE TABLE IF NOT EXISTS `Settings` (
+            `id` VARCHAR(191) NOT NULL,
+            `name` VARCHAR(191) NULL,
+            `addressEn` VARCHAR(191) NULL,
+            `addressJa` VARCHAR(191) NULL,
+            `lat` DOUBLE NULL,
+            `lng` DOUBLE NULL,
+            `phone` VARCHAR(191) NULL,
+            `email` VARCHAR(191) NULL,
+            `timezone` VARCHAR(191) NOT NULL DEFAULT 'Asia/Tokyo',
+            `currency` VARCHAR(191) NOT NULL DEFAULT 'JPY',
+            `weeklyHours` JSON NULL,
+            `holidays` JSON NULL,
+            `socials` JSON NULL,
+            `googlePlaceId` VARCHAR(191) NULL,
+            `mapUrl` TEXT NULL,
+            `googleMapsLink` TEXT NULL,
+            `aboutEn` TEXT NULL,
+            `aboutJa` TEXT NULL,
+            `aboutHeroImage` VARCHAR(191) NULL,
+            `aboutHeroTag` VARCHAR(191) NULL,
+            `aboutHeroTitle` VARCHAR(191) NULL,
+            `aboutStoryJa` TEXT NULL,
+            `aboutStoryLabelJa` VARCHAR(191) NULL,
+            `aboutStoryTitleJa` VARCHAR(191) NULL,
+            `aboutSpiceLabelJa` VARCHAR(191) NULL,
+            `aboutSpiceTitleJa` VARCHAR(191) NULL,
+            `aboutSpiceDescJa` TEXT NULL,
+            `aboutSpiceImage` VARCHAR(191) NULL,
+            `aboutChefLabelJa` VARCHAR(191) NULL,
+            `aboutChefTitleJa` VARCHAR(191) NULL,
+            `aboutChefDescJa` TEXT NULL,
+            `aboutChefImage` VARCHAR(191) NULL,
+            `contactHeroImage` VARCHAR(191) NULL,
+            `menuLunchHeroImage` VARCHAR(191) NULL,
+            `menuTakeoutHeroImage` VARCHAR(191) NULL,
+            `menuGrandHeroImage` VARCHAR(191) NULL,
+            `orderingEnabled` BOOLEAN NOT NULL DEFAULT true,
+            `pickupEnabled` BOOLEAN NOT NULL DEFAULT false,
+            `pickupHours` VARCHAR(191) NULL,
+            `pickupClosedDays` JSON NULL,
+            `pickupClosedDates` JSON NULL,
+            `pickupLeadMinutes` INTEGER NULL,
+            `pickupNoteJa` VARCHAR(191) NULL,
+            `publicSiteUrl` VARCHAR(191) NULL,
+            `footerLogo` VARCHAR(191) NULL,
+            `footerBrand` VARCHAR(191) NULL,
+            `footerTaglineJa` VARCHAR(191) NULL,
+            `footerCopyright` VARCHAR(191) NULL,
+            `footerLinks` JSON NULL,
+            `footerShowHours` BOOLEAN NULL,
+            `footerShowSocials` BOOLEAN NULL,
+            `googleReviewsMinRating` INTEGER NULL,
+            `storeReviewCount` INTEGER NULL,
+            `featuredReviews` JSON NULL,
+            `storeReviewScore` VARCHAR(191) NULL,
+            `storeReviewText` VARCHAR(191) NULL,
+            `storeReviewLink` TEXT NULL,
+            `orderingPausedUntil` DATETIME(3) NULL,
+            `pointsEnabled` BOOLEAN NULL,
+            `pointsPer100Yen` INTEGER NULL,
+            `pointValueYen` INTEGER NULL,
+            `signupBonusPoints` INTEGER NULL,
+            `taxRatePercent` INTEGER NULL,
+            `deliveryEnabled` BOOLEAN NULL,
+            `deliveryFee` INTEGER NULL,
+            `deliveryMinOrder` INTEGER NULL,
+            `deliveryAreas` JSON NULL,
+            `deliveryLeadMinutes` INTEGER NULL,
+            `stampsEnabled` BOOLEAN NULL,
+            `stampsPerCard` INTEGER NULL,
+            `stampMinAmount` INTEGER NULL,
+            `stampCooldownHours` INTEGER NULL,
+            `stampRewardValidDays` INTEGER NULL,
+            `stampRewards` JSON NULL,
+            `welcomeTitleEn` VARCHAR(191) NULL,
+            `welcomeTitleJa` VARCHAR(191) NULL,
+            `welcomeTextJa` TEXT NULL,
+            `storeSectionLabelJa` VARCHAR(191) NULL,
+            `storeSectionTitleJa` VARCHAR(191) NULL,
+            `storeSectionSubJa` TEXT NULL,
+            `storeLocationJa` VARCHAR(191) NULL,
+            `storeBadgeJa` VARCHAR(191) NULL,
+            `heroTagJa` VARCHAR(191) NULL,
+            `heroSubJa` TEXT NULL,
+            `menuExplorerLabelJa` VARCHAR(191) NULL,
+            `menuExplorerTitleJa` VARCHAR(191) NULL,
+            `recommendedLabelJa` VARCHAR(191) NULL,
+            `recommendedTitleJa` VARCHAR(191) NULL,
+            `recommendedSubJa` VARCHAR(191) NULL,
+            `newsletterTitleJa` VARCHAR(191) NULL,
+            `newsletterSubJa` TEXT NULL,
+            `newsletterBgImage` VARCHAR(191) NULL,
+            `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            `updatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+
+        'ContactMessage' => "CREATE TABLE IF NOT EXISTS `ContactMessage` (
+            `id` VARCHAR(191) NOT NULL,
+            `name` VARCHAR(191) NOT NULL,
+            `email` VARCHAR(191) NOT NULL,
+            `phone` VARCHAR(191) NULL,
+            `type` ENUM('GENERAL', 'RESERVATION', 'CATERING', 'FEEDBACK') NOT NULL DEFAULT 'GENERAL',
+            `date` DATETIME(3) NULL,
+            `guests` INTEGER NULL,
+            `message` TEXT NOT NULL,
+            `isRead` BOOLEAN NOT NULL DEFAULT false,
+            `ip` VARCHAR(191) NULL,
+            `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+
+        'PickupOrder' => "CREATE TABLE IF NOT EXISTS `PickupOrder` (
+            `id` VARCHAR(191) NOT NULL,
+            `number` INTEGER NOT NULL,
+            `dateKey` VARCHAR(191) NOT NULL,
+            `token` VARCHAR(191) NOT NULL,
+            `status` ENUM('NEW', 'CONFIRMED', 'READY', 'COMPLETED', 'CANCELLED') NOT NULL DEFAULT 'NEW',
+            `customerName` VARCHAR(191) NOT NULL,
+            `phone` VARCHAR(191) NOT NULL,
+            `email` VARCHAR(191) NULL,
+            `note` TEXT NULL,
+            `pickupAt` DATETIME(3) NOT NULL,
+            `items` JSON NOT NULL,
+            `customerId` VARCHAR(191) NULL,
+            `subtotal` INTEGER NULL,
+            `offer` JSON NULL,
+            `pointsUsed` INTEGER NOT NULL DEFAULT 0,
+            `pointsDiscount` INTEGER NOT NULL DEFAULT 0,
+            `total` INTEGER NOT NULL,
+            `taxRate` INTEGER NULL,
+            `tax` INTEGER NULL,
+            `grandTotal` INTEGER NULL,
+            `pointsEarned` INTEGER NOT NULL DEFAULT 0,
+            `confirmedAt` DATETIME(3) NULL,
+            `readyAt` DATETIME(3) NULL,
+            `completedAt` DATETIME(3) NULL,
+            `cancelledAt` DATETIME(3) NULL,
+            `ip` VARCHAR(191) NULL,
+            `fulfillment` VARCHAR(191) NOT NULL DEFAULT 'PICKUP',
+            `deliveryFee` INTEGER NULL,
+            `deliveryAddress` JSON NULL,
+            `reward` JSON NULL,
+            `stampAwarded` BOOLEAN NULL,
+            `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            `updatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+            UNIQUE INDEX `PickupOrder_token_key`(`token`),
+            INDEX `PickupOrder_status_pickupAt_idx`(`status`, `pickupAt`),
+            INDEX `PickupOrder_customerId_createdAt_idx`(`customerId`, `createdAt`),
+            INDEX `PickupOrder_dateKey_idx`(`dateKey`),
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+
+        'Customer' => "CREATE TABLE IF NOT EXISTS `Customer` (
+            `id` VARCHAR(191) NOT NULL,
+            `email` VARCHAR(191) NOT NULL,
+            `passwordHash` VARCHAR(191) NOT NULL,
+            `name` VARCHAR(191) NOT NULL,
+            `nameKana` VARCHAR(191) NULL,
+            `phone` VARCHAR(191) NULL,
+            `birthDate` VARCHAR(191) NULL,
+            `address` JSON NULL,
+            `preferences` JSON NULL,
+            `newsletterOptIn` BOOLEAN NOT NULL DEFAULT false,
+            `newsletterOptInAt` DATETIME(3) NULL,
+            `points` INTEGER NOT NULL DEFAULT 0,
+            `isActive` BOOLEAN NOT NULL DEFAULT true,
+            `deletedAt` DATETIME(3) NULL,
+            `memberCode` VARCHAR(191) NULL,
+            `stampCount` INTEGER NOT NULL DEFAULT 0,
+            `stampTotal` INTEGER NOT NULL DEFAULT 0,
+            `stampCardsCompleted` INTEGER NOT NULL DEFAULT 0,
+            `lastStampAt` DATETIME(3) NULL,
+            `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            `updatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+            UNIQUE INDEX `Customer_email_key`(`email`),
+            UNIQUE INDEX `Customer_memberCode_key`(`memberCode`),
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+
+        'PointTransaction' => "CREATE TABLE IF NOT EXISTS `PointTransaction` (
+            `id` VARCHAR(191) NOT NULL,
+            `customerId` VARCHAR(191) NOT NULL,
+            `type` ENUM('EARN', 'REDEEM', 'REFUND', 'BONUS', 'ADJUST') NOT NULL,
+            `points` INTEGER NOT NULL,
+            `balanceAfter` INTEGER NOT NULL,
+            `orderId` VARCHAR(191) NULL,
+            `orderNumber` INTEGER NULL,
+            `note` VARCHAR(191) NULL,
+            `userId` VARCHAR(191) NULL,
+            `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            INDEX `PointTransaction_customerId_createdAt_idx`(`customerId`, `createdAt`),
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+
+        'Offer' => "CREATE TABLE IF NOT EXISTS `Offer` (
+            `id` VARCHAR(191) NOT NULL,
+            `titleJa` VARCHAR(191) NOT NULL,
+            `descriptionJa` TEXT NULL,
+            `imageUrl` VARCHAR(191) NULL,
+            `discountType` ENUM('PERCENT', 'AMOUNT') NOT NULL,
+            `discountValue` INTEGER NOT NULL,
+            `minSubtotal` INTEGER NOT NULL DEFAULT 0,
+            `startsAt` DATETIME(3) NULL,
+            `endsAt` DATETIME(3) NULL,
+            `oncePerCustomer` BOOLEAN NOT NULL DEFAULT false,
+            `isActive` BOOLEAN NOT NULL DEFAULT true,
+            `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            `updatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+
+        'OrderCounter' => "CREATE TABLE IF NOT EXISTS `OrderCounter` (
+            `id` VARCHAR(191) NOT NULL,
+            `seq` INTEGER NOT NULL,
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+
+        'AuditLog' => "CREATE TABLE IF NOT EXISTS `AuditLog` (
+            `id` VARCHAR(191) NOT NULL,
+            `userId` VARCHAR(191) NOT NULL,
+            `action` VARCHAR(191) NOT NULL,
+            `entity` VARCHAR(191) NOT NULL,
+            `entityId` VARCHAR(191) NOT NULL,
+            `diff` JSON NULL,
+            `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+
+        'Stamp' => "CREATE TABLE IF NOT EXISTS `Stamp` (
+            `id` VARCHAR(191) NOT NULL,
+            `customerId` VARCHAR(191) NOT NULL,
+            `card` INTEGER NOT NULL,
+            `position` INTEGER NOT NULL,
+            `source` VARCHAR(191) NOT NULL,
+            `amount` INTEGER NULL,
+            `orderId` VARCHAR(191) NULL,
+            `orderNumber` INTEGER NULL,
+            `userId` VARCHAR(191) NULL,
+            `note` VARCHAR(191) NULL,
+            `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            UNIQUE INDEX `Stamp_orderId_key`(`orderId`),
+            INDEX `Stamp_customerId_createdAt_idx`(`customerId`, `createdAt`),
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+
+        'StampReward' => "CREATE TABLE IF NOT EXISTS `StampReward` (
+            `id` VARCHAR(191) NOT NULL,
+            `customerId` VARCHAR(191) NOT NULL,
+            `titleJa` VARCHAR(191) NOT NULL,
+            `kind` VARCHAR(191) NOT NULL,
+            `amount` INTEGER NULL,
+            `at` INTEGER NULL,
+            `card` INTEGER NULL,
+            `status` VARCHAR(191) NOT NULL DEFAULT 'AVAILABLE',
+            `earnedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            `usedAt` DATETIME(3) NULL,
+            `expiresAt` DATETIME(3) NULL,
+            `orderId` VARCHAR(191) NULL,
+            `orderNumber` INTEGER NULL,
+            `usedBy` VARCHAR(191) NULL,
+            INDEX `StampReward_customerId_status_earnedAt_idx`(`customerId`, `status`, `earnedAt`),
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+
+        'AppSecret' => "CREATE TABLE IF NOT EXISTS `AppSecret` (
+            `id` VARCHAR(191) NOT NULL,
+            `publicKey` TEXT NOT NULL,
+            `privateKey` TEXT NOT NULL,
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+
+        'PushSubscription' => "CREATE TABLE IF NOT EXISTS `PushSubscription` (
+            `id` VARCHAR(191) NOT NULL,
+            `endpoint` VARCHAR(1000) NOT NULL,
+            `p256dh` VARCHAR(500) NOT NULL,
+            `auth` VARCHAR(200) NOT NULL,
+            `customerId` VARCHAR(191) NULL,
+            `orderIds` JSON NULL,
+            `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            `updatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+            UNIQUE INDEX `PushSubscription_endpoint_key`(`endpoint`(255)),
+            INDEX `PushSubscription_customerId_idx`(`customerId`),
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+
+        'SquarePayment' => "CREATE TABLE IF NOT EXISTS `SquarePayment` (
+            `id` VARCHAR(191) NOT NULL,
+            `sessionId` VARCHAR(191) NOT NULL,
+            `tableNumber` VARCHAR(191) NOT NULL,
+            `channel` VARCHAR(191) NOT NULL,
+            `amount` INTEGER NOT NULL,
+            `currency` VARCHAR(191) NOT NULL DEFAULT 'JPY',
+            `status` VARCHAR(191) NOT NULL DEFAULT 'pending',
+            `idempotencyKey` VARCHAR(191) NOT NULL,
+            `squarePaymentId` VARCHAR(191) NULL,
+            `squareCheckoutId` VARCHAR(191) NULL,
+            `squareLinkId` VARCHAR(191) NULL,
+            `squareOrderId` VARCHAR(191) NULL,
+            `deviceId` VARCHAR(191) NULL,
+            `failureCode` VARCHAR(191) NULL,
+            `refundedAmount` INTEGER NOT NULL DEFAULT 0,
+            `closedByUserId` VARCHAR(191) NOT NULL,
+            `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            `updatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+            UNIQUE INDEX `SquarePayment_idempotencyKey_key`(`idempotencyKey`),
+            INDEX `SquarePayment_sessionId_status_idx`(`sessionId`, `status`),
+            INDEX `SquarePayment_squarePaymentId_idx`(`squarePaymentId`),
+            INDEX `SquarePayment_squareCheckoutId_idx`(`squareCheckoutId`),
+            INDEX `SquarePayment_squareLinkId_idx`(`squareLinkId`),
+            INDEX `SquarePayment_createdAt_idx`(`createdAt`),
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+
+        'SquareWebhookEvent' => "CREATE TABLE IF NOT EXISTS `SquareWebhookEvent` (
+            `id` VARCHAR(191) NOT NULL,
+            `squareEventId` VARCHAR(191) NOT NULL,
+            `eventType` VARCHAR(191) NOT NULL,
+            `receivedAt` DATETIME(3) NOT NULL,
+            `processedAt` DATETIME(3) NULL,
+            `processingStatus` VARCHAR(191) NOT NULL DEFAULT 'pending',
+            `payload` JSON NOT NULL,
+            `retryCount` INTEGER NOT NULL DEFAULT 0,
+            UNIQUE INDEX `SquareWebhookEvent_squareEventId_key`(`squareEventId`),
+            INDEX `SquareWebhookEvent_processingStatus_idx`(`processingStatus`),
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+
+        'GoogleReviewCache' => "CREATE TABLE IF NOT EXISTS `GoogleReviewCache` (
+            `id` VARCHAR(191) NOT NULL,
+            `placeId` VARCHAR(191) NOT NULL,
+            `name` VARCHAR(191) NULL,
+            `rating` DOUBLE NULL,
+            `userRatingCount` INTEGER NULL,
+            `mapsUrl` TEXT NULL,
+            `reviews` JSON NOT NULL,
+            `fetchedAt` DATETIME(3) NULL,
+            `lastError` TEXT NULL,
+            `lastErrorAt` DATETIME(3) NULL,
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+
+        '_CategoryToMenu' => "CREATE TABLE IF NOT EXISTS `_CategoryToMenu` (
+            `A` VARCHAR(191) NOT NULL,
+            `B` VARCHAR(191) NOT NULL,
+            UNIQUE INDEX `_CategoryToMenu_AB_unique`(`A`, `B`),
+            INDEX `_CategoryToMenu_B_index`(`B`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+
+        '_MenuItemToOptionGroup' => "CREATE TABLE IF NOT EXISTS `_MenuItemToOptionGroup` (
+            `A` VARCHAR(191) NOT NULL,
+            `B` VARCHAR(191) NOT NULL,
+            UNIQUE INDEX `_MenuItemToOptionGroup_AB_unique`(`A`, `B`),
+            INDEX `_MenuItemToOptionGroup_B_index`(`B`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
+    ];
+
+    $created = [];
+    foreach ($tables as $name => $ddl) {
+        try {
+            $pdo->exec($ddl);
+            $created[] = $name;
+        } catch (Exception $e) {
+            $created[] = "{$name} (error: " . $e->getMessage() . ")";
+        }
+    }
+
+    // Drop legacy dining tables if they exist
+    try { $pdo->exec("DROP TABLE IF EXISTS `_CustomerToTableSession`"); } catch (Exception $e) {}
+    try { $pdo->exec("DROP TABLE IF EXISTS `TableSession`"); } catch (Exception $e) {}
+    try { $pdo->exec("DROP TABLE IF EXISTS `DiningTable`"); } catch (Exception $e) {}
+
+    // Ensure missing columns exist in existing tables
+    $columnsToEnsure = [
+        ['MenuItem', 'isOrderable', "BOOLEAN NOT NULL DEFAULT 1"],
+        ['Settings', 'aboutHeroTag', "VARCHAR(191) NULL"],
+        ['Settings', 'aboutHeroTitle', "VARCHAR(191) NULL"],
+        ['Settings', 'heroTagJa', "VARCHAR(191) NULL"],
+        ['Settings', 'heroSubJa', "TEXT NULL"],
+        ['Settings', 'menuExplorerLabelJa', "VARCHAR(191) NULL"],
+        ['Settings', 'menuExplorerTitleJa', "VARCHAR(191) NULL"],
+        ['Settings', 'recommendedLabelJa', "VARCHAR(191) NULL"],
+        ['Settings', 'recommendedTitleJa', "VARCHAR(191) NULL"],
+        ['Settings', 'recommendedSubJa', "VARCHAR(191) NULL"],
+        ['Settings', 'newsletterTitleJa', "VARCHAR(191) NULL"],
+        ['Settings', 'newsletterSubJa', "TEXT NULL"],
+        ['Settings', 'newsletterBgImage', "VARCHAR(191) NULL"],
+    ];
+
+    $columnsUpdated = [];
+    foreach ($columnsToEnsure as $col) {
+        list($table, $colName, $colDef) = $col;
+        try {
+            $check = $pdo->prepare("SHOW COLUMNS FROM `{$table}` LIKE ?");
+            $check->execute([$colName]);
+            if (!$check->fetch()) {
+                $pdo->exec("ALTER TABLE `{$table}` ADD `{$colName}` {$colDef}");
+                $columnsUpdated[] = "{$table}.{$colName}";
+            }
+        } catch (Exception $e) {}
+    }
+
+    // Seed initial data
+    $seedStatus = ensureDefaultDatabaseData($pdo);
+
+    return [
+        'status' => 'completed',
+        'tables' => $created,
+        'columns_added' => $columnsUpdated,
+        'seeded' => $seedStatus,
+        'time' => date('c'),
+    ];
+}
+
+// Auto-run migrations if Settings or Category table is missing, otherwise ensure default baseline data
+try {
+    $pdo->query('SELECT 1 FROM `Settings` LIMIT 1');
+    ensureDefaultDatabaseData($pdo);
+} catch (Exception $e) {
+    runDatabaseMigrations($pdo);
+}
 
 // 3. Routing
 $requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
@@ -195,6 +843,19 @@ if (($pos = strpos($path, '/api/v1')) !== false) {
     $subPath = $path;
 }
 if (empty($subPath)) $subPath = '/';
+
+// -------------------------------------------------------------
+// Endpoint: GET|POST /migrate (Execute complete DB migrations)
+// -------------------------------------------------------------
+if (($method === 'GET' || $method === 'POST') && ($subPath === '/migrate' || $subPath === '/migrate/')) {
+    $result = runDatabaseMigrations($pdo);
+    echo json_encode([
+        'success' => true,
+        'message' => 'Database schema migration executed successfully',
+        'result' => $result,
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    exit;
+}
 
 // -------------------------------------------------------------
 // Endpoint: GET /settings
