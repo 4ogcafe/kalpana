@@ -9,12 +9,23 @@ Options -Indexes
   RewriteEngine On
   RewriteBase /
 
-  # Block hidden files/dirs (.git, .env, ...) except .well-known
+  # 1. Block access to hidden files and repo source code
   RewriteRule "(^|/)\.(?!well-known)" - [F,L]
+  RewriteRule "(^|/)(kalpana-config\.php|\.env|\.git|composer\.(json|lock)|package(-lock)?\.json|tsconfig.*\.json)$" - [F,L]
+  RewriteRule "^(apps|packages|docs|\.agents|\.vscode)(/.*)?$" - [F,L]
 
-  # If already rewritten or requested into public_html, do not rewrite again
-  RewriteRule ^public_html(/.*)?$ - [L]
+  # 2. Stop immediately on internal subrequests to prevent any rewrite loop (LiteSpeed 503 fix)
+  RewriteCond %{ENV:REDIRECT_STATUS} !^$
+  RewriteRule ^ - [L]
 
-  # Everything else -> public_html/
+  # 3. Route API requests directly to PHP API gateway
+  RewriteRule ^api(/.*)?$ public_html/api/index.php [QSA,L]
+
+  # 4. If file or directory exists inside public_html/, serve it
+  RewriteCond %{DOCUMENT_ROOT}/public_html/$1 -f [OR]
+  RewriteCond %{DOCUMENT_ROOT}/public_html/$1 -d
   RewriteRule ^(.*)$ public_html/$1 [L]
+
+  # 5. Frontend SPA fallback
+  RewriteRule ^ public_html/index.html [L]
 </IfModule>

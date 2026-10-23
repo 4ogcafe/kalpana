@@ -9,17 +9,21 @@ DirectoryIndex index.html index.php
   RewriteRule "(^|/)\.(?!well-known)" - [F,L]
   RewriteRule "(^|/)(kalpana-config\.php|\.env|\.git|composer\.(json|lock)|package(-lock)?\.json|tsconfig.*\.json)$" - [F,L]
 
-  # 2. Route API requests to PHP API gateway
+  # 2. Stop immediately on internal subrequests to prevent any rewrite loop (LiteSpeed 503 fix)
+  RewriteCond %{ENV:REDIRECT_STATUS} !^$
+  RewriteRule ^ - [L]
+
+  # 3. Route API requests to PHP API gateway
   RewriteRule ^api/index\.php$ - [L]
   RewriteRule ^api(/.*)?$ api/index.php [QSA,L]
 
-  # 3. Serve real files and directories as-is
+  # 4. Serve real files and directories as-is
   RewriteRule ^index\.html$ - [L]
   RewriteCond %{REQUEST_FILENAME} -f [OR]
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
 
-  # 4. Frontend SPA fallback
+  # 5. Frontend SPA fallback
   RewriteRule ^ index.html [L]
 </IfModule>
 

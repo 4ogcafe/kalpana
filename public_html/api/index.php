@@ -46,20 +46,19 @@ $dbUser = $cfg('db_user', 'u309882766_kalpana');
 $dbPass = $cfg('db_pass', '64650@Mohan');
 $jwtSecret = $cfg('jwt_secret', 'kalpana-dev-secret-change-in-production-32chars!!');
 
+$pdoOptions = [
+    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    PDO::ATTR_EMULATE_PREPARES => false,
+    PDO::ATTR_TIMEOUT => 5,
+];
+
 try {
-    $pdo = new PDO("mysql:host={$dbHost};dbname={$dbName};charset=utf8mb4", $dbUser, $dbPass, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES => false,
-    ]);
+    $pdo = new PDO("mysql:host={$dbHost};dbname={$dbName};charset=utf8mb4", $dbUser, $dbPass, $pdoOptions);
 } catch (PDOException $e) {
     if ($dbHost === 'localhost') {
         try {
-            $pdo = new PDO("mysql:host=127.0.0.1;dbname={$dbName};charset=utf8mb4", $dbUser, $dbPass, [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                PDO::ATTR_EMULATE_PREPARES => false,
-            ]);
+            $pdo = new PDO("mysql:host=127.0.0.1;dbname={$dbName};charset=utf8mb4", $dbUser, $dbPass, $pdoOptions);
         } catch (PDOException $e2) {
             http_response_code(500);
             echo json_encode(['error' => ['code' => 'DB_CONNECTION_FAILED', 'message' => 'Database connection failed: ' . $e2->getMessage()]]);
