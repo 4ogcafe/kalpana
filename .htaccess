@@ -14,9 +14,8 @@ Options -Indexes
   RewriteRule "(^|/)(kalpana-config\.php|\.env|\.git|composer\.(json|lock)|package(-lock)?\.json|tsconfig.*\.json)$" - [F,L]
   RewriteRule "^(apps|packages|docs|\.agents|\.vscode)(/.*)?$" - [F,L]
 
-  # 2. Stop immediately on internal subrequests to prevent any rewrite loop (LiteSpeed 503 fix)
-  RewriteCond %{ENV:REDIRECT_STATUS} !^$
-  RewriteRule ^ - [L]
+  # 2. If already inside public_html/, do not rewrite again (prevents LiteSpeed rewrite loop)
+  RewriteRule ^public_html(/.*)?$ - [L]
 
   # 3. Route API requests directly to PHP API gateway
   RewriteRule ^api(/.*)?$ public_html/api/index.php [QSA,L]

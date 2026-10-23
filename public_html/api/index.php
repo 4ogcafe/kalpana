@@ -40,7 +40,7 @@ $cfg = function (string $key, $default = null) use ($config) {
     return ($env !== false && $env !== '') ? $env : $default;
 };
 
-$dbHost = $cfg('db_host', 'localhost');
+$dbHost = $cfg('db_host', '127.0.0.1');
 $dbName = $cfg('db_name', 'u309882766_kalpanadb');
 $dbUser = $cfg('db_user', 'u309882766_kalpana');
 $dbPass = $cfg('db_pass', '64650@Mohan');
@@ -50,15 +50,15 @@ $pdoOptions = [
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
     PDO::ATTR_EMULATE_PREPARES => false,
-    PDO::ATTR_TIMEOUT => 5,
+    PDO::ATTR_TIMEOUT => 3,
 ];
 
 try {
-    $pdo = new PDO("mysql:host={$dbHost};dbname={$dbName};charset=utf8mb4", $dbUser, $dbPass, $pdoOptions);
+    $pdo = new PDO("mysql:host={$dbHost};port=3306;dbname={$dbName};charset=utf8mb4", $dbUser, $dbPass, $pdoOptions);
 } catch (PDOException $e) {
-    if ($dbHost === 'localhost') {
+    if ($dbHost !== 'localhost') {
         try {
-            $pdo = new PDO("mysql:host=127.0.0.1;dbname={$dbName};charset=utf8mb4", $dbUser, $dbPass, $pdoOptions);
+            $pdo = new PDO("mysql:host=localhost;dbname={$dbName};charset=utf8mb4", $dbUser, $dbPass, $pdoOptions);
         } catch (PDOException $e2) {
             http_response_code(500);
             echo json_encode(['error' => ['code' => 'DB_CONNECTION_FAILED', 'message' => 'Database connection failed: ' . $e2->getMessage()]]);
@@ -828,10 +828,9 @@ function runDatabaseMigrations(PDO $pdo): array {
     ];
 }
 
-// Auto-run migrations if Settings or Category table is missing, otherwise ensure default baseline data
+// Auto-run migrations if Settings table is missing
 try {
     $pdo->query('SELECT 1 FROM `Settings` LIMIT 1');
-    ensureDefaultDatabaseData($pdo);
 } catch (Exception $e) {
     runDatabaseMigrations($pdo);
 }
