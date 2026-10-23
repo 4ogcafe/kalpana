@@ -1485,7 +1485,7 @@ if ($method === 'GET' && ($subPath === '/orders/slots' || $subPath === '/orders/
 // Endpoint: GET /offers
 // -------------------------------------------------------------
 if ($method === 'GET' && ($subPath === '/offers' || $subPath === '/offers/')) {
-    $stmt = $pdo->query('SELECT * FROM Offer WHERE isActive = 1 ORDER BY sortOrder ASC');
+    $stmt = $pdo->query('SELECT * FROM Offer WHERE isActive = 1 ORDER BY createdAt DESC');
     $offers = $stmt->fetchAll();
     echo json_encode($offers);
     exit;
