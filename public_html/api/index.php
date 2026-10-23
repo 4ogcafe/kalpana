@@ -17,10 +17,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 // 2. Database Connection
-$dbHost = 'localhost';
-$dbName = 'u309882766_kalpanadb';
-$dbUser = 'u309882766_kalpana';
-$dbPass = '64650@Mohan';
+// Credentials live outside the web root: <parent of public_html>/kalpana-config.php
+// (see public_html/api/config.example.php), or in environment variables.
+$configFile = dirname(__DIR__, 2) . '/kalpana-config.php';
+$config = is_file($configFile) ? (require $configFile) : [];
+if (!is_array($config)) $config = [];
+$cfg = function (string $key, $default = null) use ($config) {
+    if (isset($config[$key]) && $config[$key] !== '') return $config[$key];
+    $env = getenv('KALPANA_' . strtoupper($key));
+    return ($env !== false && $env !== '') ? $env : $default;
+};
+
+$dbHost = $cfg('db_host', 'localhost');
+$dbName = $cfg('db_name');
+$dbUser = $cfg('db_user');
+$dbPass = $cfg('db_pass');
+$jwtSecret = $cfg('jwt_secret');
+
+if (!$dbName || !$dbUser || $dbPass === null || !$jwtSecret || strlen($jwtSecret) < 32) {
+    http_response_code(500);
+    echo json_encode(['error' => ['code' => 'CONFIG_MISSING', 'message' => 'Server is not configured']]);
+    exit;
+}
 
 try {
     $pdo = new PDO("mysql:host={$dbHost};dbname={$dbName};charset=utf8mb4", $dbUser, $dbPass, [
@@ -240,7 +258,6 @@ if ($method === 'GET' && ($subPath === '/offers' || $subPath === '/offers/')) {
 }
 
 // Helper: JWT verification & creation (HS256)
-$jwtSecret = 'kalpana-dev-secret-change-in-production-32chars!!';
 
 function base64UrlEncode($data) {
     return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
