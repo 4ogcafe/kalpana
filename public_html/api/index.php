@@ -54,12 +54,11 @@ $method = $_SERVER['REQUEST_METHOD'];
 $path = rtrim($requestUri, '/');
 if (empty($path)) $path = '/';
 
-// Optional: handle prefix like /api/v1 or /api
-$prefix = '/api/v1';
-if (str_starts_with($path, $prefix)) {
-    $subPath = substr($path, strlen($prefix));
-} elseif (str_starts_with($path, '/api')) {
-    $subPath = substr($path, 4);
+// Optional: handle prefix like /api/v1 or /api (even if preceded by /public_html)
+if (($pos = strpos($path, '/api/v1')) !== false) {
+    $subPath = substr($path, $pos + strlen('/api/v1'));
+} elseif (($pos = strpos($path, '/api')) !== false) {
+    $subPath = substr($path, $pos + 4);
 } else {
     $subPath = $path;
 }
@@ -234,6 +233,258 @@ if ($method === 'GET' && ($subPath === '/carousels' || $subPath === '/carousels/
 }
 
 // -------------------------------------------------------------
+// Endpoint: PUT /carousels/:id
+// -------------------------------------------------------------
+if ($method === 'PUT' && preg_match('#^/carousels/([a-zA-Z0-9_-]+)/?$#', $subPath, $matches)) {
+    $slideId = $matches[1];
+    $user = requireAdminUser($jwtSecret, $pdo);
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+
+    $fields = [];
+    $params = [];
+    $allowed = ['titleEn', 'titleJa', 'altEn', 'altJa', 'imageUrl', 'placement', 'isActive', 'sortOrder', 'subtitleEn', 'subtitleJa', 'ctaLabelEn', 'ctaLabelJa', 'ctaLink'];
+
+    foreach ($allowed as $f) {
+        if (array_key_exists($f, $input)) {
+            $val = $input[$f];
+            if ($f === 'isActive') {
+                $val = $val ? 1 : 0;
+            } elseif ($f === 'sortOrder') {
+                $val = (int)$val;
+            }
+            $fields[] = "`{$f}` = ?";
+            $params[] = $val;
+        }
+    }
+
+    if (empty($fields)) {
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
+    $params[] = $slideId;
+    $sql = 'UPDATE CarouselSlide SET ' . implode(', ', $fields) . ' WHERE id = ?';
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+
+    echo json_encode(['success' => true]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: DELETE /carousels/:id
+// -------------------------------------------------------------
+if ($method === 'DELETE' && preg_match('#^/carousels/([a-zA-Z0-9_-]+)/?$#', $subPath, $matches)) {
+    $slideId = $matches[1];
+    $user = requireAdminUser($jwtSecret, $pdo);
+
+    $stmt = $pdo->prepare('DELETE FROM CarouselSlide WHERE id = ?');
+    $stmt->execute([$slideId]);
+
+    echo json_encode(['success' => true]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: POST /carousels
+// -------------------------------------------------------------
+if ($method === 'POST' && ($subPath === '/carousels' || $subPath === '/carousels/')) {
+    $user = requireAdminUser($jwtSecret, $pdo);
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+
+    $placement = ($input['placement'] ?? 'HOME') === 'CONTACT' ? 'CONTACT' : 'HOME';
+    $titleEn = trim($input['titleEn'] ?? '');
+    $titleJa = trim($input['titleJa'] ?? '');
+    $altEn = trim($input['altEn'] ?? '') ?: ($titleEn ?: $titleJa);
+    $imageUrl = trim($input['imageUrl'] ?? '');
+
+    if (empty($imageUrl)) {
+        http_response_code(400);
+        echo json_encode(['error' => ['code' => 'VALIDATION_FAILED', 'message' => 'Image URL is required']]);
+        exit;
+    }
+
+    $stmtCount = $pdo->prepare('SELECT COUNT(*) FROM CarouselSlide WHERE placement = ?');
+    $stmtCount->execute([$placement]);
+    $count = (int)$stmtCount->fetchColumn();
+
+    $newId = generateUuidV4();
+    $insertStmt = $pdo->prepare('
+        INSERT INTO CarouselSlide (id, placement, imageUrl, altEn, titleEn, titleJa, isActive, sortOrder)
+        VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+    ');
+    $insertStmt->execute([$newId, $placement, $imageUrl, $altEn, $titleEn, $titleJa, $count]);
+
+    $fetchStmt = $pdo->prepare('SELECT * FROM CarouselSlide WHERE id = ? LIMIT 1');
+    $fetchStmt->execute([$newId]);
+    $created = $fetchStmt->fetch();
+    if ($created) {
+        $created['isActive'] = (bool)$created['isActive'];
+    }
+
+    http_response_code(201);
+    echo json_encode($created);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: POST /upload
+// -------------------------------------------------------------
+if ($method === 'POST' && ($subPath === '/upload' || $subPath === '/upload/')) {
+    $user = requireStaffUser($jwtSecret, $pdo);
+
+    if (empty($_FILES['image']) || !isset($_FILES['image']['tmp_name']) || !is_uploaded_file($_FILES['image']['tmp_name'])) {
+        http_response_code(400);
+        echo json_encode(['error' => ['code' => 'NO_FILE', 'message' => 'No file uploaded']]);
+        exit;
+    }
+
+    $file = $_FILES['image'];
+    if ($file['size'] > 5 * 1024 * 1024) {
+        http_response_code(400);
+        echo json_encode(['error' => ['code' => 'FILE_TOO_LARGE', 'message' => 'File size must be under 5MB']]);
+        exit;
+    }
+
+    $bytes = file_get_contents($file['tmp_name'], false, null, 0, 16);
+    $ext = null;
+    if (strlen($bytes) >= 3 && substr($bytes, 0, 3) === "\xFF\xD8\xFF") {
+        $ext = '.jpg';
+    } elseif (strlen($bytes) >= 8 && substr($bytes, 0, 8) === "\x89PNG\x0D\x0A\x1A\x0A") {
+        $ext = '.png';
+    } elseif (strlen($bytes) >= 12 && substr($bytes, 0, 4) === 'RIFF' && substr($bytes, 8, 4) === 'WEBP') {
+        $ext = '.webp';
+    }
+
+    if (!$ext) {
+        http_response_code(415);
+        echo json_encode(['error' => ['code' => 'UNSUPPORTED_FILE', 'message' => 'Only JPEG, PNG and WebP images are allowed']]);
+        exit;
+    }
+
+    $uploadDir = dirname(__DIR__) . '/uploads';
+    if (!is_dir($uploadDir)) {
+        @mkdir($uploadDir, 0755, true);
+    }
+
+    $filename = time() . '-' . bin2hex(random_bytes(8)) . $ext;
+    $destination = $uploadDir . '/' . $filename;
+
+    if (!move_uploaded_file($file['tmp_name'], $destination)) {
+        http_response_code(500);
+        echo json_encode(['error' => ['code' => 'UPLOAD_FAILED', 'message' => 'Failed to save uploaded file']]);
+        exit;
+    }
+
+    http_response_code(201);
+    echo json_encode(['imageUrl' => '/uploads/' . $filename]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: PUT /settings
+// -------------------------------------------------------------
+if ($method === 'PUT' && ($subPath === '/settings' || $subPath === '/settings/')) {
+    $user = requireAdminUser($jwtSecret, $pdo);
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+
+    // Extended page settings saved to AppSecret
+    $extKeys = [
+        'aboutStoryImage', 'aboutStoryWatermark', 'aboutStoryOriginTitleJa',
+        'aboutStoryOriginTextJa', 'aboutStoryBadgeSubJa', 'aboutStoryBadgeTitleJa',
+        'aboutStoryPillar1TitleJa', 'aboutStoryPillar1DescJa', 'aboutStoryPillar2TitleJa',
+        'aboutStoryPillar2DescJa', 'aboutStoryPillar3TitleJa', 'aboutStoryPillar3DescJa',
+    ];
+    $hasExt = false;
+    $extData = [];
+    foreach ($extKeys as $ek) {
+        if (array_key_exists($ek, $input)) {
+            $extData[$ek] = $input[$ek];
+            $hasExt = true;
+        }
+    }
+
+    if ($hasExt) {
+        $prev = [];
+        try {
+            $secStmt = $pdo->prepare('SELECT publicKey FROM AppSecret WHERE id = ?');
+            $secStmt->execute(['PAGE_SETTINGS_EXT']);
+            $secRow = $secStmt->fetch();
+            if ($secRow && !empty($secRow['publicKey'])) {
+                $prev = json_decode($secRow['publicKey'], true) ?: [];
+            }
+        } catch (Exception $e) {}
+
+        $merged = array_merge($prev, $extData);
+        $encoded = json_encode($merged);
+        try {
+            $upsertStmt = $pdo->prepare('
+                INSERT INTO AppSecret (id, publicKey, privateKey)
+                VALUES (?, ?, "")
+                ON DUPLICATE KEY UPDATE publicKey = VALUES(publicKey)
+            ');
+            $upsertStmt->execute(['PAGE_SETTINGS_EXT', $encoded]);
+        } catch (Exception $e) {}
+    }
+
+    // Settings columns update
+    $existing = $pdo->query('SELECT id FROM Settings LIMIT 1')->fetch();
+    $jsonCols = ['weeklyHours', 'holidays', 'socials', 'featuredReviews', 'footerLinks', 'pickupClosedDays', 'pickupClosedDates', 'stampRewards', 'deliveryAreas'];
+    $boolCols = ['orderingEnabled', 'pickupEnabled', 'deliveryEnabled', 'pointsEnabled', 'stampCardEnabled', 'stampsEnabled', 'footerShowHours', 'footerShowSocials'];
+
+    // Map stampCardEnabled to stampsEnabled
+    if (isset($input['stampCardEnabled'])) {
+        $input['stampsEnabled'] = $input['stampCardEnabled'];
+    }
+
+    $updateCols = [];
+    $updateParams = [];
+
+    // Retrieve column list from information_schema
+    $colStmt = $pdo->prepare('SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = "Settings" AND TABLE_SCHEMA = DATABASE()');
+    $colStmt->execute();
+    $validCols = $colStmt->fetchAll(PDO::FETCH_COLUMN);
+
+    foreach ($input as $k => $v) {
+        if (!in_array($k, $validCols, true) || $k === 'id') continue;
+        if (in_array($k, $jsonCols, true)) {
+            $v = is_string($v) ? $v : json_encode($v);
+        } elseif (in_array($k, $boolCols, true)) {
+            $v = $v ? 1 : 0;
+        }
+        $updateCols[] = "`{$k}` = ?";
+        $updateParams[] = $v;
+    }
+
+    if ($existing && !empty($updateCols)) {
+        $updateParams[] = $existing['id'];
+        $sql = 'UPDATE Settings SET ' . implode(', ', $updateCols) . ' WHERE id = ?';
+        $pdo->prepare($sql)->execute($updateParams);
+    } elseif (!$existing && !empty($updateCols)) {
+        $cols = array_keys($input);
+        // Fallback insert if empty
+        $newId = generateUuidV4();
+        $pdo->prepare('INSERT INTO Settings (id) VALUES (?)')->execute([$newId]);
+    }
+
+    // Return updated settings
+    $stmt = $pdo->query('SELECT * FROM Settings LIMIT 1');
+    $settings = $stmt->fetch() ?: [];
+    foreach ($jsonCols as $jf) {
+        if (isset($settings[$jf]) && is_string($settings[$jf])) {
+            $settings[$jf] = json_decode($settings[$jf], true) ?: $settings[$jf];
+        }
+    }
+    foreach ($boolCols as $bf) {
+        if (isset($settings[$bf])) {
+            $settings[$bf] = (bool)$settings[$bf];
+        }
+    }
+    echo json_encode($settings);
+    exit;
+}
+
+// -------------------------------------------------------------
 // Endpoint: GET /orders/slots
 // -------------------------------------------------------------
 if ($method === 'GET' && ($subPath === '/orders/slots' || $subPath === '/orders/slots/')) {
@@ -297,6 +548,47 @@ function getBearerOrCookie($cookieName) {
         return trim($matches[1]);
     }
     return null;
+}
+
+function generateUuidV4() {
+    $data = random_bytes(16);
+    $data[6] = chr(ord($data[6]) & 0x0f | 0x40); // set version to 0100
+    $data[8] = chr(ord($data[8]) & 0x3f | 0x80); // set bits 6-7 to 10
+    return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
+}
+
+function requireStaffUser($secret, $pdo) {
+    $token = getBearerOrCookie('kalpana_session');
+    if (!$token) {
+        http_response_code(401);
+        echo json_encode(['error' => ['code' => 'UNAUTHORIZED', 'message' => 'Staff login required']]);
+        exit;
+    }
+    $payload = verifyJwt($token, $secret);
+    if (!$payload || empty($payload['sub']) || isset($payload['aud'])) {
+        http_response_code(401);
+        echo json_encode(['error' => ['code' => 'UNAUTHORIZED', 'message' => 'Invalid or expired session']]);
+        exit;
+    }
+    $stmt = $pdo->prepare('SELECT id, name, email, role, isActive FROM User WHERE id = ? LIMIT 1');
+    $stmt->execute([$payload['sub']]);
+    $user = $stmt->fetch();
+    if (!$user || !$user['isActive']) {
+        http_response_code(401);
+        echo json_encode(['error' => ['code' => 'UNAUTHORIZED', 'message' => 'User account is inactive or not found']]);
+        exit;
+    }
+    return $user;
+}
+
+function requireAdminUser($secret, $pdo) {
+    $user = requireStaffUser($secret, $pdo);
+    if ($user['role'] !== 'ADMIN') {
+        http_response_code(403);
+        echo json_encode(['error' => ['code' => 'FORBIDDEN', 'message' => 'Admin permissions required']]);
+        exit;
+    }
+    return $user;
 }
 
 // -------------------------------------------------------------
