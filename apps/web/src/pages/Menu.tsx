@@ -123,8 +123,12 @@ export default function Menu() {
     return false;
   };
   
-  // Filter items that belong strictly to this menu page's category hierarchy
+  // Filter items that belong strictly to this menu page's category hierarchy or menuTypes
   const filteredItems = menuItems.filter(item => {
+    // If item explicitly has menuTypes array matching this menu
+    if (Array.isArray(item.menuTypes) && item.menuTypes.includes(menuTypeEnum)) {
+      return true;
+    }
     // If the item's category is under this page's main category
     if (categoryBelongsToPage(item.categoryId)) {
       return true;

@@ -71,6 +71,113 @@ try {
     }
 }
 
+// Auto-seed baseline restaurant data if tables are empty
+function ensureDefaultDatabaseData(PDO $pdo) {
+    try {
+        $stmt = $pdo->query('SELECT COUNT(*) FROM Settings');
+        if ($stmt && (int)$stmt->fetchColumn() === 0) {
+            $now = date('Y-m-d H:i:s');
+            $hours = json_encode([
+                'monday' => 'ランチ 11:30–15:00 / ディナー 17:00–22:00',
+                'tuesday' => '定休日',
+                'wednesday' => 'ランチ 11:30–15:00 / ディナー 17:00–22:00',
+                'thursday' => 'ランチ 11:30–15:00 / ディナー 17:00–22:00',
+                'friday' => 'ランチ 11:30–15:00 / ディナー 17:00–22:00',
+                'saturday' => 'ランチ 11:30–15:00 / ディナー 17:00–22:00',
+                'sunday' => 'ランチ 11:30–15:00 / ディナー 17:00–22:00',
+            ], JSON_UNESCAPED_UNICODE);
+            $holidays = json_encode(['regular' => '火曜日'], JSON_UNESCAPED_UNICODE);
+            $ins = $pdo->prepare('INSERT INTO Settings (
+                id, name, addressEn, addressJa, phone, email, mapUrl, googleMapsLink,
+                weeklyHours, holidays, orderingEnabled, pickupEnabled, deliveryEnabled,
+                pointsEnabled, stampCardEnabled, aboutEn, aboutJa, createdAt, updatedAt
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, 0, 1, 1, ?, ?, ?, ?)');
+            $ins->execute([
+                'default',
+                'Kalpna Indian Cuisine',
+                '2081 Sayada, Kumagaya, Saitama 360-0831, Japan',
+                '〒360-0831 埼玉県熊谷市佐谷田2081',
+                '048-514-8386',
+                'info@kalpnacurry.com',
+                'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3220.8906325916053!2d139.4005126!3d36.1408166!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x6018cdba11dc903b%3A0xe95d3e6cfb99db10!2sKalpana%20Indian%20Restaurant!5e0!3m2!1sen!2sjp!4v1715000000000!5m2!1sen!2sjp',
+                'https://maps.app.goo.gl/92p48n6Zc4X9Nq518',
+                $hours,
+                $holidays,
+                'Authentic Indian Cuisine in Kumagaya, Saitama.',
+                '埼玉・熊谷の本格インド料理店カルパナ。タンドール窯で焼き上げるナン、スパイス香るカレー、ランチ・テイクアウト・グランドメニューをご案内します。',
+                $now,
+                $now
+            ]);
+        }
+    } catch (Exception $e) {}
+
+    try {
+        $stmt = $pdo->query('SELECT COUNT(*) FROM Category');
+        if ($stmt && (int)$stmt->fetchColumn() === 0) {
+            $catIns = $pdo->prepare('INSERT INTO Category (id, nameEn, nameJa, sortOrder, dineIn, parentId) VALUES (?, ?, ?, ?, ?, ?)');
+            $catIns->execute(['cat_lunch', 'Lunch Menu', 'ランチメニュー', 1, 1, null]);
+            $catIns->execute(['cat_takeout', 'Takeout Menu', 'テイクアウトメニュー', 2, 0, null]);
+            $catIns->execute(['cat_grand', 'Grand Menu', 'グランドメニュー', 3, 1, null]);
+
+            $catIns->execute(['cat_curry', 'Chicken Curries', 'チキンカレー', 1, 1, 'cat_grand']);
+            $catIns->execute(['cat_mutton', 'Mutton Curries', 'マトンカレー', 2, 1, 'cat_grand']);
+            $catIns->execute(['cat_bread', 'Breads & Naan', 'ナン・ライス', 3, 1, 'cat_grand']);
+            $catIns->execute(['cat_lunch_set', 'Lunch Sets', 'ランチセット', 1, 1, 'cat_lunch']);
+        }
+    } catch (Exception $e) {}
+
+    try {
+        $stmt = $pdo->query('SELECT COUNT(*) FROM MenuItem');
+        if ($stmt && (int)$stmt->fetchColumn() === 0) {
+            $now = date('Y-m-d H:i:s');
+            $itemIns = $pdo->prepare('INSERT INTO MenuItem (
+                id, categoryId, nameEn, nameJa, descriptionEn, descriptionJa,
+                price, imageUrl, spiceLevel, isRecommended, isVegetarian, isVegan,
+                isHalal, isGlutenFree, isSoldOut, isOrderable, isActive, sortOrder,
+                menuTypes, allergens, createdAt, updatedAt
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1, 1, ?, ?, ?, ?, ?)');
+
+            $samples = [
+                ['item_1', 'cat_curry', 'Butter Chicken Curry', 'バターチキンカレー', 'Creamy tomato-based chicken curry with rich butter aroma.', 'トマトベースの濃厚でコクのあるクリーミーなチキンカレー。', 1200, '/bg-hero-img.webp', 1, 1, 0, 0, 1, 0, 1, ['LUNCH', 'TAKEOUT', 'GRAND'], ['乳']],
+                ['item_2', 'cat_mutton', 'Keema Curry', 'キーマカレー', 'Minced mutton curry spiced with fragrant whole spices.', 'スパイス香る挽肉の旨味たっぷりキーマカレー。', 1100, '/bg-hero-img.webp', 3, 1, 0, 0, 1, 0, 2, ['GRAND', 'TAKEOUT'], []],
+                ['item_3', 'cat_bread', 'Cheese Naan', 'チーズナン', 'Freshly baked naan stuffed with melted mozzarella cheese.', 'とろ〜り溶け出すたっぷりチーズの本格ナン。', 550, '/bg-hero-img.webp', 0, 1, 1, 0, 1, 0, 1, ['LUNCH', 'TAKEOUT', 'GRAND'], ['乳', '小麦']],
+                ['item_4', 'cat_bread', 'Garlic Naan', 'ガーリックナン', 'Crispy naan topped with fresh chopped garlic and herbs.', '香ばしいガーリックをトッピングした風味豊かなナン。', 400, '/bg-hero-img.webp', 0, 0, 1, 1, 1, 0, 2, ['GRAND', 'TAKEOUT'], ['小麦']],
+                ['item_5', 'cat_lunch_set', 'Lunch Set A', 'ランチセット A', 'Choice of curry, plain naan or rice, and mini salad.', 'お好みのカレー1種、プレーンナンまたはライス、ミニサラダ付き。', 950, '/bg-hero-img.webp', 1, 1, 0, 0, 1, 0, 1, ['LUNCH'], ['乳', '小麦']],
+                ['item_6', 'cat_lunch_set', 'Lunch Set B (Cheese Naan)', 'チーズナンランチセット', 'Choice of curry, cheese naan, and mini salad.', 'お好みのカレー、チーズナン、ミニサラダがセットになった大満足ランチ。', 1150, '/bg-hero-img.webp', 1, 1, 0, 0, 1, 0, 2, ['LUNCH'], ['乳', '小麦']],
+            ];
+
+            foreach ($samples as $s) {
+                $itemIns->execute([
+                    $s[0], $s[1], $s[2], $s[3], $s[4], $s[5],
+                    $s[6], $s[7], $s[8], $s[9], $s[10], $s[11],
+                    $s[12], $s[13], $s[14],
+                    json_encode($s[15]), json_encode($s[16], JSON_UNESCAPED_UNICODE),
+                    $now, $now
+                ]);
+            }
+        }
+    } catch (Exception $e) {}
+
+    try {
+        $stmt = $pdo->query('SELECT COUNT(*) FROM CarouselSlide');
+        if ($stmt && (int)$stmt->fetchColumn() === 0) {
+            $slideIns = $pdo->prepare('INSERT INTO CarouselSlide (
+                id, placement, imageUrl, altEn, altJa, titleEn, titleJa,
+                subtitleEn, subtitleJa, sortOrder, isActive
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)');
+            $slideIns->execute([
+                'slide_1', 'HOME', '/bg-hero-img.webp',
+                'Authentic Indian Curry and Naan', '本格インド料理と焼きたてナン',
+                'Authentic Indian Flavors', '本格スパイスが香る、伝統のインド料理',
+                'Handcrafted curries and tandoori specials.', 'タンドール窯で焼き上げるナンと極上のスパイスカレー',
+                1
+            ]);
+        }
+    } catch (Exception $e) {}
+}
+
+ensureDefaultDatabaseData($pdo);
+
 // 3. Routing
 $requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $method = $_SERVER['REQUEST_METHOD'];
@@ -130,6 +237,32 @@ if ($method === 'GET' && ($subPath === '/settings' || $subPath === '/settings/')
         }
     } catch (Exception $e) {}
 
+    $defaultSettings = [
+        'name' => 'Kalpna Indian Cuisine',
+        'addressEn' => '2081 Sayada, Kumagaya, Saitama 360-0831, Japan',
+        'addressJa' => '〒360-0831 埼玉県熊谷市佐谷田2081',
+        'phone' => '048-514-8386',
+        'email' => 'info@kalpnacurry.com',
+        'mapUrl' => 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3220.8906325916053!2d139.4005126!3d36.1408166!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x6018cdba11dc903b%3A0xe95d3e6cfb99db10!2sKalpana%20Indian%20Restaurant!5e0!3m2!1sen!2sjp!4v1715000000000!5m2!1sen!2sjp',
+        'googleMapsLink' => 'https://maps.app.goo.gl/92p48n6Zc4X9Nq518',
+        'weeklyHours' => [
+            'monday' => 'ランチ 11:30–15:00 / ディナー 17:00–22:00',
+            'tuesday' => '定休日',
+            'wednesday' => 'ランチ 11:30–15:00 / ディナー 17:00–22:00',
+            'thursday' => 'ランチ 11:30–15:00 / ディナー 17:00–22:00',
+            'friday' => 'ランチ 11:30–15:00 / ディナー 17:00–22:00',
+            'saturday' => 'ランチ 11:30–15:00 / ディナー 17:00–22:00',
+            'sunday' => 'ランチ 11:30–15:00 / ディナー 17:00–22:00',
+        ],
+        'holidays' => ['regular' => '火曜日'],
+        'orderingEnabled' => true,
+        'pickupEnabled' => true,
+        'deliveryEnabled' => false,
+        'pointsEnabled' => true,
+        'stampCardEnabled' => true,
+    ];
+    $settings = array_merge($defaultSettings, array_filter($settings, fn($v) => $v !== null && $v !== ''));
+
     echo json_encode($settings);
     exit;
 }
@@ -149,38 +282,47 @@ if ($method === 'GET' && ($subPath === '/menu/categories' || $subPath === '/menu
 // -------------------------------------------------------------
 if ($method === 'GET' && ($subPath === '/menu/items' || $subPath === '/menu/items/')) {
     // 1. Fetch items
-    $stmt = $pdo->query('SELECT * FROM MenuItem ORDER BY categoryId ASC, sortOrder ASC, createdAt DESC');
-    $items = $stmt->fetchAll();
+    $items = [];
+    try {
+        $stmt = $pdo->query('SELECT * FROM MenuItem ORDER BY categoryId ASC, sortOrder ASC, createdAt DESC');
+        $items = $stmt->fetchAll();
+    } catch (Exception $e) {}
 
     // 2. Fetch categories map
-    $catStmt = $pdo->query('SELECT * FROM Category');
     $cats = [];
-    while ($cat = $catStmt->fetch()) {
-        $cats[$cat['id']] = $cat;
-    }
+    try {
+        $catStmt = $pdo->query('SELECT * FROM Category');
+        while ($cat = $catStmt->fetch()) {
+            $cats[$cat['id']] = $cat;
+        }
+    } catch (Exception $e) {}
 
     // 3. Fetch variants
-    $varStmt = $pdo->query('SELECT * FROM ItemVariant ORDER BY sortOrder ASC');
     $variantsByItem = [];
-    while ($var = $varStmt->fetch()) {
-        $variantsByItem[$var['itemId']][] = $var;
-    }
+    try {
+        $varStmt = $pdo->query('SELECT * FROM ItemVariant ORDER BY sortOrder ASC');
+        while ($var = $varStmt->fetch()) {
+            $variantsByItem[$var['itemId']][] = $var;
+        }
+    } catch (Exception $e) {}
 
     // 4. Fetch option groups relation
-    $optStmt = $pdo->query('
-        SELECT mog.A as itemId, og.id, og.nameJa, og.nameEn, og.type
-        FROM _MenuItemToOptionGroup mog
-        JOIN OptionGroup og ON og.id = mog.B
-    ');
     $optionsByItem = [];
-    while ($opt = $optStmt->fetch()) {
-        $optionsByItem[$opt['itemId']][] = [
-            'id' => $opt['id'],
-            'nameJa' => $opt['nameJa'],
-            'nameEn' => $opt['nameEn'],
-            'type' => $opt['type'],
-        ];
-    }
+    try {
+        $optStmt = $pdo->query('
+            SELECT mog.A as itemId, og.id, og.nameJa, og.nameEn, og.type
+            FROM _MenuItemToOptionGroup mog
+            JOIN OptionGroup og ON og.id = mog.B
+        ');
+        while ($opt = $optStmt->fetch()) {
+            $optionsByItem[$opt['itemId']][] = [
+                'id' => $opt['id'],
+                'nameJa' => $opt['nameJa'],
+                'nameEn' => $opt['nameEn'],
+                'type' => $opt['type'],
+            ];
+        }
+    } catch (Exception $e) {}
 
     // Format items
     $formatted = array_map(function ($item) use ($cats, $variantsByItem, $optionsByItem) {
@@ -676,6 +818,100 @@ if ($method === 'GET' && ($subPath === '/offers' || $subPath === '/offers/')) {
     $stmt = $pdo->query('SELECT * FROM Offer WHERE isActive = 1 ORDER BY sortOrder ASC');
     $offers = $stmt->fetchAll();
     echo json_encode($offers);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: GET /reviews
+// -------------------------------------------------------------
+if ($method === 'GET' && ($subPath === '/reviews' || $subPath === '/reviews/')) {
+    $settings = [];
+    try {
+        $stmt = $pdo->query('SELECT * FROM Settings LIMIT 1');
+        $settings = $stmt->fetch() ?: [];
+    } catch (Exception $e) {}
+
+    $featured = [];
+    if (!empty($settings['featuredReviews'])) {
+        $decoded = is_string($settings['featuredReviews']) ? json_decode($settings['featuredReviews'], true) : $settings['featuredReviews'];
+        if (is_array($decoded)) {
+            foreach ($decoded as $rev) {
+                $featured[] = [
+                    'authorName' => $rev['authorName'] ?? 'Guest',
+                    'authorUrl' => null,
+                    'authorPhoto' => null,
+                    'rating' => (float)($rev['rating'] ?? 5),
+                    'text' => $rev['text'] ?? '',
+                    'relativeTime' => $rev['dateLabel'] ?? '',
+                    'publishTime' => null,
+                    'reviewUrl' => null,
+                ];
+            }
+        }
+    }
+
+    $manual = !empty($settings['storeReviewScore']) ? (float)$settings['storeReviewScore'] : 4.8;
+    $count = !empty($settings['storeReviewCount']) ? (int)$settings['storeReviewCount'] : 124;
+
+    header('Cache-Control: public, max-age=3600');
+    echo json_encode([
+        'source' => 'manual',
+        'rating' => $manual,
+        'userRatingCount' => $count,
+        'mapsUrl' => $settings['googleMapsLink'] ?? 'https://maps.app.goo.gl/92p48n6Zc4X9Nq518',
+        'writeReviewUrl' => $settings['storeReviewLink'] ?? null,
+        'reviews' => $featured,
+        'fetchedAt' => null,
+    ]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: POST /contact
+// -------------------------------------------------------------
+if ($method === 'POST' && ($subPath === '/contact' || $subPath === '/contact/')) {
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+    $name = trim($input['name'] ?? '');
+    $email = strtolower(trim($input['email'] ?? ''));
+    $phone = trim($input['phone'] ?? '');
+    $type = strtoupper(trim($input['type'] ?? 'GENERAL'));
+    $message = trim($input['message'] ?? '');
+    $date = !empty($input['date']) ? $input['date'] : null;
+    $guests = !empty($input['guests']) ? (int)$input['guests'] : null;
+
+    // Honeypot spam check
+    if (!empty($input['website'])) {
+        http_response_code(201);
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
+    if (empty($name) || empty($email)) {
+        http_response_code(400);
+        echo json_encode(['error' => ['code' => 'VALIDATION_FAILED', 'message' => '名前とメールアドレスは必須です']]);
+        exit;
+    }
+
+    $id = generateUuidV4();
+    $now = date('Y-m-d H:i:s');
+    $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+
+    $stmt = $pdo->prepare('INSERT INTO ContactMessage (id, name, email, phone, type, message, date, guests, isRead, ip, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)');
+    $stmt->execute([$id, $name, $email, $phone, $type, $message, $date, $guests, $ip, $now, $now]);
+
+    http_response_code(201);
+    echo json_encode(['success' => true, 'id' => $id]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: GET /contact
+// -------------------------------------------------------------
+if ($method === 'GET' && ($subPath === '/contact' || $subPath === '/contact/')) {
+    requireAdminUser($jwtSecret, $pdo);
+    $stmt = $pdo->query('SELECT * FROM ContactMessage ORDER BY createdAt DESC');
+    $messages = $stmt->fetchAll();
+    echo json_encode($messages);
     exit;
 }
 
