@@ -190,6 +190,158 @@ if ($method === 'GET' && ($subPath === '/menu/items' || $subPath === '/menu/item
 }
 
 // -------------------------------------------------------------
+// Shared: menu item field mapping (mirrors apps/api itemUpdateSchema)
+// -------------------------------------------------------------
+function menuItemColumns(array $input): array
+{
+    $cols = [];
+    $strings = ['categoryId', 'nameEn', 'nameJa', 'descriptionEn', 'descriptionJa', 'imageUrl'];
+    $bools = ['isRecommended', 'isVegetarian', 'isVegan', 'isHalal', 'isGlutenFree', 'isSoldOut', 'isOrderable', 'isActive'];
+    foreach ($strings as $f) {
+        if (array_key_exists($f, $input)) {
+            $v = $input[$f];
+            $cols[$f] = ($v === null || $v === '') && $f !== 'nameEn' && $f !== 'categoryId' ? null : (string)$v;
+        }
+    }
+    foreach ($bools as $f) {
+        if (array_key_exists($f, $input)) $cols[$f] = $input[$f] ? 1 : 0;
+    }
+    if (array_key_exists('price', $input)) $cols['price'] = max(0, (int)round((float)$input['price']));
+    if (array_key_exists('spiceLevel', $input)) $cols['spiceLevel'] = max(0, min(5, (int)$input['spiceLevel']));
+    if (array_key_exists('sortOrder', $input)) $cols['sortOrder'] = (int)$input['sortOrder'];
+    if (array_key_exists('rating', $input)) {
+        $cols['rating'] = ($input['rating'] === null || $input['rating'] === '') ? null : (float)$input['rating'];
+    }
+    foreach (['menuTypes', 'allergens'] as $f) {
+        if (array_key_exists($f, $input)) {
+            $cols[$f] = json_encode(is_array($input[$f]) ? array_values($input[$f]) : [], JSON_UNESCAPED_UNICODE);
+        }
+    }
+    return $cols;
+}
+
+function setMenuItemOptionGroups(PDO $pdo, string $itemId, $groupIds): void
+{
+    if (!is_array($groupIds)) return;
+    $pdo->prepare('DELETE FROM _MenuItemToOptionGroup WHERE A = ?')->execute([$itemId]);
+    $ins = $pdo->prepare('INSERT IGNORE INTO _MenuItemToOptionGroup (A, B) VALUES (?, ?)');
+    foreach (array_unique($groupIds) as $gid) {
+        if (is_string($gid) && $gid !== '') $ins->execute([$itemId, $gid]);
+    }
+}
+
+// -------------------------------------------------------------
+// Endpoint: POST /menu/items
+// -------------------------------------------------------------
+if ($method === 'POST' && ($subPath === '/menu/items' || $subPath === '/menu/items/')) {
+    requireStaffUser($jwtSecret, $pdo);
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+
+    if (empty($input['categoryId']) || trim((string)($input['nameEn'] ?? '')) === '' || !isset($input['price'])) {
+        http_response_code(400);
+        echo json_encode(['error' => ['code' => 'VALIDATION_FAILED', 'message' => 'categoryId, nameEn and price are required']]);
+        exit;
+    }
+
+    $cols = menuItemColumns($input) + [
+        'menuTypes' => '[]', 'allergens' => '[]', 'spiceLevel' => 0, 'sortOrder' => 0,
+    ];
+    $newId = generateUuidV4();
+    $cols['id'] = $newId;
+    $now = (new DateTime('now', new DateTimeZone('UTC')))->format('Y-m-d H:i:s.v');
+    $cols['createdAt'] = $now;
+    $cols['updatedAt'] = $now;
+
+    try {
+        $pdo->beginTransaction();
+        $names = array_keys($cols);
+        $sql = 'INSERT INTO MenuItem (`' . implode('`, `', $names) . '`) VALUES (' . implode(', ', array_fill(0, count($names), '?')) . ')';
+        $pdo->prepare($sql)->execute(array_values($cols));
+        setMenuItemOptionGroups($pdo, $newId, $input['optionGroupIds'] ?? null);
+        $pdo->commit();
+    } catch (PDOException $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        http_response_code(400);
+        echo json_encode(['error' => ['code' => 'SAVE_FAILED', 'message' => 'Could not create menu item']]);
+        exit;
+    }
+
+    http_response_code(201);
+    echo json_encode(['id' => $newId, 'success' => true]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: PUT /menu/items/:id
+// -------------------------------------------------------------
+if (($method === 'PUT' || $method === 'PATCH') && preg_match('#^/menu/items/([a-zA-Z0-9_-]+)/?$#', $subPath, $matches) && $matches[1] !== 'import') {
+    $itemId = $matches[1];
+    requireStaffUser($jwtSecret, $pdo);
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+
+    $exists = $pdo->prepare('SELECT id FROM MenuItem WHERE id = ? LIMIT 1');
+    $exists->execute([$itemId]);
+    if (!$exists->fetch()) {
+        http_response_code(404);
+        echo json_encode(['error' => ['code' => 'NOT_FOUND', 'message' => 'Menu item not found']]);
+        exit;
+    }
+
+    $cols = menuItemColumns($input);
+    $cols['updatedAt'] = (new DateTime('now', new DateTimeZone('UTC')))->format('Y-m-d H:i:s.v');
+
+    try {
+        $pdo->beginTransaction();
+        $sets = [];
+        foreach (array_keys($cols) as $c) $sets[] = "`{$c}` = ?";
+        $params = array_values($cols);
+        $params[] = $itemId;
+        $pdo->prepare('UPDATE MenuItem SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($params);
+        setMenuItemOptionGroups($pdo, $itemId, $input['optionGroupIds'] ?? null);
+        $pdo->commit();
+    } catch (PDOException $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        http_response_code(400);
+        echo json_encode(['error' => ['code' => 'SAVE_FAILED', 'message' => 'Could not update menu item']]);
+        exit;
+    }
+
+    echo json_encode(['success' => true]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: DELETE /menu/items/:id
+// -------------------------------------------------------------
+if ($method === 'DELETE' && preg_match('#^/menu/items/([a-zA-Z0-9_-]+)/?$#', $subPath, $matches)) {
+    $itemId = $matches[1];
+    requireAdminUser($jwtSecret, $pdo);
+
+    try {
+        $pdo->beginTransaction();
+        $pdo->prepare('DELETE FROM _MenuItemToOptionGroup WHERE A = ?')->execute([$itemId]);
+        $pdo->prepare('DELETE FROM ItemVariant WHERE itemId = ?')->execute([$itemId]);
+        $del = $pdo->prepare('DELETE FROM MenuItem WHERE id = ?');
+        $del->execute([$itemId]);
+        $pdo->commit();
+    } catch (PDOException $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        http_response_code(400);
+        echo json_encode(['error' => ['code' => 'DELETE_FAILED', 'message' => 'Could not delete menu item']]);
+        exit;
+    }
+
+    if ($del->rowCount() === 0) {
+        http_response_code(404);
+        echo json_encode(['error' => ['code' => 'NOT_FOUND', 'message' => 'Menu item not found']]);
+        exit;
+    }
+
+    echo json_encode(['success' => true]);
+    exit;
+}
+
+// -------------------------------------------------------------
 // Endpoint: GET /menu/option-groups
 // -------------------------------------------------------------
 if ($method === 'GET' && ($subPath === '/menu/option-groups' || $subPath === '/menu/option-groups/')) {
