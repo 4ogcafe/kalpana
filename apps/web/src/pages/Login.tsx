@@ -52,7 +52,7 @@ export default function Login() {
             ? await errorMessage(res, 'Too many attempts. Please wait a few minutes and try again.')
             : res.status === 401
               ? 'Wrong email or password, or this account is switched off.'
-              : await errorMessage(res, 'Sign-in failed. Is the API server running?'),
+              : await errorMessage(res, `Sign-in failed (${res.status}). Is the API server running?`),
         );
         return;
       }
