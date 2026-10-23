@@ -1657,6 +1657,142 @@ if ($method === 'POST' && ($subPath === '/customers/logout' || $subPath === '/cu
     exit;
 }
 
+// -------------------------------------------------------------
+// Endpoint: GET /users
+// -------------------------------------------------------------
+if ($method === 'GET' && ($subPath === '/users' || $subPath === '/users/')) {
+    requireAdminUser($jwtSecret, $pdo);
+    $stmt = $pdo->query('SELECT id, name, email, role, isActive, createdAt FROM User ORDER BY createdAt DESC');
+    $users = $stmt->fetchAll();
+    foreach ($users as &$u) {
+        $u['isActive'] = (bool)$u['isActive'];
+    }
+    unset($u);
+    header('Cache-Control: no-store');
+    echo json_encode($users);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: POST /users
+// -------------------------------------------------------------
+if ($method === 'POST' && ($subPath === '/users' || $subPath === '/users/')) {
+    requireAdminUser($jwtSecret, $pdo);
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+    $name = trim($input['name'] ?? '');
+    $email = strtolower(trim($input['email'] ?? ''));
+    $role = strtoupper(trim($input['role'] ?? 'STAFF'));
+    $password = $input['password'] ?? '';
+
+    if (empty($name) || empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        http_response_code(400);
+        echo json_encode(['error' => ['code' => 'VALIDATION_FAILED', 'message' => 'Valid name and email are required']]);
+        exit;
+    }
+    if (!in_array($role, ['ADMIN', 'STAFF', 'KITCHEN'], true)) {
+        http_response_code(400);
+        echo json_encode(['error' => ['code' => 'VALIDATION_FAILED', 'message' => 'Invalid role']]);
+        exit;
+    }
+    if (strlen($password) < 8) {
+        http_response_code(400);
+        echo json_encode(['error' => ['code' => 'VALIDATION_FAILED', 'message' => 'Password must be at least 8 characters']]);
+        exit;
+    }
+
+    $stmt = $pdo->prepare('SELECT id FROM User WHERE email = ? LIMIT 1');
+    $stmt->execute([$email]);
+    if ($stmt->fetch()) {
+        http_response_code(409);
+        echo json_encode(['error' => ['code' => 'EMAIL_TAKEN', 'message' => 'A user with this email already exists']]);
+        exit;
+    }
+
+    $id = generateUuidV4();
+    $hash = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
+    $now = date('Y-m-d H:i:s');
+
+    $stmt = $pdo->prepare('INSERT INTO User (id, name, email, role, isActive, passwordHash, createdAt, updatedAt) VALUES (?, ?, ?, ?, 1, ?, ?, ?)');
+    $stmt->execute([$id, $name, $email, $role, $hash, $now, $now]);
+
+    http_response_code(201);
+    echo json_encode([
+        'id' => $id,
+        'name' => $name,
+        'email' => $email,
+        'role' => $role,
+        'isActive' => true,
+        'createdAt' => $now,
+    ]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: PUT /users/:id
+// -------------------------------------------------------------
+if ($method === 'PUT' && preg_match('#^/users/([a-zA-Z0-9_-]+)/?$#', $subPath, $matches)) {
+    $admin = requireAdminUser($jwtSecret, $pdo);
+    $targetId = $matches[1];
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+
+    $stmt = $pdo->prepare('SELECT * FROM User WHERE id = ? LIMIT 1');
+    $stmt->execute([$targetId]);
+    $user = $stmt->fetch();
+    if (!$user) {
+        http_response_code(404);
+        echo json_encode(['error' => ['code' => 'NOT_FOUND', 'message' => 'User not found']]);
+        exit;
+    }
+
+    $newRole = isset($input['role']) ? strtoupper(trim($input['role'])) : $user['role'];
+    $newActive = isset($input['isActive']) ? (bool)$input['isActive'] : (bool)$user['isActive'];
+
+    // Prevent self-lockout
+    if ($targetId === $admin['id'] && ($newRole !== 'ADMIN' || !$newActive)) {
+        http_response_code(400);
+        echo json_encode(['error' => ['code' => 'SELF_LOCKOUT', 'message' => 'You cannot remove your own admin access']]);
+        exit;
+    }
+
+    $updates = ['role = ?', 'isActive = ?', 'updatedAt = NOW()'];
+    $params = [$newRole, $newActive ? 1 : 0];
+
+    if (!empty($input['password'])) {
+        if (strlen($input['password']) < 8) {
+            http_response_code(400);
+            echo json_encode(['error' => ['code' => 'VALIDATION_FAILED', 'message' => 'Password must be at least 8 characters']]);
+            exit;
+        }
+        $updates[] = 'passwordHash = ?';
+        $params[] = password_hash($input['password'], PASSWORD_BCRYPT, ['cost' => 12]);
+    }
+
+    $params[] = $targetId;
+    $sql = 'UPDATE User SET ' . implode(', ', $updates) . ' WHERE id = ?';
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+
+    echo json_encode(['success' => true]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: DELETE /users/:id
+// -------------------------------------------------------------
+if ($method === 'DELETE' && preg_match('#^/users/([a-zA-Z0-9_-]+)/?$#', $subPath, $matches)) {
+    $admin = requireAdminUser($jwtSecret, $pdo);
+    $targetId = $matches[1];
+    if ($targetId === $admin['id']) {
+        http_response_code(400);
+        echo json_encode(['error' => ['code' => 'SELF_LOCKOUT', 'message' => 'You cannot delete yourself']]);
+        exit;
+    }
+    $stmt = $pdo->prepare('DELETE FROM User WHERE id = ?');
+    $stmt->execute([$targetId]);
+    http_response_code(204);
+    exit;
+}
+
 // Default 404 for unmatched API routes
 http_response_code(404);
 echo json_encode(['error' => ['code' => 'NOT_FOUND', 'message' => 'API endpoint not found: ' . $subPath]]);
