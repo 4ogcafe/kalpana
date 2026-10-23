@@ -7,12 +7,24 @@ DirectoryIndex index.html index.php
   # 1. Route API requests to PHP API gateway
   RewriteRule ^api/(.*)$ api/index.php [QSA,L]
 
-  # 2. Don't rewrite real files or directories
+  # 2. Block access to hidden files, config files, env, and source code
+  RewriteRule "(^|/)\.(?!well-known)" - [F,L]
+  RewriteRule "(^|/)(kalpana-config\.php|\.env|\.git|composer\.(json|lock)|package(-lock)?\.json|tsconfig.*\.json)$" - [F,L]
+
+  # 3. Don't rewrite real files or directories
   RewriteRule ^index\.html$ - [L]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteCond %{REQUEST_FILENAME} !-l
 
-  # 3. Frontend SPA fallback
+  # 4. Frontend SPA fallback
   RewriteRule . /index.html [L]
+</IfModule>
+
+# Security Headers
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set X-XSS-Protection "1; mode=block"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
 </IfModule>

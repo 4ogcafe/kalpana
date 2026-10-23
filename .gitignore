@@ -19,3 +19,9 @@ apps/api/public/uploads/*
 .DS_Store
 .vscode/
 *.log
+
+# Secret configuration files and deployment archives
+kalpana-config.php
+*.zip
+*.tar.gz
+
