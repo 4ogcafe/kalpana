@@ -118,7 +118,7 @@ export default function GameSettings() {
         const data = await res.json();
         setConfig(data);
       } else {
-        toast.error('ゲーム設定の取得に失敗しました。');
+        toast.error(await errorMessage(res, `ゲーム設定の取得に失敗しました。(${res.status})`));
       }
     } catch {
       toast.error('通信エラーが発生しました。');
