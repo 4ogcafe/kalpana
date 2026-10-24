@@ -110,7 +110,16 @@ export function getCategoryIcon(nameJa?: string | null, nameEn?: string | null):
     return '🍨';
   }
 
-  // 6. Otsumami / Snacks / Appetizers / Samosa / Pakora / Papad / Momo
+  // 6. Momo (Nepalese dumplings)
+  if (
+    lower.includes('モモ') ||
+    lower.includes('momo') ||
+    lower.includes('餃子')
+  ) {
+    return '🥟';
+  }
+
+  // 7. Otsumami / Snacks / Appetizers / Samosa / Pakora / Papad
   if (
     lower.includes('おつまみ') ||
     lower.includes('つまみ') ||
@@ -121,7 +130,6 @@ export function getCategoryIcon(nameJa?: string | null, nameEn?: string | null):
     lower.includes('サモサ') ||
     lower.includes('パパド') ||
     lower.includes('パコラ') ||
-    lower.includes('モモ') ||
     lower.includes('otsumami') ||
     lower.includes('snack') ||
     lower.includes('appetizer') ||
@@ -129,10 +137,9 @@ export function getCategoryIcon(nameJa?: string | null, nameEn?: string | null):
     lower.includes('side') ||
     lower.includes('samosa') ||
     lower.includes('papad') ||
-    lower.includes('pakora') ||
-    lower.includes('momo')
+    lower.includes('pakora')
   ) {
-    return '🥟';
+    return '🧆';
   }
 
   // 7. Naan / Breads / Roti / Paratha
