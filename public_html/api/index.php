@@ -1940,10 +1940,775 @@ if ($method === 'PUT' && ($subPath === '/settings' || $subPath === '/settings/')
 }
 
 // -------------------------------------------------------------
+// Shared: Order pricing, slot calculation & helpers
+// -------------------------------------------------------------
+function generatePickupSlots(array $settings, string $fulfillment = 'PICKUP'): array {
+    $hoursText = trim((string)($fulfillment === 'DELIVERY' && !empty($settings['deliveryHours']) ? $settings['deliveryHours'] : ($settings['pickupHours'] ?? '')));
+    if ($hoursText === '') {
+        $hoursText = '11:30-15:00, 17:00-22:00';
+    }
+
+    $ranges = [];
+    $parts = preg_split('/[,、]/u', $hoursText);
+    foreach ($parts as $p) {
+        if (preg_match('/(\d{1,2}:\d{2})\s*[-–~〜]\s*(\d{1,2}:\d{2})/u', trim($p), $m)) {
+            $ranges[] = [$m[1], $m[2]];
+        }
+    }
+    if (empty($ranges)) {
+        $ranges = [['11:30', '15:00'], ['17:00', '22:00']];
+    }
+
+    $leadMinutes = $fulfillment === 'DELIVERY'
+        ? (isset($settings['deliveryLeadMinutes']) ? (int)$settings['deliveryLeadMinutes'] : 60)
+        : (isset($settings['pickupLeadMinutes']) ? (int)$settings['pickupLeadMinutes'] : 30);
+
+    $now = new DateTime('now', new DateTimeZone('Asia/Tokyo'));
+    $earliestTimestamp = $now->getTimestamp() + ($leadMinutes * 60);
+
+    $closedDays = !empty($settings['pickupClosedDays'])
+        ? (is_string($settings['pickupClosedDays']) ? json_decode($settings['pickupClosedDays'], true) : $settings['pickupClosedDays'])
+        : [];
+    $closedDates = !empty($settings['pickupClosedDates'])
+        ? (is_string($settings['pickupClosedDates']) ? json_decode($settings['pickupClosedDates'], true) : $settings['pickupClosedDates'])
+        : [];
+
+    $closedDaysSet = array_flip(is_array($closedDays) ? $closedDays : []);
+    $closedDatesSet = array_flip(is_array($closedDates) ? $closedDates : []);
+
+    $slots = [];
+    for ($dayOffset = 0; $dayOffset <= 1; $dayOffset++) {
+        $dateObj = (clone $now)->modify("+{$dayOffset} day");
+        $dateStr = $dateObj->format('Y-m-d');
+        $weekday = (int)$dateObj->format('w');
+
+        if (isset($closedDaysSet[$weekday]) || isset($closedDatesSet[$dateStr])) {
+            continue;
+        }
+
+        foreach ($ranges as $range) {
+            list($startHhmm, $endHhmm) = $range;
+            list($sh, $sm) = explode(':', $startHhmm);
+            list($eh, $em) = explode(':', $endHhmm);
+            $startMins = (int)$sh * 60 + (int)$sm;
+            $endMins = (int)$eh * 60 + (int)$em;
+
+            for ($mins = $startMins; $mins <= $endMins; $mins += 15) {
+                $h = floor($mins / 60);
+                $m = $mins % 60;
+                $timeStr = sprintf('%02d:%02d', $h, $m);
+
+                $slotDt = DateTime::createFromFormat('Y-m-d H:i:s', "{$dateStr} {$timeStr}:00", new DateTimeZone('Asia/Tokyo'));
+                if (!$slotDt) continue;
+
+                if ($slotDt->getTimestamp() < $earliestTimestamp) {
+                    continue;
+                }
+
+                $slots[] = [
+                    'date' => $dateStr,
+                    'time' => $timeStr,
+                    'at' => $slotDt->format('Y-m-d\TH:i:s.000\Z'),
+                ];
+            }
+        }
+    }
+
+    return $slots;
+}
+
+function computeOrderQuote(PDO $pdo, array $input, ?array $customer, array $settings): array {
+    $rawItems = isset($input['items']) && is_array($input['items']) ? $input['items'] : [];
+    if (empty($rawItems)) {
+        throw new Exception('カートに商品がありません。', 400);
+    }
+
+    $quantities = [];
+    $optionAdjusts = [];
+    $optionsByItemId = [];
+
+    foreach ($rawItems as $req) {
+        $itemId = (string)($req['itemId'] ?? '');
+        if ($itemId === '') continue;
+        $qty = max(1, min(20, (int)($req['quantity'] ?? 1)));
+        $quantities[$itemId] = ($quantities[$itemId] ?? 0) + $qty;
+        if (isset($req['optionAdjust'])) {
+            $optionAdjusts[$itemId] = (int)$req['optionAdjust'];
+        }
+        if (isset($req['options']) && is_array($req['options'])) {
+            $optionsByItemId[$itemId] = $req['options'];
+        }
+    }
+
+    if (empty($quantities)) {
+        throw new Exception('有効な商品が選択されていません。', 400);
+    }
+
+    $itemIds = array_keys($quantities);
+    $inClause = implode(',', array_fill(0, count($itemIds), '?'));
+    $stmt = $pdo->prepare("SELECT id, nameEn, nameJa, price, isActive, isSoldOut FROM MenuItem WHERE id IN ($inClause)");
+    $stmt->execute($itemIds);
+    $dbItems = [];
+    while ($row = $stmt->fetch()) {
+        $dbItems[$row['id']] = $row;
+    }
+
+    $lines = [];
+    $subtotal = 0;
+
+    foreach ($quantities as $id => $qty) {
+        if (!isset($dbItems[$id])) {
+            throw new Exception("商品は現在ご利用いただけません (ID: $id)", 409);
+        }
+        $it = $dbItems[$id];
+        if (!$it['isActive'] || $it['isSoldOut']) {
+            $name = $it['nameJa'] ?: $it['nameEn'];
+            throw new Exception("「{$name}」は現在ご注文いただけません。カートから削除してください。", 409);
+        }
+
+        $unitPrice = (int)$it['price'] + ($optionAdjusts[$id] ?? 0);
+        $lineTotal = $unitPrice * $qty;
+        $subtotal += $lineTotal;
+
+        $line = [
+            'itemId' => $it['id'],
+            'nameEn' => $it['nameEn'],
+            'nameJa' => $it['nameJa'],
+            'unitPrice' => $unitPrice,
+            'quantity' => $qty,
+            'lineTotal' => $lineTotal,
+        ];
+        if (isset($optionsByItemId[$id])) {
+            $line['options'] = $optionsByItemId[$id];
+        }
+        $lines[] = $line;
+    }
+
+    // Offers
+    $rawOfferIds = [];
+    if (!empty($input['offerIds']) && is_array($input['offerIds'])) {
+        $rawOfferIds = $input['offerIds'];
+    } elseif (!empty($input['offerId'])) {
+        $rawOfferIds = is_array($input['offerId']) ? $input['offerId'] : [$input['offerId']];
+    }
+    $targetOfferIds = array_unique(array_filter($rawOfferIds));
+
+    $appliedOffers = [];
+    $currentSubtotalForDiscount = $subtotal;
+    $totalOfferDiscount = 0;
+    $nowStr = date('Y-m-d H:i:s');
+
+    foreach ($targetOfferIds as $offerId) {
+        $oStmt = $pdo->prepare('SELECT * FROM Offer WHERE id = ? AND isActive = 1 LIMIT 1');
+        $oStmt->execute([$offerId]);
+        $offer = $oStmt->fetch();
+        if (!$offer) continue;
+
+        if (!empty($offer['startsAt']) && $offer['startsAt'] > $nowStr) continue;
+        if (!empty($offer['endsAt']) && $offer['endsAt'] < $nowStr) continue;
+
+        $minSub = (int)($offer['minSubtotal'] ?? 0);
+        if ($subtotal < $minSub) {
+            throw new Exception("特典「{$offer['titleJa']}」は¥" . number_format($minSub) . "以上のご注文でご利用いただけます。", 409);
+        }
+
+        if (!empty($offer['oncePerCustomer']) && $customer) {
+            $checkUsed = $pdo->prepare("SELECT COUNT(*) FROM PickupOrder WHERE customerId = ? AND JSON_UNQUOTE(JSON_EXTRACT(offer, '$.id')) = ? AND status != 'CANCELLED'");
+            $checkUsed->execute([$customer['id'], $offer['id']]);
+            if ((int)$checkUsed->fetchColumn() > 0) {
+                throw new Exception('この特典はすでにご利用済みです。', 409);
+            }
+        }
+
+        $disc = $offer['discountType'] === 'PERCENT'
+            ? (int)floor(($currentSubtotalForDiscount * (int)$offer['discountValue']) / 100)
+            : (int)$offer['discountValue'];
+        $disc = max(0, min($disc, $currentSubtotalForDiscount));
+
+        if ($disc > 0) {
+            $totalOfferDiscount += $disc;
+            $currentSubtotalForDiscount = max(0, $currentSubtotalForDiscount - $disc);
+            $appliedOffers[] = [
+                'id' => $offer['id'],
+                'titleJa' => $offer['titleJa'],
+                'discount' => $disc,
+            ];
+        }
+    }
+
+    // Reward
+    $rewardDoc = null;
+    $rewardDiscount = 0;
+    $rewardId = !empty($input['rewardId']) ? trim((string)$input['rewardId']) : null;
+    if ($rewardId && $customer) {
+        $rStmt = $pdo->prepare('SELECT * FROM StampReward WHERE id = ? AND customerId = ? AND status = "AVAILABLE" LIMIT 1');
+        $rStmt->execute([$rewardId, $customer['id']]);
+        $r = $rStmt->fetch();
+        if ($r) {
+            if (empty($r['expiresAt']) || $r['expiresAt'] >= $nowStr) {
+                $rewardDoc = $r;
+                if ($r['kind'] === 'AMOUNT_OFF') {
+                    $rewardDiscount = max(0, min((int)$r['amount'], $subtotal - $totalOfferDiscount));
+                }
+            }
+        }
+    }
+
+    // Points
+    $isMember = !empty($customer);
+    $pointsEnabled = $settings['pointsEnabled'] !== null ? (bool)$settings['pointsEnabled'] : true;
+    $pointValueYen = max(1, (int)($settings['pointValueYen'] ?? 1));
+    $pointsPer100Yen = (int)($settings['pointsPer100Yen'] ?? 1);
+
+    $afterOffer = max(0, $subtotal - $totalOfferDiscount - $rewardDiscount);
+    $pointsUsed = 0;
+    $pointsDiscount = 0;
+
+    if ($isMember && $pointsEnabled) {
+        $maxPoints = (int)floor($afterOffer / $pointValueYen);
+        $custPoints = (int)($customer['points'] ?? 0);
+        $reqPoints = max(0, (int)($input['pointsToUse'] ?? 0));
+        $pointsUsed = min($reqPoints, $custPoints, $maxPoints);
+        $pointsDiscount = $pointsUsed * $pointValueYen;
+    }
+
+    $total = $afterOffer - $pointsDiscount;
+    $pointsToEarn = ($isMember && $pointsEnabled) ? (int)(floor($total / 100) * $pointsPer100Yen) : 0;
+
+    // Tax
+    $taxRate = isset($settings['taxRatePercent']) && $settings['taxRatePercent'] !== null ? (int)$settings['taxRatePercent'] : 8;
+    $tax = (int)floor(($total * $taxRate) / 100);
+
+    // Fulfillment
+    $fulfillment = strtoupper(trim((string)($input['fulfillment'] ?? 'PICKUP')));
+    if ($fulfillment !== 'DELIVERY') $fulfillment = 'PICKUP';
+    $isDelivery = $fulfillment === 'DELIVERY';
+
+    $deliveryFeeSetting = (int)($settings['deliveryFee'] ?? 0);
+    $deliveryFreeOver = (int)($settings['deliveryFreeOver'] ?? 0);
+    $deliveryMinOrder = (int)($settings['deliveryMinOrder'] ?? 0);
+
+    $deliveryFee = 0;
+    if ($isDelivery) {
+        $deliveryFee = ($deliveryFreeOver > 0 && $subtotal >= $deliveryFreeOver) ? 0 : $deliveryFeeSetting;
+    }
+    $minOrderShortfall = $isDelivery ? max(0, $deliveryMinOrder - $subtotal) : 0;
+    $grandTotal = $total + $tax + $deliveryFee;
+
+    return [
+        'lines' => $lines,
+        'subtotal' => $subtotal,
+        'offerDiscount' => $totalOfferDiscount,
+        'rewardDiscount' => $rewardDiscount,
+        'pointsUsed' => $pointsUsed,
+        'pointsDiscount' => $pointsDiscount,
+        'total' => $total,
+        'taxRate' => $taxRate,
+        'tax' => $tax,
+        'deliveryFee' => $deliveryFee,
+        'minOrderShortfall' => $minOrderShortfall,
+        'grandTotal' => $grandTotal,
+        'pointsToEarn' => $pointsToEarn,
+        'offer' => !empty($appliedOffers) ? [
+            'id' => implode(',', array_column($appliedOffers, 'id')),
+            'titleJa' => implode(' ＋ ', array_column($appliedOffers, 'titleJa')),
+        ] : null,
+        'reward' => $rewardDoc ? [
+            'id' => $rewardDoc['id'],
+            'titleJa' => (string)$rewardDoc['titleJa'],
+            'kind' => $rewardDoc['kind'],
+            'discount' => $rewardDiscount,
+        ] : null,
+        'fulfillment' => $fulfillment,
+    ];
+}
+
+// -------------------------------------------------------------
 // Endpoint: GET /orders/slots
 // -------------------------------------------------------------
 if ($method === 'GET' && ($subPath === '/orders/slots' || $subPath === '/orders/slots/')) {
-    echo json_encode(['enabled' => true, 'slots' => []]);
+    $stmt = $pdo->query('SELECT * FROM Settings LIMIT 1');
+    $settings = $stmt->fetch() ?: [];
+
+    $orderingEnabled = $settings['orderingEnabled'] !== null ? (bool)$settings['orderingEnabled'] : true;
+    $pickupEnabled = (bool)($settings['pickupEnabled'] ?? false);
+    $deliveryEnabled = (bool)($settings['deliveryEnabled'] ?? false);
+    $deliveryFee = (int)($settings['deliveryFee'] ?? 0);
+    $deliveryMinOrder = (int)($settings['deliveryMinOrder'] ?? 0);
+    $deliveryAreas = !empty($settings['deliveryAreas'])
+        ? (is_string($settings['deliveryAreas']) ? json_decode($settings['deliveryAreas'], true) : $settings['deliveryAreas'])
+        : [];
+
+    $type = isset($_GET['type']) && strtolower($_GET['type']) === 'delivery' ? 'DELIVERY' : 'PICKUP';
+    $slots = $orderingEnabled ? generatePickupSlots($settings, $type) : [];
+
+    header('Cache-Control: no-store');
+    echo json_encode([
+        'enabled' => $orderingEnabled && ($pickupEnabled || $deliveryEnabled),
+        'orderingEnabled' => $orderingEnabled,
+        'note' => $orderingEnabled ? ($settings['pickupNoteJa'] ?? '') : 'ただいまオンラインでのご注文を停止しています。',
+        'pausedUntil' => $settings['orderingPausedUntil'] ?? null,
+        'pickup' => [
+            'enabled' => $pickupEnabled,
+            'note' => $settings['pickupNoteJa'] ?? '',
+        ],
+        'delivery' => [
+            'enabled' => $deliveryEnabled,
+            'fee' => $deliveryFee,
+            'freeOver' => (int)($settings['deliveryFreeOver'] ?? 0),
+            'minOrder' => $deliveryMinOrder,
+            'areas' => is_array($deliveryAreas) ? $deliveryAreas : [],
+            'note' => $settings['deliveryNoteJa'] ?? '',
+        ],
+        'slots' => $slots,
+    ]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: POST /orders/quote
+// -------------------------------------------------------------
+if ($method === 'POST' && ($subPath === '/orders/quote' || $subPath === '/orders/quote/')) {
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+    $customer = getOptionalCustomer($jwtSecret, $pdo);
+
+    $sStmt = $pdo->query('SELECT * FROM Settings LIMIT 1');
+    $settings = $sStmt->fetch() ?: [];
+
+    try {
+        $quote = computeOrderQuote($pdo, $input, $customer, $settings);
+    } catch (Exception $e) {
+        http_response_code($e->getCode() >= 400 && $e->getCode() < 600 ? $e->getCode() : 400);
+        echo json_encode(['error' => ['code' => 'QUOTE_FAILED', 'message' => $e->getMessage()]]);
+        exit;
+    }
+
+    header('Cache-Control: no-store');
+    echo json_encode([
+        'subtotal' => $quote['subtotal'],
+        'offerDiscount' => $quote['offerDiscount'],
+        'rewardDiscount' => $quote['rewardDiscount'],
+        'pointsUsed' => $quote['pointsUsed'],
+        'pointsDiscount' => $quote['pointsDiscount'],
+        'total' => $quote['total'],
+        'taxRate' => $quote['taxRate'],
+        'tax' => $quote['tax'],
+        'deliveryFee' => $quote['deliveryFee'],
+        'minOrderShortfall' => $quote['minOrderShortfall'],
+        'grandTotal' => $quote['grandTotal'],
+        'pointsToEarn' => $quote['pointsToEarn'],
+        'offer' => $quote['offer'],
+        'reward' => $quote['reward'],
+    ]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: POST /orders
+// -------------------------------------------------------------
+if ($method === 'POST' && ($subPath === '/orders' || $subPath === '/orders/')) {
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+
+    // Honeypot spam check
+    if (!empty($input['website'])) {
+        $fakeToken = bin2hex(random_bytes(16));
+        http_response_code(201);
+        echo json_encode(['token' => $fakeToken]);
+        exit;
+    }
+
+    $customer = getOptionalCustomer($jwtSecret, $pdo);
+    $sStmt = $pdo->query('SELECT * FROM Settings LIMIT 1');
+    $settings = $sStmt->fetch() ?: [];
+
+    $orderingEnabled = $settings['orderingEnabled'] !== null ? (bool)$settings['orderingEnabled'] : true;
+    if (!$orderingEnabled) {
+        http_response_code(409);
+        echo json_encode(['error' => ['code' => 'ORDERING_DISABLED', 'message' => 'ただいまオンラインでのご注文を停止しています。']]);
+        exit;
+    }
+
+    if (!empty($settings['orderingPausedUntil'])) {
+        $pausedUntil = new DateTime($settings['orderingPausedUntil']);
+        $now = new DateTime();
+        if ($pausedUntil > $now) {
+            $untilStr = $pausedUntil->format('H:i');
+            http_response_code(409);
+            echo json_encode(['error' => ['code' => 'ORDERING_PAUSED', 'message' => "ただいま大変混み合っているため、{$untilStr}頃までご注文の受付を一時停止しています。"]]);
+            exit;
+        }
+    }
+
+    $name = trim((string)($input['name'] ?? ''));
+    $phone = trim((string)($input['phone'] ?? ''));
+    if ($name === '' || $phone === '') {
+        http_response_code(400);
+        echo json_encode(['error' => ['code' => 'VALIDATION_FAILED', 'message' => 'お名前とお電話番号を入力してください。']]);
+        exit;
+    }
+
+    $pickupAtStr = trim((string)($input['pickupAt'] ?? ''));
+    if ($pickupAtStr === '') {
+        $pickupAtDt = (new DateTime('now', new DateTimeZone('Asia/Tokyo')))->modify('+30 minutes');
+    } else {
+        try {
+            $pickupAtDt = new DateTime($pickupAtStr, new DateTimeZone('Asia/Tokyo'));
+        } catch (Exception $e) {
+            $pickupAtDt = (new DateTime('now', new DateTimeZone('Asia/Tokyo')))->modify('+30 minutes');
+        }
+    }
+
+    $fulfillment = strtoupper(trim((string)($input['fulfillment'] ?? 'PICKUP')));
+    if ($fulfillment !== 'DELIVERY') $fulfillment = 'PICKUP';
+    $isDelivery = $fulfillment === 'DELIVERY';
+
+    if ($isDelivery && empty($input['deliveryAddress'])) {
+        http_response_code(400);
+        echo json_encode(['error' => ['code' => 'ADDRESS_REQUIRED', 'message' => 'お届け先の住所を入力してください。']]);
+        exit;
+    }
+
+    try {
+        $quote = computeOrderQuote($pdo, $input, $customer, $settings);
+    } catch (Exception $e) {
+        http_response_code($e->getCode() >= 400 && $e->getCode() < 600 ? $e->getCode() : 400);
+        echo json_encode(['error' => ['code' => 'QUOTE_FAILED', 'message' => $e->getMessage()]]);
+        exit;
+    }
+
+    if ($quote['minOrderShortfall'] > 0) {
+        http_response_code(409);
+        echo json_encode(['error' => ['code' => 'BELOW_MINIMUM', 'message' => "デリバリーは¥" . number_format((int)($settings['deliveryMinOrder'] ?? 0)) . "以上のご注文で承ります。"]]);
+        exit;
+    }
+
+    $orderId = generateUuidV4();
+    $dateKey = $pickupAtDt->format('Y-m-d');
+    $pickupAtDb = $pickupAtDt->format('Y-m-d H:i:s.v');
+    $nowDb = (new DateTime('now', new DateTimeZone('UTC')))->format('Y-m-d H:i:s.v');
+
+    $pdo->beginTransaction();
+    try {
+        $numStmt = $pdo->prepare('SELECT IFNULL(MAX(number), 0) + 1 FROM PickupOrder WHERE dateKey = ? FOR UPDATE');
+        $numStmt->execute([$dateKey]);
+        $orderNumber = (int)$numStmt->fetchColumn();
+
+        $token = bin2hex(random_bytes(16));
+        $itemsJson = json_encode($quote['lines'], JSON_UNESCAPED_UNICODE);
+        $offerJson = $quote['offer'] ? json_encode($quote['offer'], JSON_UNESCAPED_UNICODE) : null;
+        $rewardJson = $quote['reward'] ? json_encode($quote['reward'], JSON_UNESCAPED_UNICODE) : null;
+        $deliveryAddrJson = $isDelivery && !empty($input['deliveryAddress']) ? json_encode($input['deliveryAddress'], JSON_UNESCAPED_UNICODE) : null;
+        $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+        $email = !empty($input['email']) ? trim((string)$input['email']) : null;
+        $note = !empty($input['note']) ? trim((string)$input['note']) : null;
+        $customerId = $customer ? $customer['id'] : null;
+
+        $insStmt = $pdo->prepare('
+            INSERT INTO PickupOrder (
+                id, number, dateKey, token, status, customerName, phone, email, note,
+                pickupAt, items, customerId, subtotal, offer, reward, pointsUsed,
+                pointsDiscount, total, taxRate, tax, grandTotal, pointsEarned, stampAwarded,
+                ip, fulfillment, deliveryFee, deliveryAddress, createdAt, updatedAt
+            ) VALUES (
+                ?, ?, ?, ?, "NEW", ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, 0, 0,
+                ?, ?, ?, ?, ?, ?
+            )
+        ');
+        $insStmt->execute([
+            $orderId, $orderNumber, $dateKey, $token, $name, $phone, $email, $note,
+            $pickupAtDb, $itemsJson, $customerId, $quote['subtotal'], $offerJson, $rewardJson,
+            $quote['pointsUsed'], $quote['pointsDiscount'], $quote['total'], $quote['taxRate'],
+            $quote['tax'], $quote['grandTotal'], $ip, $fulfillment, $quote['deliveryFee'],
+            $deliveryAddrJson, $nowDb, $nowDb
+        ]);
+
+        if ($customerId && $quote['pointsUsed'] > 0) {
+            $pdo->prepare('UPDATE Customer SET points = GREATEST(0, points - ?) WHERE id = ?')->execute([$quote['pointsUsed'], $customerId]);
+            $ptId = generateUuidV4();
+            $pdo->prepare('INSERT INTO PointTransaction (id, customerId, type, points, balanceAfter, orderId, orderNumber, note, createdAt) VALUES (?, ?, "REDEEM", ?, (SELECT points FROM Customer WHERE id = ?), ?, ?, "Order payment", ?)')
+                ->execute([$ptId, $customerId, -$quote['pointsUsed'], $customerId, $orderId, $orderNumber, $nowDb]);
+        }
+
+        if ($customerId && $quote['reward']) {
+            $pdo->prepare('UPDATE StampReward SET status = "USED", usedAt = ?, orderId = ?, orderNumber = ? WHERE id = ?')
+                ->execute([$nowDb, $orderId, $orderNumber, $quote['reward']['id']]);
+        }
+
+        $pdo->commit();
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        http_response_code(500);
+        echo json_encode(['error' => ['code' => 'ORDER_CREATION_FAILED', 'message' => 'ご注文を作成できませんでした: ' . $e->getMessage()]]);
+        exit;
+    }
+
+    http_response_code(201);
+    echo json_encode([
+        'token' => $token,
+        'number' => $orderNumber,
+        'total' => $quote['total'],
+        'tax' => $quote['tax'],
+        'grandTotal' => $quote['grandTotal'],
+        'pickupAt' => $pickupAtDt->format('c'),
+    ]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: GET /orders/track/:token
+// -------------------------------------------------------------
+if ($method === 'GET' && preg_match('#^/orders/track/([a-zA-Z0-9_-]+)/?$#', $subPath, $matches)) {
+    $token = $matches[1];
+    $stmt = $pdo->prepare('SELECT * FROM PickupOrder WHERE token = ? LIMIT 1');
+    $stmt->execute([$token]);
+    $order = $stmt->fetch();
+    if (!$order) {
+        http_response_code(404);
+        echo json_encode(['error' => ['code' => 'NOT_FOUND', 'message' => 'Order not found']]);
+        exit;
+    }
+
+    $items = is_string($order['items']) ? json_decode($order['items'], true) : ($order['items'] ?: []);
+    $offer = is_string($order['offer']) ? json_decode($order['offer'], true) : $order['offer'];
+    $reward = is_string($order['reward']) ? json_decode($order['reward'], true) : $order['reward'];
+    $deliveryAddress = is_string($order['deliveryAddress']) ? json_decode($order['deliveryAddress'], true) : $order['deliveryAddress'];
+
+    header('Cache-Control: no-store');
+    echo json_encode([
+        'token' => $order['token'],
+        'number' => (int)$order['number'],
+        'status' => $order['status'],
+        'customerName' => $order['customerName'],
+        'phone' => $order['phone'],
+        'note' => $order['note'],
+        'pickupAt' => (new DateTime($order['pickupAt']))->format('c'),
+        'items' => array_map(function($line) {
+            return [
+                'nameEn' => $line['nameEn'] ?? '',
+                'nameJa' => $line['nameJa'] ?? null,
+                'quantity' => (int)($line['quantity'] ?? 1),
+                'unitPrice' => (int)($line['unitPrice'] ?? 0),
+                'lineTotal' => (int)($line['lineTotal'] ?? 0),
+                'options' => $line['options'] ?? null,
+            ];
+        }, is_array($items) ? $items : []),
+        'subtotal' => (int)($order['subtotal'] ?? $order['total']),
+        'offerTitle' => $offer['titleJa'] ?? null,
+        'offerDiscount' => (int)($offer['discount'] ?? 0),
+        'rewardTitle' => $reward['titleJa'] ?? null,
+        'rewardKind' => $reward['kind'] ?? null,
+        'rewardDiscount' => (int)($reward['discount'] ?? 0),
+        'pointsUsed' => (int)$order['pointsUsed'],
+        'pointsDiscount' => (int)$order['pointsDiscount'],
+        'total' => (int)$order['total'],
+        'taxRate' => isset($order['taxRate']) ? (int)$order['taxRate'] : null,
+        'tax' => (int)$order['tax'],
+        'grandTotal' => (int)($order['grandTotal'] ?? $order['total']),
+        'pointsEarned' => (int)$order['pointsEarned'],
+        'isMember' => !empty($order['customerId']),
+        'fulfillment' => $order['fulfillment'] ?: 'PICKUP',
+        'deliveryFee' => (int)($order['deliveryFee'] ?? 0),
+        'deliveryAddress' => $deliveryAddress ?: null,
+        'createdAt' => (new DateTime($order['createdAt']))->format('c'),
+    ]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: GET /orders
+// -------------------------------------------------------------
+if ($method === 'GET' && ($subPath === '/orders' || $subPath === '/orders/')) {
+    requireStaffUser($jwtSecret, $pdo);
+    $scope = $_GET['scope'] ?? 'active';
+    $active = $scope === 'active';
+
+    if ($active) {
+        $stmt = $pdo->query("SELECT * FROM PickupOrder WHERE status IN ('NEW', 'CONFIRMED', 'READY') ORDER BY pickupAt ASC");
+    } else {
+        $stmt = $pdo->query("SELECT * FROM PickupOrder WHERE status NOT IN ('NEW', 'CONFIRMED', 'READY') ORDER BY pickupAt DESC LIMIT 100");
+    }
+    $orders = $stmt->fetchAll();
+    $formatted = array_map(function($o) {
+        unset($o['token'], $o['ip']);
+        $o['items'] = is_string($o['items']) ? json_decode($o['items'], true) : $o['items'];
+        $o['offer'] = is_string($o['offer']) ? json_decode($o['offer'], true) : $o['offer'];
+        $o['reward'] = is_string($o['reward']) ? json_decode($o['reward'], true) : $o['reward'];
+        $o['deliveryAddress'] = is_string($o['deliveryAddress']) ? json_decode($o['deliveryAddress'], true) : $o['deliveryAddress'];
+        return $o;
+    }, $orders);
+
+    header('Cache-Control: no-store');
+    echo json_encode($formatted);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: GET /orders/kitchen
+// -------------------------------------------------------------
+if ($method === 'GET' && ($subPath === '/orders/kitchen' || $subPath === '/orders/kitchen/')) {
+    requireStaffUser($jwtSecret, $pdo);
+
+    $sStmt = $pdo->query('SELECT * FROM Settings LIMIT 1');
+    $settings = $sStmt->fetch() ?: [];
+
+    $activeStmt = $pdo->query("SELECT * FROM PickupOrder WHERE status IN ('NEW', 'CONFIRMED', 'READY') ORDER BY pickupAt ASC");
+    $active = $activeStmt->fetchAll();
+
+    $doneStmt = $pdo->query("SELECT * FROM PickupOrder WHERE status IN ('COMPLETED', 'CANCELLED') AND createdAt >= DATE_SUB(NOW(), INTERVAL 1 DAY) ORDER BY updatedAt DESC LIMIT 40");
+    $done = $doneStmt->fetchAll();
+
+    $todayCountStmt = $pdo->query("SELECT COUNT(*) FROM PickupOrder WHERE status != 'CANCELLED' AND DATE(createdAt) = CURDATE()");
+    $ordersToday = (int)$todayCountStmt->fetchColumn();
+
+    $completedCountStmt = $pdo->query("SELECT COUNT(*) FROM PickupOrder WHERE status = 'COMPLETED' AND DATE(completedAt) = CURDATE()");
+    $completedToday = (int)$completedCountStmt->fetchColumn();
+
+    $cancelledCountStmt = $pdo->query("SELECT COUNT(*) FROM PickupOrder WHERE status = 'CANCELLED' AND DATE(cancelledAt) = CURDATE()");
+    $cancelledToday = (int)$cancelledCountStmt->fetchColumn();
+
+    $mapOrder = function($o) {
+        unset($o['token'], $o['ip'], $o['email']);
+        $o['items'] = is_string($o['items']) ? json_decode($o['items'], true) : $o['items'];
+        $o['offer'] = is_string($o['offer']) ? json_decode($o['offer'], true) : $o['offer'];
+        $o['reward'] = is_string($o['reward']) ? json_decode($o['reward'], true) : $o['reward'];
+        $o['deliveryAddress'] = is_string($o['deliveryAddress']) ? json_decode($o['deliveryAddress'], true) : $o['deliveryAddress'];
+        return $o;
+    };
+
+    header('Cache-Control: no-store');
+    echo json_encode([
+        'serverTime' => date('c'),
+        'pausedUntil' => $settings['orderingPausedUntil'] ?? null,
+        'ordering' => [
+            'pausedUntil' => $settings['orderingPausedUntil'] ?? null,
+            'pickup' => ['enabled' => (bool)($settings['pickupEnabled'] ?? false), 'note' => $settings['pickupNoteJa'] ?? ''],
+            'delivery' => [
+                'enabled' => (bool)($settings['deliveryEnabled'] ?? false),
+                'fee' => (int)($settings['deliveryFee'] ?? 0),
+                'freeOver' => (int)($settings['deliveryFreeOver'] ?? 0),
+                'minOrder' => (int)($settings['deliveryMinOrder'] ?? 0),
+                'areas' => !empty($settings['deliveryAreas']) ? (is_string($settings['deliveryAreas']) ? json_decode($settings['deliveryAreas'], true) : $settings['deliveryAreas']) : [],
+                'note' => $settings['deliveryNoteJa'] ?? '',
+            ],
+        ],
+        'active' => array_map($mapOrder, $active),
+        'done' => array_map($mapOrder, $done),
+        'stats' => [
+            'ordersToday' => $ordersToday,
+            'completedToday' => $completedToday,
+            'cancelledToday' => $cancelledToday,
+            'itemsToday' => 0,
+            'avgPrepMinutes' => null,
+        ],
+    ]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: PATCH /orders/:id/status
+// -------------------------------------------------------------
+if ($method === 'PATCH' && preg_match('#^/orders/([a-zA-Z0-9_-]+)/status/?$#', $subPath, $matches)) {
+    $user = requireStaffUser($jwtSecret, $pdo);
+    $orderId = $matches[1];
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+    $status = strtoupper(trim((string)($input['status'] ?? '')));
+
+    $validStatuses = ['NEW', 'CONFIRMED', 'READY', 'COMPLETED', 'CANCELLED'];
+    if (!in_array($status, $validStatuses, true)) {
+        http_response_code(400);
+        echo json_encode(['error' => ['code' => 'INVALID_STATUS', 'message' => '無効なステータスです']]);
+        exit;
+    }
+
+    $chk = $pdo->prepare('SELECT * FROM PickupOrder WHERE id = ? LIMIT 1');
+    $chk->execute([$orderId]);
+    $before = $chk->fetch();
+    if (!$before) {
+        http_response_code(404);
+        echo json_encode(['error' => ['code' => 'NOT_FOUND', 'message' => 'Order not found']]);
+        exit;
+    }
+
+    $now = date('Y-m-d H:i:s');
+    $sets = ['status = ?', 'updatedAt = ?'];
+    $params = [$status, $now];
+
+    if ($status === 'CONFIRMED') {
+        $sets[] = 'confirmedAt = ?';
+        $params[] = $now;
+    } elseif ($status === 'READY') {
+        $sets[] = 'readyAt = ?';
+        $params[] = $now;
+    } elseif ($status === 'COMPLETED') {
+        $sets[] = 'completedAt = ?';
+        $params[] = $now;
+    } elseif ($status === 'CANCELLED') {
+        $sets[] = 'cancelledAt = ?';
+        $params[] = $now;
+    }
+
+    $params[] = $orderId;
+    $pdo->prepare('UPDATE PickupOrder SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($params);
+
+    if ($status === 'CANCELLED' && !empty($before['customerId']) && (int)$before['pointsUsed'] > 0) {
+        $pdo->prepare('UPDATE Customer SET points = points + ? WHERE id = ?')->execute([(int)$before['pointsUsed'], $before['customerId']]);
+        $ptId = generateUuidV4();
+        $pdo->prepare('INSERT INTO PointTransaction (id, customerId, type, points, balanceAfter, orderId, orderNumber, note, createdAt) VALUES (?, ?, "REFUND", ?, (SELECT points FROM Customer WHERE id = ?), ?, ?, "Order cancelled refund", ?)')
+            ->execute([$ptId, $before['customerId'], (int)$before['pointsUsed'], $before['customerId'], $orderId, $before['number'], $now]);
+    }
+
+    echo json_encode(['success' => true, 'status' => $status]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: PATCH /orders/:id/items/:index
+// -------------------------------------------------------------
+if ($method === 'PATCH' && preg_match('#^/orders/([a-zA-Z0-9_-]+)/items/([0-9]+)/?$#', $subPath, $matches)) {
+    requireStaffUser($jwtSecret, $pdo);
+    $orderId = $matches[1];
+    $idx = (int)$matches[2];
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+    $done = !empty($input['done']);
+
+    $chk = $pdo->prepare('SELECT id, items FROM PickupOrder WHERE id = ? LIMIT 1');
+    $chk->execute([$orderId]);
+    $order = $chk->fetch();
+    if (!$order) {
+        http_response_code(404);
+        echo json_encode(['error' => ['code' => 'NOT_FOUND', 'message' => 'Order not found']]);
+        exit;
+    }
+
+    $items = is_string($order['items']) ? json_decode($order['items'], true) : ($order['items'] ?: []);
+    if (!isset($items[$idx])) {
+        http_response_code(404);
+        echo json_encode(['error' => ['code' => 'NOT_FOUND', 'message' => 'Item not found']]);
+        exit;
+    }
+
+    $items[$idx]['doneAt'] = $done ? date('c') : null;
+    $itemsJson = json_encode($items, JSON_UNESCAPED_UNICODE);
+    $now = date('Y-m-d H:i:s');
+    $pdo->prepare('UPDATE PickupOrder SET items = ?, updatedAt = ? WHERE id = ?')->execute([$itemsJson, $now, $orderId]);
+
+    echo json_encode(['success' => true]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: POST /orders/kitchen/pause
+// -------------------------------------------------------------
+if ($method === 'POST' && ($subPath === '/orders/kitchen/pause' || $subPath === '/orders/kitchen/pause/')) {
+    requireStaffUser($jwtSecret, $pdo);
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+    $minutes = max(0, min(240, (int)($input['minutes'] ?? 0)));
+    $until = $minutes > 0 ? (new DateTime("+$minutes minutes"))->format('Y-m-d H:i:s') : null;
+
+    $pdo->prepare('UPDATE Settings SET orderingPausedUntil = ?')->execute([$until]);
+    echo json_encode(['pausedUntil' => $until]);
     exit;
 }
 
@@ -2840,6 +3605,22 @@ function requireCustomerUser($secret, $pdo) {
         http_response_code(401);
         echo json_encode(['error' => ['code' => 'UNAUTHORIZED', 'message' => 'Customer account is inactive or not found']]);
         exit;
+    }
+    return $customer;
+}
+
+function getOptionalCustomer($secret, $pdo) {
+    $token = getBearerOrCookie('kalpana_customer');
+    if (!$token) return null;
+    $payload = verifyJwt($token, $secret);
+    if (!$payload || empty($payload['sub']) || ($payload['aud'] ?? '') !== 'customer') {
+        return null;
+    }
+    $stmt = $pdo->prepare('SELECT * FROM Customer WHERE id = ? LIMIT 1');
+    $stmt->execute([$payload['sub']]);
+    $customer = $stmt->fetch();
+    if (!$customer || (isset($customer['isActive']) && !$customer['isActive'])) {
+        return null;
     }
     return $customer;
 }
