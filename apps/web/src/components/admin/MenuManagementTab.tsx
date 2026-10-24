@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { ChevronDown, ChevronRight, Edit2, FileSpreadsheet, GripVertical, Plus, Trash2, X } from 'lucide-react';
 import { apiFetch, assetUrl, errorMessage } from '../../lib/api';
+import { getCategoryIcon } from '../../lib/category-icons';
 import MenuImportModal from './MenuImportModal';
 import type { TabIntent } from './TopBar';
 
@@ -521,6 +522,7 @@ export default function MenuManagementTab({ intent }: { intent: TabIntent | null
           )}
 
           <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {isSubcategory && <span style={{ marginRight: '6px' }}>{getCategoryIcon(cat.nameJa, cat.nameEn)}</span>}
             {cat.nameEn}
             {isFixed && (
               <span style={{ marginLeft: '6px', fontSize: '0.65rem', padding: '1px 6px', background: '#e0e7ff', color: '#3730a3', borderRadius: '4px', fontWeight: 700 }}>
@@ -656,7 +658,12 @@ export default function MenuManagementTab({ intent }: { intent: TabIntent | null
             {/* Category add/edit form */}
             {catForm.open ? (
               <form onSubmit={saveCat} style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid #e5e7eb', paddingTop: '12px' }}>
-                <div style={{ fontWeight: 600, fontSize: '0.8rem', color: '#374151' }}>{catForm.id ? 'Edit category' : 'New category'}</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 600, fontSize: '0.8rem', color: '#374151' }}>
+                  <span>{catForm.id ? 'Edit category' : 'New category'}</span>
+                  {(catForm.nameJa || catForm.nameEn) && (
+                    <span style={{ fontSize: '1rem' }} title="Category Icon">{getCategoryIcon(catForm.nameJa, catForm.nameEn)}</span>
+                  )}
+                </div>
                 {!catForm.id && (
                   <select value={catForm.parentId} onChange={e => setCatForm(f => ({ ...f, parentId: e.target.value }))} style={{ ...inp, padding: '0.45rem' }}>
                     <option value="">No parent (root)</option>

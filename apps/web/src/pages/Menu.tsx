@@ -7,6 +7,7 @@ import OrderButtons, { type OrderableItem } from '../components/order/OrderButto
 import RelatedItemsPanel, { type PanelItem } from '../components/order/RelatedItemsPanel';
 import OfferSticker from '../components/MemberOffers';
 import NotFound from './NotFound';
+import { getCategoryIcon } from '../lib/category-icons';
 
 const HERO_IMAGES: Record<string, string> = {
   lunch: 'https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&w=1920&q=80',
@@ -151,7 +152,8 @@ export default function Menu() {
     const sortOrder = cat?.sortOrder ?? 0;
     
     if (!categoriesMap.has(catId)) {
-      categoriesMap.set(catId, { id: catId, name: catName, icon: '🍛', sortOrder, items: [] });
+      const icon = getCategoryIcon(cat?.nameJa || catName, cat?.nameEn);
+      categoriesMap.set(catId, { id: catId, name: catName, icon, sortOrder, items: [] });
     }
     
     const resolvedGroups = Array.isArray(item.optionGroupIds)
