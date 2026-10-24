@@ -165,6 +165,7 @@ export default function Menu() {
       name: item.nameJa || item.nameEn,
       nameJa: item.nameJa,
       nameEn: item.nameEn,
+      sortOrder: typeof item.sortOrder === 'number' ? item.sortOrder : 0,
       desc: item.descriptionJa || item.descriptionEn,
       price: `¥${(item.price || 0).toLocaleString()}`,
       priceValue: item.price || 0,
@@ -185,6 +186,7 @@ export default function Menu() {
   });
 
   const categories = Array.from(categoriesMap.values()).sort((a, b) => a.sortOrder - b.sortOrder);
+  categories.forEach(cat => cat.items.sort((a: any, b: any) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)));
   const flatItems = categories.flatMap(cat => cat.items);
 
   const defaultHero = carousels.length > 0 ? carousels[0].imageUrl : 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1920&q=80';

@@ -138,6 +138,28 @@ router.put('/categories-reorder', requireAdmin, async (req, res) => {
   res.json({ success: true });
 });
 
+router.put('/items-reorder', requireStaff, async (req, res) => {
+  const schema = z.object({
+    orders: z.array(z.object({
+      id: objectIdString,
+      sortOrder: z.number().int().min(0).max(10_000),
+    })).min(1).max(500),
+  });
+
+  const { orders } = schema.parse(req.body);
+
+  await prisma.$transaction(
+    orders.map(({ id, sortOrder }) =>
+      prisma.menuItem.update({
+        where: { id },
+        data: { sortOrder },
+      })
+    )
+  );
+
+  res.json({ success: true });
+});
+
 /** The category plus every descendant so deletes never leave orphaned children. */
 async function categoryTree(rootId: string): Promise<string[]> {
   const ids = [rootId];

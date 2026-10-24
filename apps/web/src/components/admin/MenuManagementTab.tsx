@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'react-hot-toast';
-import { ChevronDown, ChevronRight, Edit2, FileSpreadsheet, GripVertical, Plus, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronUp, Edit2, FileSpreadsheet, GripVertical, Plus, Trash2, X } from 'lucide-react';
 import { apiFetch, assetUrl, errorMessage } from '../../lib/api';
 import { getCategoryIcon } from '../../lib/category-icons';
 import MenuImportModal from './MenuImportModal';
@@ -85,6 +85,11 @@ export default function MenuManagementTab({ intent }: { intent: TabIntent | null
   const [draggedCatId, setDraggedCatId] = useState<string | null>(null);
   const [dragOverCatId, setDragOverCatId] = useState<string | null>(null);
   const [dragOverPosition, setDragOverPosition] = useState<'before' | 'after' | null>(null);
+
+  // Drag & drop for food items
+  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+  const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
+  const [dragOverItemPosition, setDragOverItemPosition] = useState<'before' | 'after' | null>(null);
 
   // Category add/edit
   const [catForm, setCatForm] = useState({ open: false, id: '', nameEn: '', nameJa: '', parentId: '' });
@@ -317,11 +322,13 @@ export default function MenuManagementTab({ intent }: { intent: TabIntent | null
     selectedPath.unshift(c.nameEn);
     if (selectedPath.length > 4) break;
   }
-  const filteredItems = items.filter(it => {
-    if (it.categoryId !== selectedCatId) return false;
-    if (search.trim()) return it.nameEn.toLowerCase().includes(search.toLowerCase()) || (it.nameJa ?? '').includes(search);
-    return true;
-  });
+  const filteredItems = items
+    .filter(it => {
+      if (it.categoryId !== selectedCatId) return false;
+      if (search.trim()) return it.nameEn.toLowerCase().includes(search.toLowerCase()) || (it.nameJa ?? '').includes(search);
+      return true;
+    })
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
 
   // Category tree helpers
   const rootCats = categories.filter(c => !c.parentId).sort((a, b) => a.sortOrder - b.sortOrder);
@@ -454,6 +461,165 @@ export default function MenuManagementTab({ intent }: { intent: TabIntent | null
     setDraggedCatId(null);
     setDragOverCatId(null);
     setDragOverPosition(null);
+  };
+
+  // ── Food item drag & drop and manual move ──
+  const handleItemDragStart = (e: React.DragEvent, item: MenuItem) => {
+    if (search.trim()) {
+      e.preventDefault();
+      return;
+    }
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', item.id);
+    setDraggedItemId(item.id);
+  };
+
+  const handleItemDragOver = (e: React.DragEvent, targetItem: MenuItem) => {
+    if (!draggedItemId || draggedItemId === targetItem.id) return;
+    const dragged = items.find(it => it.id === draggedItemId);
+    if (!dragged || dragged.categoryId !== targetItem.categoryId) return;
+
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    const pos = e.clientY < midY ? 'before' : 'after';
+    if (dragOverItemId !== targetItem.id || dragOverItemPosition !== pos) {
+      setDragOverItemId(targetItem.id);
+      setDragOverItemPosition(pos);
+    }
+  };
+
+  const handleItemDragLeave = (e: React.DragEvent, targetItem: MenuItem) => {
+    if (dragOverItemId === targetItem.id) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      if (
+        e.clientX < rect.left ||
+        e.clientX >= rect.right ||
+        e.clientY < rect.top ||
+        e.clientY >= rect.bottom
+      ) {
+        setDragOverItemId(null);
+        setDragOverItemPosition(null);
+      }
+    }
+  };
+
+  const handleItemDrop = async (e: React.DragEvent, targetItem: MenuItem) => {
+    e.preventDefault();
+    if (!draggedItemId || draggedItemId === targetItem.id) {
+      setDraggedItemId(null);
+      setDragOverItemId(null);
+      setDragOverItemPosition(null);
+      return;
+    }
+
+    const dragged = items.find(it => it.id === draggedItemId);
+    if (!dragged || dragged.categoryId !== targetItem.categoryId) {
+      setDraggedItemId(null);
+      setDragOverItemId(null);
+      setDragOverItemPosition(null);
+      return;
+    }
+
+    const catItems = items
+      .filter(it => it.categoryId === targetItem.categoryId)
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+
+    const oldIndex = catItems.findIndex(it => it.id === draggedItemId);
+    const targetIndex = catItems.findIndex(it => it.id === targetItem.id);
+
+    if (oldIndex === -1 || targetIndex === -1) {
+      setDraggedItemId(null);
+      setDragOverItemId(null);
+      setDragOverItemPosition(null);
+      return;
+    }
+
+    const newItems = [...catItems];
+    const [removed] = newItems.splice(oldIndex, 1);
+    let newIndex = newItems.findIndex(it => it.id === targetItem.id);
+    if (dragOverItemPosition === 'after') {
+      newIndex += 1;
+    }
+    newItems.splice(newIndex, 0, removed);
+
+    // Optimistically update items locally
+    const orderUpdates = newItems.map((it, index) => ({ id: it.id, sortOrder: index + 1 }));
+    setItems(prev =>
+      prev.map(it => {
+        const update = orderUpdates.find(u => u.id === it.id);
+        return update ? { ...it, sortOrder: update.sortOrder } : it;
+      })
+    );
+
+    setDraggedItemId(null);
+    setDragOverItemId(null);
+    setDragOverItemPosition(null);
+
+    try {
+      const res = await apiFetch('/api/v1/menu/items-reorder', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orders: orderUpdates }),
+      });
+      if (res.ok) {
+        toast.success('料理の並び順を更新しました。');
+      } else {
+        toast.error('並び順の更新に失敗しました。');
+        fetchAll();
+      }
+    } catch {
+      toast.error('通信エラーが発生しました。');
+      fetchAll();
+    }
+  };
+
+  const handleItemDragEnd = () => {
+    setDraggedItemId(null);
+    setDragOverItemId(null);
+    setDragOverItemPosition(null);
+  };
+
+  const moveItem = async (item: MenuItem, direction: 'up' | 'down') => {
+    const catItems = items
+      .filter(it => it.categoryId === item.categoryId)
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    const currentIndex = catItems.findIndex(it => it.id === item.id);
+    if (currentIndex === -1) return;
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= catItems.length) return;
+
+    const newItems = [...catItems];
+    const temp = newItems[currentIndex];
+    newItems[currentIndex] = newItems[targetIndex];
+    newItems[targetIndex] = temp;
+
+    const orderUpdates = newItems.map((it, index) => ({ id: it.id, sortOrder: index + 1 }));
+    setItems(prev =>
+      prev.map(it => {
+        const update = orderUpdates.find(u => u.id === it.id);
+        return update ? { ...it, sortOrder: update.sortOrder } : it;
+      })
+    );
+
+    try {
+      const res = await apiFetch('/api/v1/menu/items-reorder', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orders: orderUpdates }),
+      });
+      if (res.ok) {
+        toast.success('料理の並び順を更新しました。');
+      } else {
+        toast.error('並び順の更新に失敗しました。');
+        fetchAll();
+      }
+    } catch {
+      toast.error('通信エラーが発生しました。');
+      fetchAll();
+    }
   };
 
   // ── Render category row ──
@@ -697,6 +863,11 @@ export default function MenuManagementTab({ intent }: { intent: TabIntent | null
                   {selectedCat && (
                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginTop: '6px', flexWrap: 'wrap' }}>
                       <span style={{ color: '#6b7280', fontSize: '0.85rem' }}>{filteredItems.length} item{filteredItems.length !== 1 ? 's' : ''}</span>
+                      {filteredItems.length > 1 && !search.trim() && (
+                        <span style={{ fontSize: '0.78rem', color: '#8b4513', background: '#faebd7', border: '1px solid #f2d2b6', borderRadius: '20px', padding: '2px 10px', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                          <GripVertical size={13} /> ドラッグで並び替え可能 (Drag to reorder)
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -769,42 +940,151 @@ export default function MenuManagementTab({ intent }: { intent: TabIntent | null
               </div>
             )}
 
-            {!isEditing && filteredItems.map(item => (
-              <div key={item.id} style={{ display: 'flex', gap: '1rem', padding: '1.25rem', background: item.isActive ? '#f9fafb' : '#fdf2f2', borderRadius: '12px', border: `1px solid ${item.isActive ? '#e5e7eb' : '#fca5a5'}`, marginBottom: '0.75rem', alignItems: 'flex-start' }}>
-                {item.imageUrl
-                  ? <img src={assetUrl(item.imageUrl)} alt={item.nameEn} style={{ width: '90px', height: '90px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }} />
-                  : <div style={{ width: '90px', height: '90px', background: '#e5e7eb', borderRadius: '8px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: '0.75rem' }}>No image</div>}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <div>
-                      <span style={{ fontWeight: 700, fontSize: '1.05rem', color: '#111827' }}>{item.nameEn}</span>
-                      {item.nameJa && <span style={{ marginLeft: '6px', color: '#6b7280', fontSize: '0.85rem' }}>{item.nameJa}</span>}
+            {!isEditing && filteredItems.map((item, itemIndex) => {
+              const canDrag = !search.trim() && filteredItems.length > 1;
+              const isDragged = draggedItemId === item.id;
+              const isDropTarget = dragOverItemId === item.id;
+
+              return (
+                <div
+                  key={item.id}
+                  draggable={canDrag}
+                  onDragStart={e => handleItemDragStart(e, item)}
+                  onDragOver={e => handleItemDragOver(e, item)}
+                  onDragLeave={e => handleItemDragLeave(e, item)}
+                  onDrop={e => handleItemDrop(e, item)}
+                  onDragEnd={handleItemDragEnd}
+                  style={{
+                    display: 'flex',
+                    gap: '1rem',
+                    padding: '1.15rem 1.25rem',
+                    background: isDragged
+                      ? '#f3f4f6'
+                      : isDropTarget
+                      ? '#fffbeb'
+                      : item.isActive
+                      ? '#f9fafb'
+                      : '#fdf2f2',
+                    opacity: isDragged ? 0.45 : 1,
+                    borderRadius: '12px',
+                    border: `1px solid ${item.isActive ? '#e5e7eb' : '#fca5a5'}`,
+                    borderTop:
+                      isDropTarget && dragOverItemPosition === 'before'
+                        ? '3px solid #8b4513'
+                        : `1px solid ${item.isActive ? '#e5e7eb' : '#fca5a5'}`,
+                    borderBottom:
+                      isDropTarget && dragOverItemPosition === 'after'
+                        ? '3px solid #8b4513'
+                        : `1px solid ${item.isActive ? '#e5e7eb' : '#fca5a5'}`,
+                    marginBottom: '0.75rem',
+                    alignItems: 'center',
+                    transition: 'all 0.15s ease',
+                    boxShadow: isDragged ? '0 8px 16px rgba(0,0,0,0.1)' : 'none',
+                  }}
+                >
+                  {/* Drag Handle & Order Controls */}
+                  {canDrag && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '2px',
+                        flexShrink: 0,
+                        color: '#9ca3af',
+                        userSelect: 'none',
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => moveItem(item, 'up')}
+                        disabled={itemIndex === 0}
+                        title="上に移動 (Move up)"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: itemIndex === 0 ? 'default' : 'pointer',
+                          opacity: itemIndex === 0 ? 0.2 : 0.7,
+                          padding: '2px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          color: '#4b5563',
+                        }}
+                      >
+                        <ChevronUp size={16} />
+                      </button>
+                      <div
+                        title="ドラッグして並び替え (Drag to reorder)"
+                        style={{
+                          cursor: 'grab',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          padding: '2px',
+                        }}
+                      >
+                        <GripVertical size={18} style={{ color: '#8b4513' }} />
+                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#8b4513' }}>
+                          #{itemIndex + 1}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => moveItem(item, 'down')}
+                        disabled={itemIndex === filteredItems.length - 1}
+                        title="下に移動 (Move down)"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: itemIndex === filteredItems.length - 1 ? 'default' : 'pointer',
+                          opacity: itemIndex === filteredItems.length - 1 ? 0.2 : 0.7,
+                          padding: '2px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          color: '#4b5563',
+                        }}
+                      >
+                        <ChevronDown size={16} />
+                      </button>
                     </div>
-                    <span style={{ fontWeight: 700, color: '#8b4513', fontSize: '1.05rem', whiteSpace: 'nowrap' }}>¥{item.price.toLocaleString()}</span>
+                  )}
+
+                  {item.imageUrl
+                    ? <img src={assetUrl(item.imageUrl)} alt={item.nameEn} style={{ width: '90px', height: '90px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }} />
+                    : <div style={{ width: '90px', height: '90px', background: '#e5e7eb', borderRadius: '8px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: '0.75rem' }}>No image</div>}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <div>
+                        <span style={{ fontWeight: 700, fontSize: '1.05rem', color: '#111827' }}>{item.nameEn}</span>
+                        {item.nameJa && <span style={{ marginLeft: '6px', color: '#6b7280', fontSize: '0.85rem' }}>{item.nameJa}</span>}
+                      </div>
+                      <span style={{ fontWeight: 700, color: '#8b4513', fontSize: '1.05rem', whiteSpace: 'nowrap' }}>¥{item.price.toLocaleString()}</span>
+                    </div>
+                    {item.descriptionEn && <p style={{ margin: '4px 0 6px', color: '#6b7280', fontSize: '0.85rem', lineHeight: 1.4 }}>{item.descriptionEn}</p>}
+                    <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', alignItems: 'center' }}>
+                      {item.menuTypes.map(t => <span key={t} style={badge('#f3f4f6', '#374151')}>{t}</span>)}
+                      {item.spiceLevel > 0 && <span style={{ fontSize: '0.78rem' }}>{spiceIcon(item.spiceLevel)}</span>}
+                      {!item.isActive && <span style={badge('#fee2e2', '#b91c1c')}>Hidden</span>}
+                      {item.isOrderable === false && <span style={badge('#fee2e2', '#991b1b')}>Order OFF</span>}
+                      {item.isSoldOut && <span style={badge('#fee2e2', '#b91c1c')}>Sold out</span>}
+                      {item.isRecommended && <span style={badge('#fef3c7', '#d97706')}>⭐ Recommended</span>}
+                      {item.isVegetarian && <span style={badge('#d1fae5', '#059669')}>🌿 Veg</span>}
+                      {item.isVegan && <span style={badge('#dcfce7', '#16a34a')}>🌱 Vegan</span>}
+                      {item.isHalal && <span style={badge('#fce7f3', '#9d174d')}>Halal</span>}
+                      {item.isGlutenFree && <span style={badge('#e0e7ff', '#4f46e5')}>GF</span>}
+                    </div>
                   </div>
-                  {item.descriptionEn && <p style={{ margin: '4px 0 6px', color: '#6b7280', fontSize: '0.85rem', lineHeight: 1.4 }}>{item.descriptionEn}</p>}
-                  <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    {item.menuTypes.map(t => <span key={t} style={badge('#f3f4f6', '#374151')}>{t}</span>)}
-                    {item.spiceLevel > 0 && <span style={{ fontSize: '0.78rem' }}>{spiceIcon(item.spiceLevel)}</span>}
-                    {!item.isActive && <span style={badge('#fee2e2', '#b91c1c')}>Hidden</span>}
-                    {item.isOrderable === false && <span style={badge('#fee2e2', '#991b1b')}>Order OFF</span>}
-                    {item.isSoldOut && <span style={badge('#fee2e2', '#b91c1c')}>Sold out</span>}
-                    {item.isRecommended && <span style={badge('#fef3c7', '#d97706')}>⭐ Recommended</span>}
-                    {item.isVegetarian && <span style={badge('#d1fae5', '#059669')}>🌿 Veg</span>}
-                    {item.isVegan && <span style={badge('#dcfce7', '#16a34a')}>🌱 Vegan</span>}
-                    {item.isHalal && <span style={badge('#fce7f3', '#9d174d')}>Halal</span>}
-                    {item.isGlutenFree && <span style={badge('#e0e7ff', '#4f46e5')}>GF</span>}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flexShrink: 0 }}>
+                    <button onClick={() => openEdit(item)} style={{ padding: '0.4rem 0.8rem', border: '1px solid #d1d5db', borderRadius: '6px', background: '#fff', cursor: 'pointer', fontWeight: 500, fontSize: '0.82rem', color: '#374151' }}>Edit</button>
+                    <button onClick={() => toggleOrderable(item)} style={{ padding: '0.4rem 0.8rem', border: '1px solid #d1d5db', borderRadius: '6px', background: item.isOrderable !== false ? '#ecfdf5' : '#fef2f2', cursor: 'pointer', fontWeight: 600, fontSize: '0.82rem', color: item.isOrderable !== false ? '#065f46' : '#991b1b' }}>{item.isOrderable !== false ? 'Order: ON' : 'Order: OFF'}</button>
+                    <button onClick={() => toggleSoldOut(item)} style={{ padding: '0.4rem 0.8rem', border: '1px solid #d1d5db', borderRadius: '6px', background: '#fff', cursor: 'pointer', fontWeight: 500, fontSize: '0.82rem', color: item.isSoldOut ? '#059669' : '#b45309' }}>{item.isSoldOut ? 'In stock' : 'Sold out'}</button>
+                    <button onClick={() => toggleActive(item)} style={{ padding: '0.4rem 0.8rem', border: '1px solid #d1d5db', borderRadius: '6px', background: '#fff', cursor: 'pointer', fontWeight: 500, fontSize: '0.82rem', color: item.isActive ? '#6b7280' : '#059669' }}>{item.isActive ? 'Hide' : 'Show'}</button>
+                    <button onClick={() => deleteItem(item.id)} style={{ padding: '0.4rem 0.8rem', border: '1px solid #fca5a5', borderRadius: '6px', background: '#fee2e2', cursor: 'pointer', fontWeight: 500, fontSize: '0.82rem', color: '#ef4444' }}>Delete</button>
                   </div>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flexShrink: 0 }}>
-                  <button onClick={() => openEdit(item)} style={{ padding: '0.4rem 0.8rem', border: '1px solid #d1d5db', borderRadius: '6px', background: '#fff', cursor: 'pointer', fontWeight: 500, fontSize: '0.82rem', color: '#374151' }}>Edit</button>
-                  <button onClick={() => toggleOrderable(item)} style={{ padding: '0.4rem 0.8rem', border: '1px solid #d1d5db', borderRadius: '6px', background: item.isOrderable !== false ? '#ecfdf5' : '#fef2f2', cursor: 'pointer', fontWeight: 600, fontSize: '0.82rem', color: item.isOrderable !== false ? '#065f46' : '#991b1b' }}>{item.isOrderable !== false ? 'Order: ON' : 'Order: OFF'}</button>
-                  <button onClick={() => toggleSoldOut(item)} style={{ padding: '0.4rem 0.8rem', border: '1px solid #d1d5db', borderRadius: '6px', background: '#fff', cursor: 'pointer', fontWeight: 500, fontSize: '0.82rem', color: item.isSoldOut ? '#059669' : '#b45309' }}>{item.isSoldOut ? 'In stock' : 'Sold out'}</button>
-                  <button onClick={() => toggleActive(item)} style={{ padding: '0.4rem 0.8rem', border: '1px solid #d1d5db', borderRadius: '6px', background: '#fff', cursor: 'pointer', fontWeight: 500, fontSize: '0.82rem', color: item.isActive ? '#6b7280' : '#059669' }}>{item.isActive ? 'Hide' : 'Show'}</button>
-                  <button onClick={() => deleteItem(item.id)} style={{ padding: '0.4rem 0.8rem', border: '1px solid #fca5a5', borderRadius: '6px', background: '#fee2e2', cursor: 'pointer', fontWeight: 500, fontSize: '0.82rem', color: '#ef4444' }}>Delete</button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
 
             {/* ── Add / Edit form ── */}
             {isEditing && (

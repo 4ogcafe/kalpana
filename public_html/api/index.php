@@ -1007,6 +1007,40 @@ if ($method === 'PUT' && ($subPath === '/menu/categories-reorder' || $subPath ==
 }
 
 // -------------------------------------------------------------
+// Endpoint: PUT /menu/items-reorder
+// -------------------------------------------------------------
+if ($method === 'PUT' && ($subPath === '/menu/items-reorder' || $subPath === '/menu/items-reorder/')) {
+    requireStaffUser($jwtSecret, $pdo);
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+    $orders = isset($input['orders']) && is_array($input['orders']) ? $input['orders'] : [];
+
+    if (empty($orders)) {
+        http_response_code(400);
+        echo json_encode(['error' => ['code' => 'VALIDATION_FAILED', 'message' => 'No orders provided']]);
+        exit;
+    }
+
+    $pdo->beginTransaction();
+    try {
+        $stmt = $pdo->prepare('UPDATE MenuItem SET sortOrder = ? WHERE id = ?');
+        foreach ($orders as $item) {
+            if (isset($item['id']) && isset($item['sortOrder'])) {
+                $stmt->execute([(int)$item['sortOrder'], (string)$item['id']]);
+            }
+        }
+        $pdo->commit();
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        http_response_code(400);
+        echo json_encode(['error' => ['code' => 'SAVE_FAILED', 'message' => 'Could not reorder menu items']]);
+        exit;
+    }
+
+    echo json_encode(['success' => true]);
+    exit;
+}
+
+// -------------------------------------------------------------
 // Endpoint: PUT /menu/categories/:id
 // -------------------------------------------------------------
 if (($method === 'PUT' || $method === 'PATCH') && preg_match('#^/menu/categories/([a-zA-Z0-9_-]+)/?$#', $subPath, $matches)) {
