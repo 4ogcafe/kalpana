@@ -964,9 +964,8 @@ if ($method === 'POST' && ($subPath === '/menu/categories' || $subPath === '/men
     $parentId = !empty($input['parentId']) ? trim((string)$input['parentId']) : null;
 
     $newId = generateUuidV4();
-    $now = (new DateTime('now', new DateTimeZone('UTC')))->format('Y-m-d H:i:s.v');
-    $stmt = $pdo->prepare('INSERT INTO Category (id, nameEn, nameJa, sortOrder, parentId, createdAt, updatedAt) VALUES (?, ?, ?, 0, ?, ?, ?)');
-    $stmt->execute([$newId, $nameEn, $nameJa, $parentId, $now, $now]);
+    $stmt = $pdo->prepare('INSERT INTO Category (id, nameEn, nameJa, sortOrder, parentId) VALUES (?, ?, ?, 0, ?)');
+    $stmt->execute([$newId, $nameEn, $nameJa, $parentId]);
 
     http_response_code(201);
     echo json_encode([
@@ -1064,8 +1063,6 @@ if (($method === 'PUT' || $method === 'PATCH') && preg_match('#^/menu/categories
     }
 
     if (!empty($cols)) {
-        $cols[] = '`updatedAt` = ?';
-        $params[] = (new DateTime('now', new DateTimeZone('UTC')))->format('Y-m-d H:i:s.v');
         $params[] = $catId;
         $pdo->prepare('UPDATE Category SET ' . implode(', ', $cols) . ' WHERE id = ?')->execute($params);
     }
@@ -2035,8 +2032,8 @@ if ($method === 'POST' && ($subPath === '/contact' || $subPath === '/contact/'))
     $now = date('Y-m-d H:i:s');
     $ip = $_SERVER['REMOTE_ADDR'] ?? null;
 
-    $stmt = $pdo->prepare('INSERT INTO ContactMessage (id, name, email, phone, type, message, date, guests, isRead, ip, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)');
-    $stmt->execute([$id, $name, $email, $phone, $type, $message, $date, $guests, $ip, $now, $now]);
+    $stmt = $pdo->prepare('INSERT INTO ContactMessage (id, name, email, phone, type, message, date, guests, isRead, ip, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)');
+    $stmt->execute([$id, $name, $email, $phone, $type, $message, $date, $guests, $ip, $now]);
 
     http_response_code(201);
     echo json_encode(['success' => true, 'id' => $id]);
