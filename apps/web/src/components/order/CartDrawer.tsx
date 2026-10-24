@@ -83,7 +83,7 @@ export default function CartDrawer() {
             <ul style={{ listStyle: 'none', margin: 0, padding: '0 20px', overflowY: 'auto', flex: 1 }}>
               {cart.lines.map(line => (
                 <li key={line.cartKey} style={{ display: 'flex', gap: '12px', padding: '16px 0', borderBottom: '1px solid #f0ebe3' }}>
-                  <img src={line.img} alt="" width={64} height={64} style={{ borderRadius: '10px', objectFit: 'cover', flexShrink: 0 }} />
+                  <img src={line.img} alt={line.name || "カート商品写真"} width={64} height={64} style={{ borderRadius: '10px', objectFit: 'cover', flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                       <div style={{ minWidth: 0 }}>

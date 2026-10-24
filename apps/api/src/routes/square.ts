@@ -101,7 +101,7 @@ router.post('/payment-link', requireStaff, async (req, res) => {
   }>('POST', '/online-checkout/payment-links', {
     idempotency_key: idempotencyKey,
     quick_pay: {
-      name: label ?? 'Kalpana Restaurant',
+      name: label ?? 'Kalpna Restaurant',
       price_money: { amount: yenToAmount(amount), currency: 'JPY' },
       location_id: config.square.locationId,
     },
@@ -184,7 +184,7 @@ router.post('/terminal/checkout', requireStaff, async (req, res) => {
       checkout: {
         amount_money: { amount: yenToAmount(amount), currency: 'JPY' },
         reference_id: sessionId,
-        note: label ?? 'Kalpana Restaurant',
+        note: label ?? 'Kalpna Restaurant',
         device_options: { device_id: deviceId, skip_receipt_screen: false },
       },
     },
@@ -292,7 +292,7 @@ router.post('/payment', requireStaff, async (req, res) => {
       source_id: token,
       amount_money: { amount: yenToAmount(amount), currency: 'JPY' },
       location_id: config.square.locationId,
-      note: label ?? 'Kalpana Restaurant',
+      note: label ?? 'Kalpna Restaurant',
       reference_id: sessionId,
     });
 

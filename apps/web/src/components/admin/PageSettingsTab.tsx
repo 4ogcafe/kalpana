@@ -67,10 +67,10 @@ export const DEFAULT_ABOUT_CONTENT: Record<string, string> = {
   aboutHeroImage: 'https://images.unsplash.com/photo-1552566626-52f8b828add9?auto=format&fit=crop&w=1920&q=80',
   aboutStoryLabelJa: '私たちの物語',
   aboutStoryTitleJa: '本場インドの味を、<em>熊谷へ</em>',
-  aboutStoryJa: 'Kalpana（カルプナ）は、サンスクリット語で「想像」や「創造」を意味します。\n私たちは、インドの伝統的なスパイスと製法を守りながら、日本の皆さまの味覚に寄り添う新しいインディアン・ダイニングを創造しています。\n\n本場インドのホテルで腕を磨いたシェフが、厳選された数十種類のスパイスを巧みにブレンド。\n特注のタンドール（土窯）で焼き上げる備長炭の香ばしいナンやタンドリーチキンは、多くのお客様に愛されています。',
+  aboutStoryJa: 'Kalpna（カルプナ）は、サンスクリット語で「想像」や「創造」を意味します。\n私たちは、インドの伝統的なスパイスと製法を守りながら、日本の皆さまの味覚に寄り添う新しいインディアン・ダイニングを創造しています。\n\n本場インドのホテルで腕を磨いたシェフが、厳選された数十種類のスパイスを巧みにブレンド。\n特注のタンドール（土窯）で焼き上げる備長炭の香ばしいナンやタンドリーチキンは、多くのお客様に愛されています。',
   aboutStoryImage: 'https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&w=1200&q=80',
   aboutStoryWatermark: 'カルプナ',
-  aboutStoryOriginTitleJa: '店名「Kalpana（カルプナ）」に込めた想い',
+  aboutStoryOriginTitleJa: '店名「Kalpna（カルプナ）」に込めた想い',
   aboutStoryOriginTextJa: 'サンスクリット語で「想像」や「創造」を意味します。インド何千年の食の知恵を受け継ぎ、日本の皆さまの心を満たす新しい美味しさを創り出します。',
   aboutStoryBadgeSubJa: '炭火仕込み',
   aboutStoryBadgeTitleJa: '備長炭タンドール窯焼き',
@@ -92,7 +92,7 @@ export const DEFAULT_ABOUT_CONTENT: Record<string, string> = {
 
 export const DEFAULT_HOME_CONTENT: Record<string, string> = {
   heroTagJa: '埼玉・熊谷で味わう、本場のインド料理',
-  heroSubJa: '愛とスパイス、そして伝統に彩られた数世紀にわたるレシピを。\nKalpana Indian Cuisineで皆様をお待ちしております。',
+  heroSubJa: '愛とスパイス、そして伝統に彩られた数世紀にわたるレシピを。\nKalpna Indian Cuisineで皆様をお待ちしております。',
   welcomeTitleEn: 'Authentic Indian Flavors',
   welcomeTitleJa: '本格インドの味わい',
   welcomeTextJa: 'インドの豊かな食文化と鮮やかなスパイスを体験してください。熟練のシェフが伝統的なタンドール窯と新鮮な食材を使用し、すべての料理をゼロから手作りしています。忘れられない特別なひとときをお届けします。',
@@ -516,7 +516,7 @@ function AboutPageTab({ settings, setSettings }: { settings: Settings; setSettin
           <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.95rem', color: '#92400e', fontWeight: 700 }}>店名の由来・哲学（ハイライト枠）</h4>
           <label style={lbl}>
             引用見出し
-            <input style={inp} type="text" value={settings.aboutStoryOriginTitleJa ?? ''} onChange={set('aboutStoryOriginTitleJa')} placeholder="店名「Kalpana（カルプナ）」に込めた想い" />
+            <input style={inp} type="text" value={settings.aboutStoryOriginTitleJa ?? ''} onChange={set('aboutStoryOriginTitleJa')} placeholder="店名「Kalpna（カルプナ）」に込めた想い" />
           </label>
           <label style={lbl}>
             引用本文
@@ -842,9 +842,9 @@ function CarouselTab() {
         {
           placement: 'CONTACT' as const,
           imageUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1920&q=80',
-          titleEn: 'Visit Kalpana in Kumagaya',
+          titleEn: 'Visit Kalpna in Kumagaya',
           titleJa: '熊谷でお待ちしております',
-          altEn: 'Kalpana Indian Cuisine dining hall in Kumagaya',
+          altEn: 'Kalpna Indian Cuisine dining hall in Kumagaya',
         },
       ];
       for (const slide of DEFAULT_SLIDES) {

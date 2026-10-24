@@ -46,11 +46,11 @@ export default function Contact() {
 
   return (
     <main>
-      <title>お問い合わせ | Kalpana (カルプナ)</title>
+      <title>お問い合わせ | Kalpna (カルプナ)</title>
       <meta name="description" content="カルプナへのご予約・貸し切り・ケータリングのご相談はこちらから。住所・電話番号・地図もご確認いただけます。" />
       {/* Hero Section */}
       <div className="home-hero" style={{ height: '40vh', minHeight: '300px' }}>
-        <img src={assetUrl(settings.contactHeroImage) || "https://images.unsplash.com/photo-1590846406792-0adc7f928f1d?auto=format&fit=crop&w=1920&q=80"} alt="" fetchPriority="high" className="slide-bg-img" style={{ opacity: 0.5, objectFit: 'cover' }} />
+        <img src={assetUrl(settings.contactHeroImage) || "https://images.unsplash.com/photo-1590846406792-0adc7f928f1d?auto=format&fit=crop&w=1920&q=80"} alt="本格インド料理 Kalpna (カルプナ) お問い合わせ・店舗外観" fetchPriority="high" className="slide-bg-img" style={{ opacity: 0.5, objectFit: 'cover' }} />
         <div className="hero-content">
           <div className="hero-tag">CONTACT US</div>
           <h1 className="hero-title">お問い<em>合わせ</em></h1>
@@ -118,7 +118,7 @@ export default function Contact() {
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: 'bold' }}>住所</div>
                     <div style={{ color: 'var(--dark-bark)', fontSize: '0.95rem', lineHeight: '1.5' }}>
                       {settings.addressJa || '埼玉県熊谷市'}<br/>
-                      {settings.name || 'Kalpana Indian Cuisine'}
+                      {settings.name || 'Kalpna Indian Cuisine'}
                     </div>
                   </div>
                 </div>
@@ -148,7 +148,7 @@ export default function Contact() {
             <div style={{ flex: '1', borderRadius: '12px', overflow: 'hidden', minHeight: '300px', backgroundColor: '#e5e3df', position: 'relative', boxShadow: '0 10px 30px rgba(0,0,0,0.05)' }}>
               <iframe 
                 src={settings.mapUrl?.startsWith(MAP_EMBED_PREFIX) ? settings.mapUrl : "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3221.724944983944!2d139.41883000000002!3d36.1251!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x601f2b0605446c1f%3A0x1a31a406a1c1b3d6!2sKalpna%20Indian%20Cuisine!5e0!3m2!1sen!2sus!4v1700000000000!5m2!1sen!2sus"}
-                title="Google マップ: Kalpana Indian Cuisine" 
+                title="Google マップ: Kalpna Indian Cuisine" 
                 width="100%" 
                 height="100%" 
                 style={{ border: 0, position: 'absolute', top: 0, left: 0 }} 

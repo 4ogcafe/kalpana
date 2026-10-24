@@ -101,7 +101,7 @@ export default function AccountAuth({ mode }: { mode: 'login' | 'register' }) {
 
   return (
     <main>
-      <title>{`${isRegister ? '会員登録' : 'ログイン'} | Kalpana (カルプナ)`}</title>
+      <title>{`${isRegister ? '会員登録' : 'ログイン'} | Kalpna (カルプナ)`}</title>
       <meta name="robots" content="noindex" />
       <div className="section" style={{ backgroundColor: 'var(--cream)', paddingTop: '120px', minHeight: '70vh' }}>
         <div style={{ maxWidth: '960px', margin: '0 auto', padding: '0 16px' }}>

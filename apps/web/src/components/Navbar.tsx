@@ -91,7 +91,7 @@ export default function Navbar() {
         <div className="nav-inner">
           <Link className="nav-logo" to="/">
             <div style={{ height: '40px', display: 'flex', alignItems: 'center' }}>
-              <img src="/site-logo-01.webp" alt="Kalpana" width={40} height={40} style={{ height: '100%', width: 'auto', objectFit: 'contain' }} />
+              <img src="/site-logo-01.webp" alt="Kalpna (カルプナ) ロゴ" width={40} height={40} style={{ height: '100%', width: 'auto', objectFit: 'contain' }} />
             </div>
             <div>
               <div className="nav-logo-text">カルプナ<span>.</span></div>

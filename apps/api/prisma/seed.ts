@@ -13,7 +13,7 @@ async function main() {
       data: {
         email: 'admin@example.com',
         passwordHash: await bcrypt.hash('admin123', 10),
-        name: 'Kalpana Admin',
+        name: 'Kalpna Admin',
         role: Role.ADMIN,
       },
     });
@@ -142,7 +142,7 @@ async function main() {
       aboutHeroImage: 'https://images.unsplash.com/photo-1552566626-52f8b828add9?auto=format&fit=crop&w=1920&q=80',
       aboutStoryLabelJa: '私たちの物語',
       aboutStoryTitleJa: '本場インドの味を、熊谷へ',
-      aboutStoryJa: 'Kalpana（カルプナ）は、サンスクリット語で「想像」や「創造」を意味します。\n私たちは、インドの伝統的なスパイスと製法を守りながら、日本の皆さまの味覚に寄り添う新しいインディアン・ダイニングを創造しています。\n\n本場インドのホテルで腕を磨いたシェフが、厳選された数十種類のスパイスを巧みにブレンド。\n特注のタンドール（土窯）で焼き上げる備長炭の香ばしいナンやタンドリーチキンは、多くのお客様に愛されています。',
+      aboutStoryJa: 'Kalpna（カルプナ）は、サンスクリット語で「想像」や「創造」を意味します。\n私たちは、インドの伝統的なスパイスと製法を守りながら、日本の皆さまの味覚に寄り添う新しいインディアン・ダイニングを創造しています。\n\n本場インドのホテルで腕を磨いたシェフが、厳選された数十種類のスパイスを巧みにブレンド。\n特注のタンドール（土窯）で焼き上げる備長炭の香ばしいナンやタンドリーチキンは、多くのお客様に愛されています。',
       aboutSpiceLabelJa: 'こだわり',
       aboutSpiceTitleJa: '命を吹き込む、スパイス',
       aboutSpiceDescJa: 'カレーの味の決め手となるスパイスは、インドから直接取り寄せた最高品質のものを使用しています。クミン、コリアンダー、ターメリック、カルダモン... それぞれのスパイスが持つ薬効や香りを最大限に引き出すため、独自に配合し、挽きたてを使用しています。',
@@ -190,9 +190,9 @@ async function main() {
         {
           placement: 'CONTACT',
           imageUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1920&q=80',
-          titleEn: 'Visit Kalpana in Kumagaya',
+          titleEn: 'Visit Kalpna in Kumagaya',
           titleJa: '熊谷でお待ちしております',
-          altEn: 'Kalpana Indian Cuisine dining hall in Kumagaya',
+          altEn: 'Kalpna Indian Cuisine dining hall in Kumagaya',
           isActive: true,
           sortOrder: 0,
         },

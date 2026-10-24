@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 export default function NotFound() {
   return (
     <main className="section centered" style={{ minHeight: '50vh' }}>
-      <title>ページが見つかりません | Kalpana</title>
+      <title>ページが見つかりません | Kalpna (カルプナ)</title>
       <meta name="robots" content="noindex" />
       <h1 className="section-title">ページが見つかりません</h1>
       <p className="section-sub">お探しのページは移動または削除された可能性があります。</p>

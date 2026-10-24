@@ -351,7 +351,7 @@ export default function Kitchen() {
   if (!user || !board) {
     return (
       <div className="kd kd-center" aria-busy="true">
-        <title>Kitchen | Kalpana</title>
+        <title>Kitchen | Kalpna</title>
         {offline ? <><WifiOff size={40} /><p>Can't reach the server. Retrying…</p></> : <p>Loading kitchen…</p>}
       </div>
     );
@@ -359,7 +359,7 @@ export default function Kitchen() {
 
   return (
     <div className="kd">
-      <title>{`${byColumn('NEW').length ? `(${byColumn('NEW').length}) ` : ''}Kitchen | Kalpana`}</title>
+      <title>{`${byColumn('NEW').length ? `(${byColumn('NEW').length}) ` : ''}Kitchen | Kalpna`}</title>
       <meta name="robots" content="noindex, nofollow" />
 
       {!started && (
@@ -378,7 +378,7 @@ export default function Kitchen() {
         <div className="kd-brand">
           <ChefHat size={26} aria-hidden="true" />
           <div>
-            <strong>Kalpana Kitchen</strong>
+            <strong>Kalpna Kitchen</strong>
             <span className="kd-clock">{new Date(serverNow).toLocaleString('ja-JP', { timeZone: TIMEZONE, month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' })}</span>
           </div>
         </div>

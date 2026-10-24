@@ -20,12 +20,12 @@ export default function RefundPolicy() {
       .catch(() => {});
   }, []);
 
-  const restaurantName = info.name || '本格インド料理 カルプナ (Kalpana)';
+  const restaurantName = info.name || '本格インド料理 カルプナ (Kalpna)';
   const phoneClean = info.phone ? info.phone.replace(/[^\d+]/g, '') : '';
 
   return (
     <main style={{ backgroundColor: '#faf7f2', minHeight: '100vh', color: '#1f2937' }}>
-      <title>返金・キャンセルポリシー (特定商取引法に基づく表記) | Kalpana</title>
+      <title>返金・キャンセルポリシー (特定商取引法に基づく表記) | Kalpna (カルプナ)</title>
       <meta name="description" content="本格インド料理カルプナの返金・キャンセルポリシーです。テイクアウト、デリバリー、お席のご予約に関するキャンセルや返金基準をご案内します。" />
 
       {/* Hero Header */}

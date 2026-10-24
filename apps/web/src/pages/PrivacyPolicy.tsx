@@ -20,11 +20,11 @@ export default function PrivacyPolicy() {
       .catch(() => {});
   }, []);
 
-  const restaurantName = info.name || '本格インド料理 カルプナ (Kalpana)';
+  const restaurantName = info.name || '本格インド料理 カルプナ (Kalpna)';
 
   return (
     <main style={{ backgroundColor: '#faf7f2', minHeight: '100vh', color: '#1f2937' }}>
-      <title>プライバシーポリシー (個人情報保護方針) | Kalpana</title>
+      <title>プライバシーポリシー (個人情報保護方針) | Kalpna (カルプナ)</title>
       <meta name="description" content="本格インド料理カルプナのプライバシーポリシーです。お客様の個人情報の適切な保護と取り扱いに関する方針をご案内します。" />
 
       {/* Hero Header */}
