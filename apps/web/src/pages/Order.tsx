@@ -357,7 +357,7 @@ export default function Order() {
                     <PriceSummary quote={quote} />
                   ) : (
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
-                      <span>小計 (税抜)</span><span>{yen(subtotal)}</span>
+                      <span>小計</span><span>{yen(subtotal)}</span>
                     </div>
                   )}
                   {problem && <p role="alert" style={{ color: '#b91c1c', fontSize: '0.9rem', margin: '8px 0 0' }}>{problem}</p>}

@@ -118,7 +118,7 @@ function ItemCard({ item, onAdd }: { item: PanelItem; onAdd: () => void }) {
       <img src={item.img} alt={item.name} loading="lazy" style={{ width: '100%', height: '90px', objectFit: 'cover' }} />
       <div style={{ padding: '8px', flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
         <div style={{ fontSize: '0.78rem', fontWeight: 'bold', color: 'var(--dark-bark)', lineHeight: 1.3, flex: 1 }}>{item.name}</div>
-        <div style={{ fontSize: '0.78rem', color: 'var(--spice)', fontWeight: 'bold' }}>{yen(item.priceValue)}<small style={{ fontWeight: 'normal', color: 'var(--text-muted)', marginLeft: '2px' }}>税抜</small></div>
+        <div style={{ fontSize: '0.78rem', color: 'var(--spice)', fontWeight: 'bold' }}>{yen(item.priceValue)}<small style={{ fontWeight: 'normal', color: 'var(--text-muted)', marginLeft: '2px' }}>税込</small></div>
         {inCart ? (
           <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textAlign: 'center', padding: '5px 0', borderRadius: '6px', border: '1px solid #e5dbcd' }}>
             カート内 {inCart.quantity}点

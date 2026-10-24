@@ -295,7 +295,7 @@ export default function Home() {
                     )}
                     
                     <div style={{ color: 'var(--spice)', fontSize: '1.4rem', fontWeight: 'bold', fontFamily: 'serif' }}>
-                      ¥{item.price.toLocaleString()} <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal', fontFamily: 'sans-serif' }}>(税抜)</span>
+                      ¥{item.price.toLocaleString()} <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal', fontFamily: 'sans-serif' }}>(税込)</span>
                     </div>
                   </div>
                 </div>
@@ -334,7 +334,7 @@ export default function Home() {
                     )}
                     
                     <div style={{ color: 'var(--spice)', fontSize: '1.4rem', fontWeight: 'bold', fontFamily: 'serif' }}>
-                      ¥{item.price.toLocaleString()} <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal', fontFamily: 'sans-serif' }}>(税抜)</span>
+                      ¥{item.price.toLocaleString()} <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal', fontFamily: 'sans-serif' }}>(税込)</span>
                     </div>
                   </div>
                 </div>

@@ -5,7 +5,7 @@ import type { Quote } from './useOrderQuote';
 export default function PriceSummary({ quote }: { quote: Quote }) {
   return (
     <dl style={{ margin: 0, display: 'grid', gridTemplateColumns: '1fr auto', gap: '6px 12px', fontSize: '0.92rem' }}>
-      <dt>小計 (税抜)</dt><dd style={dd}>{yen(quote.subtotal)}</dd>
+      <dt>小計</dt><dd style={dd}>{yen(quote.subtotal)}</dd>
       {quote.offerDiscount > 0 && (
         <>
           <dt>クーポン割引{quote.offer?.titleJa ? `（${quote.offer.titleJa}）` : ''}</dt>

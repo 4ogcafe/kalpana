@@ -111,7 +111,7 @@ export default function CartDrawer() {
             </ul>
 
             <div style={{ padding: '16px 20px calc(16px + env(safe-area-inset-bottom))', borderTop: '1px solid #f0ebe3', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <Row label="小計 (税抜)" value={yen(cart.total)} />
+              <Row label="小計" value={yen(cart.total)} />
               <Row label={`消費税 (${taxRate}%)`} value={yen(tax)} />
               <Row label="合計 (税込)" value={yen(cart.total + tax)} strong />
               <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>特典・ポイントのご利用と最終金額は、注文手続きの画面で確定します。</p>

@@ -94,7 +94,7 @@ export default function OrderCard({ order }: { order: MemberOrder }) {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', gap: '8px', flexWrap: 'wrap' }}>
         <div>
-          <strong style={{ color: 'var(--spice)', fontSize: '1.1rem' }}>{yen(amountDue(order).amount)}</strong> <span style={mutedStyle}>({amountDue(order).taxIncluded ? `税込・消費税${yen(order.tax)}` : '税抜'})</span>
+          <strong style={{ color: 'var(--spice)', fontSize: '1.1rem' }}>{yen(amountDue(order).amount)}</strong> <span style={mutedStyle}>({amountDue(order).taxIncluded ? `税込・消費税${yen(order.tax)}` : '税込'})</span>
           {order.pointsEarned > 0 && <span style={{ marginLeft: '8px', fontSize: '0.8rem', color: '#047857', fontWeight: 'bold' }}>+{order.pointsEarned}pt 獲得</span>}
           {order.stampAwarded && <span style={{ marginLeft: '8px', fontSize: '0.8rem', color: '#b3261e', fontWeight: 'bold' }}>スタンプ +1</span>}
         </div>

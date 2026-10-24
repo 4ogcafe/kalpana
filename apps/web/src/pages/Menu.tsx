@@ -346,7 +346,7 @@ export default function Menu() {
                                     {item.name}
                                   </button>
                                 </h3>
-                                <div className="menu-card-price">{item.price}<small>税抜</small></div>
+                                <div className="menu-card-price">{item.price}<small>税込</small></div>
                               </div>
                               {hasSubName && (
                                 <div className="menu-card-subname">{item.nameEn}</div>
@@ -418,7 +418,7 @@ export default function Menu() {
           className="btn-warm"
           style={{ position: 'fixed', left: '50%', bottom: '20px', transform: 'translateX(-50%)', zIndex: 900, display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.25)', whiteSpace: 'nowrap', borderRadius: '9999px' }}
         >
-          🛒 カートを見る（{cart.count}点） {yen(cart.total)} <span style={{ fontWeight: 'normal', fontSize: '0.8rem' }}>(税抜)</span>
+          🛒 カートを見る（{cart.count}点） {yen(cart.total)} <span style={{ fontWeight: 'normal', fontSize: '0.8rem' }}>(税込)</span>
         </button>
       )}
 
@@ -515,7 +515,7 @@ export default function Menu() {
               )}
 
               <div style={{ color: 'var(--spice)', fontSize: '1.8rem', fontWeight: 'bold', fontFamily: 'serif' }}>
-                {flatItems[selectedIndex].price} <span style={{ fontSize: '1rem', color: 'var(--text-muted)', fontWeight: 'normal', fontFamily: 'sans-serif' }}>(税抜)</span>
+                {flatItems[selectedIndex].price} <span style={{ fontSize: '1rem', color: 'var(--text-muted)', fontWeight: 'normal', fontFamily: 'sans-serif' }}>(税込)</span>
               </div>
 
               {canOrder && flatItems[selectedIndex].isOrderable !== false ? (

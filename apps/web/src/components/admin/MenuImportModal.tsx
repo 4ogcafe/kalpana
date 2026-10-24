@@ -15,7 +15,7 @@ const HEADER_ALIASES: Record<Field, string[]> = {
   subcategory: ['subcategory', 'サブカテゴリ', 'サブカテゴリー', '小分類'],
   nameJa: ['nameja', 'japanesename', '商品名', 'メニュー名', '料理名', '名前', '品名'],
   nameEn: ['nameen', 'name', 'englishname', '英語名', '商品名(英語)', '商品名（英語）'],
-  price: ['price', '価格', '値段', '金額', '税抜価格', '価格(税抜)', '価格（税抜）'],
+  price: ['price', '価格', '値段', '金額', '税込価格', '価格(税込)', '価格（税込）', '税抜価格', '価格(税抜)', '価格（税抜）'],
   descriptionJa: ['descriptionja', '説明', '説明文', '商品説明'],
   descriptionEn: ['descriptionen', 'description', '英語説明', '説明(英語)', '説明（英語）'],
   menuTypes: ['menutypes', 'menutype', 'メニュー種別', '種別', 'メニュータイプ'],

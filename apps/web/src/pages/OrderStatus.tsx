@@ -287,7 +287,7 @@ export default function OrderStatus() {
               )}
               {order.taxRate !== null && (
                 <>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '0.9rem' }}><span>小計 (税抜)</span><span>{yen(order.total)}</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '0.9rem' }}><span>小計</span><span>{yen(order.total)}</span></div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '0.9rem' }}><span>消費税 ({order.taxRate}%)</span><span>{yen(order.tax)}</span></div>
                   {order.deliveryFee > 0 && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '0.9rem' }}><span>配達料 (税込)</span><span>{yen(order.deliveryFee)}</span></div>
@@ -295,7 +295,7 @@ export default function OrderStatus() {
                 </>
               )}
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', fontWeight: 'bold', fontSize: '1.15rem' }}>
-                <span>お支払い金額 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>({amountDue(order).taxIncluded ? '税込' : '税抜'})</span></span>
+                <span>お支払い金額 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>(税込)</span></span>
                 <span style={{ color: 'var(--spice)' }}>{yen(amountDue(order).amount)}</span>
               </div>
               {order.isMember && order.status === 'COMPLETED' && order.pointsEarned > 0 && (
