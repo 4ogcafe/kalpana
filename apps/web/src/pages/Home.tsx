@@ -112,7 +112,7 @@ export default function Home() {
 
   return (
     <main>
-      <title>Kalpna (カルプナ) | 熊谷の本格インド料理</title>
+      <title>Kalpana (カルプナ) | 熊谷の本格インド料理</title>
       <meta name="description" content="埼玉・熊谷の本格インド料理店カルプナ。タンドール窯で焼き上げるナン、スパイス香るカレー、ランチ・テイクアウト・グランドメニューをご案内します。" />
       {/* Hero Slider */}
       <div className="home-hero">
@@ -122,7 +122,7 @@ export default function Home() {
             src={img} 
             srcSet={responsiveSrcSet(img)}
             sizes="100vw"
-            alt={carousels[index]?.altJa || carousels[index]?.titleJa || "本格インド料理 Kalpna (カルプナ) のカレーとナン"}
+            alt=""
             fetchPriority={index === 0 ? 'high' : 'low'}
             decoding="async" 
             className="slide-bg-img" 
@@ -145,7 +145,7 @@ export default function Home() {
         <div className="hero-content">
           <div className="hero-tag">{settings.heroTagJa || '埼玉・熊谷で味わう、本場のインド料理'}</div>
           <h1 className="hero-title">{carousels[currentSlide]?.titleJa || 'インドの香りを、そのままに'}</h1>
-          <p className="hero-sub" style={{ whiteSpace: 'pre-line' }}>{settings.heroSubJa || <>愛とスパイス、そして伝統に彩られた数世紀にわたるレシピを。<br/>Kalpna Indian Cuisineで皆様をお待ちしております。</>}</p>
+          <p className="hero-sub" style={{ whiteSpace: 'pre-line' }}>{settings.heroSubJa || <>愛とスパイス、そして伝統に彩られた数世紀にわたるレシピを。<br/>Kalpana Indian Cuisineで皆様をお待ちしております。</>}</p>
           <div className="hero-btns">
             <Link to="/menu/lunch" style={{ textDecoration: 'none' }}>
               <button className="btn-warm">ランチメニューを見る</button>
@@ -362,7 +362,7 @@ export default function Home() {
               <div style={{ position: 'absolute', top: '20px', left: '30px', fontSize: '6rem', fontWeight: '900', color: 'var(--cream)', zIndex: 0, lineHeight: 1, fontFamily: 'var(--font-display)' }}>01</div>
               
               <div style={{ position: 'relative', zIndex: 1, marginBottom: '30px' }}>
-                <h3 style={{ fontSize: '1.8rem', margin: '0 0 5px 0', color: 'var(--dark-bark)' }}>{settings.name || 'Kalpna Indian Cuisine'}</h3>
+                <h3 style={{ fontSize: '1.8rem', margin: '0 0 5px 0', color: 'var(--dark-bark)' }}>{settings.name || 'Kalpana Indian Cuisine'}</h3>
                 <p style={{ color: 'var(--spice)', fontSize: '0.9rem', margin: '0 0 15px 0', fontWeight: 'bold' }}>{settings.storeLocationJa || '埼玉県熊谷市'}</p>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: 'var(--cream)', border: '1px solid #e5dbcd', padding: '6px 12px', borderRadius: '20px', fontSize: '0.85rem', color: 'var(--spice)', fontWeight: 'bold' }}>
                   {settings.storeBadgeJa || '🍛 インド料理'}
@@ -430,7 +430,7 @@ export default function Home() {
               </div>
 
               {/* Action Button */}
-              <a href={settings.googleMapsLink || 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(settings.name || 'Kalpna Indian Cuisine')} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', backgroundColor: '#c75626', color: 'white', textDecoration: 'none', padding: '14px', borderRadius: '4px', fontWeight: 'bold', transition: 'background 0.2s', width: '100%', borderBottom: '4px solid #a64117', position: 'relative', zIndex: 1 }}>
+              <a href={settings.googleMapsLink || 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(settings.name || 'Kalpana Indian Cuisine')} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', backgroundColor: '#c75626', color: 'white', textDecoration: 'none', padding: '14px', borderRadius: '4px', fontWeight: 'bold', transition: 'background 0.2s', width: '100%', borderBottom: '4px solid #a64117', position: 'relative', zIndex: 1 }}>
                 🗺️ ルートを検索
               </a>
 
@@ -440,7 +440,7 @@ export default function Home() {
             <div style={{ flex: '1 1 500px', minHeight: '500px', backgroundColor: '#e5e3df', position: 'relative' }}>
               <iframe 
                 src={settings.mapUrl?.startsWith(MAP_EMBED_PREFIX) ? settings.mapUrl : DEFAULT_MAP_EMBED}
-                title="Google マップ: Kalpna Indian Cuisine" 
+                title="Google マップ: Kalpana Indian Cuisine" 
                 width="100%" 
                 height="100%" 
                 style={{ border: 0, position: 'absolute', top: 0, left: 0 }} 
@@ -455,7 +455,7 @@ export default function Home() {
       </div>
 
       {/* Google Reviews Section: live from Google, refreshed monthly */}
-      <GoogleReviews fallbackLink={settings.storeReviewLink || settings.googleMapsLink || 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(settings.name || 'Kalpna Indian Cuisine')} />
+      <GoogleReviews fallbackLink={settings.storeReviewLink || settings.googleMapsLink || 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(settings.name || 'Kalpana Indian Cuisine')} />
       
       {/* Subscription Section */}
       <div className="section" style={{ position: 'relative', padding: '100px 20px', backgroundColor: 'var(--dark-bark)', color: 'white', overflow: 'hidden' }}>

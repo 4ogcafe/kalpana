@@ -20,7 +20,7 @@ function PointsCard({ balance, loyalty, gamePointsWon = 0, compact = false }: { 
   return (
     <div style={{ borderRadius: '24px', padding: compact ? '20px' : '28px', color: 'white', background: 'radial-gradient(circle at 85% 15%, rgba(242,168,59,0.55), transparent 45%), linear-gradient(135deg, #c4521f 0%, #8a3313 60%, #5e220c 100%)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-        <div style={{ fontSize: '0.85rem', opacity: 0.9, letterSpacing: '1px' }}>KALPNA POINTS</div>
+        <div style={{ fontSize: '0.85rem', opacity: 0.9, letterSpacing: '1px' }}>KALPANA POINTS</div>
         {gamePointsWon > 0 && (
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', backgroundColor: 'rgba(255, 255, 255, 0.2)', padding: '3px 10px', borderRadius: '9999px', fontSize: '0.78rem', fontWeight: 600 }}>
             <Sparkles size={13} color="#fef08a" />

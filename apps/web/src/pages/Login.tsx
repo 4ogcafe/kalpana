@@ -68,7 +68,7 @@ export default function Login() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f3f4f6', padding: '16px', boxSizing: 'border-box' }}>
-      <title>Staff Login | Kalpna</title>
+      <title>Staff Login | Kalpana</title>
       <meta name="robots" content="noindex, nofollow" />
       <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', width: '100%', maxWidth: '400px', boxSizing: 'border-box' }}>
         <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: '0 0 0.25rem', textAlign: 'center' }}>Staff Login</h1>

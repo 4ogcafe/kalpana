@@ -202,12 +202,12 @@ export default function Account() {
 
   return (
     <div className="acc">
-      <title>マイページ | Kalpna (カルプナ)</title>
+      <title>マイページ | Kalpana (カルプナ)</title>
       <meta name="robots" content="noindex" />
 
       <aside className="acc-sidebar">
         <Link to="/" className="acc-brand">
-          <img src="/site-logo-01.webp" alt="Kalpna (カルプナ) ロゴ" width={36} height={36} />
+          <img src="/site-logo-01.webp" alt="" width={36} height={36} />
           <span>カルプナ<small>MEMBERS</small></span>
         </Link>
         <nav className="acc-nav" aria-label="マイページ">{navButtons}</nav>
@@ -223,7 +223,7 @@ export default function Account() {
       <div className="acc-main">
         <header className="acc-topbar">
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
-            <Link to="/" className="acc-mobile-brand" aria-label="カルプナ ホームへ"><img src="/site-logo-01.webp" alt="Kalpna (カルプナ) ロゴ" width={32} height={32} /></Link>
+            <Link to="/" className="acc-mobile-brand" aria-label="カルプナ ホームへ"><img src="/site-logo-01.webp" alt="" width={32} height={32} /></Link>
             <div style={{ minWidth: 0 }}>
               <h1>{tab === 'home' ? `${greeting()}、${customer.name}さん` : current.title}</h1>
               <p>{tab === 'home' ? '今日は何をお召し上がりになりますか？' : `${customer.name}さんの${current.title}`}</p>
@@ -240,7 +240,7 @@ export default function Account() {
             <>
               <section className="acc-hero" aria-label="ポイント残高">
                 <div>
-                  <div className="acc-hero-label">Kalpna Points</div>
+                  <div className="acc-hero-label">Kalpana Points</div>
                   <div className="acc-hero-points">{balance.toLocaleString('ja-JP')}<span>pt</span></div>
                   <div className="acc-hero-sub">
                     {yen(balance * (loyalty?.pointValueYen ?? 1))}分としてご利用いただけます

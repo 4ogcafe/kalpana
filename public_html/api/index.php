@@ -82,7 +82,7 @@ function ensureDefaultDatabaseData(PDO $pdo): array {
         if ($stmt && (int)$stmt->fetchColumn() === 0) {
             $adminHash = password_hash('admin123', PASSWORD_BCRYPT);
             $userIns = $pdo->prepare('INSERT INTO `User` (id, email, passwordHash, name, role, isActive, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, 1, ?, ?)');
-            $userIns->execute(['usr_admin_default', 'admin@example.com', $adminHash, 'Kalpna Admin', 'ADMIN', $now, $now]);
+            $userIns->execute(['usr_admin_default', 'admin@example.com', $adminHash, 'Kalpana Admin', 'ADMIN', $now, $now]);
             $seeded['user'] = 1;
         }
     } catch (Exception $e) {}
@@ -166,7 +166,7 @@ function ensureDefaultDatabaseData(PDO $pdo): array {
                 '〒360-0831 埼玉県熊谷市佐谷田2081',
                 '048-514-8386',
                 'info@kalpnacurry.com',
-                'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3220.8906325916053!2d139.4005126!3d36.1408166!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x6018cdba11dc903b%3A0xe95d3e6cfb99db10!2sKalpna%20Indian%20Cuisine!5e0!3m2!1sen!2sjp!4v1715000000000!5m2!1sen!2sjp',
+                'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3220.8906325916053!2d139.4005126!3d36.1408166!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x6018cdba11dc903b%3A0xe95d3e6cfb99db10!2sKalpana%20Indian%20Restaurant!5e0!3m2!1sen!2sjp!4v1715000000000!5m2!1sen!2sjp',
                 'https://maps.app.goo.gl/92p48n6Zc4X9Nq518',
                 $hours,
                 $holidays,
@@ -278,7 +278,7 @@ function ensureDefaultDatabaseData(PDO $pdo): array {
                 ['slide_1', 'HOME', '/bg-hero-img.webp', 'Authentic Indian Curry and Naan', '本格インド料理と焼きたてナン', 'Authentic Indian Flavors', '本格スパイスが香る、伝統のインド料理', 'Handcrafted curries and tandoori specials.', 'タンドール窯で焼き上げるナンと極上のスパイスカレー', 1],
                 ['slide_2', 'HOME', '/bg-hero-img.webp', 'Freshly baked tandoori naan and rich curry bowls', '焼きたてナンと本格スパイスカレー', 'Freshly Baked Naan & Curries', '焼きたてナンと本格スパイスカレー', 'Fresh from our charcoal tandoor oven.', '炭火粘土窯で焼き上げるタンドール料理', 2],
                 ['slide_3', 'HOME', '/bg-hero-img.webp', 'Master chef preparing tandoori specialties in traditional clay oven', '熟練シェフの本格タンドール料理', 'Traditional Charcoal Tandoor', '伝統のタンドール炭火焼料理', 'Finest spices blended with culinary passion.', '長年磨き上げたスパイスの魔法', 3],
-                ['slide_4', 'CONTACT', '/bg-hero-img.webp', 'Kalpna Indian Cuisine dining hall in Kumagaya', 'カルプナ熊谷店', 'Visit Kalpna in Kumagaya', '熊谷でお待ちしております', 'Conveniently located with parking available.', '国道17号沿い・駐車場12台完備', 1]
+                ['slide_4', 'CONTACT', '/bg-hero-img.webp', 'Kalpana Indian Cuisine dining hall in Kumagaya', 'カルプナ熊谷店', 'Visit Kalpana in Kumagaya', '熊谷でお待ちしております', 'Conveniently located with parking available.', '国道17号沿い・駐車場12台完備', 1]
             ];
             foreach ($slides as $sl) {
                 $slideIns->execute($sl);
@@ -913,7 +913,7 @@ if ($method === 'GET' && ($subPath === '/settings' || $subPath === '/settings/')
         'addressJa' => '〒360-0831 埼玉県熊谷市佐谷田2081',
         'phone' => '048-514-8386',
         'email' => 'info@kalpnacurry.com',
-        'mapUrl' => 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3220.8906325916053!2d139.4005126!3d36.1408166!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x6018cdba11dc903b%3A0xe95d3e6cfb99db10!2sKalpna%20Indian%20Cuisine!5e0!3m2!1sen!2sjp!4v1715000000000!5m2!1sen!2sjp',
+        'mapUrl' => 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3220.8906325916053!2d139.4005126!3d36.1408166!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x6018cdba11dc903b%3A0xe95d3e6cfb99db10!2sKalpana%20Indian%20Restaurant!5e0!3m2!1sen!2sjp!4v1715000000000!5m2!1sen!2sjp',
         'googleMapsLink' => 'https://maps.app.goo.gl/92p48n6Zc4X9Nq518',
         'weeklyHours' => [
             'monday' => 'ランチ 11:30–15:00 / ディナー 17:00–22:00',

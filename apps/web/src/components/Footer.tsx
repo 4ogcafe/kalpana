@@ -70,7 +70,7 @@ export default function Footer() {
             !['/privacy-policy', '/refund-policy'].includes(link.url) &&
             !['プライバシーポリシー', '返金・キャンセルポリシー'].includes(link.label)
   );
-  const copyright = (s.footerCopyright?.trim() || `© {year} ${name || 'Kalpna'}. All Rights Reserved.`).replace(/\{year\}/g, year);
+  const copyright = (s.footerCopyright?.trim() || `© {year} ${name || 'Kalpana'}. All Rights Reserved.`).replace(/\{year\}/g, year);
   
   const activeSocials = s.footerShowSocials === false ? [] : SOCIALS
     .map(social => ({

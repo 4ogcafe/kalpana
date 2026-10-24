@@ -43,7 +43,7 @@ function ReviewCard({
     <article ref={cardRef} className="gr-card">
       <header>
         {review.authorPhoto ? (
-          <img src={review.authorPhoto} alt={`${review.authorName}様のプロフィール写真`} width={40} height={40} referrerPolicy="no-referrer" loading="lazy" />
+          <img src={review.authorPhoto} alt="" width={40} height={40} referrerPolicy="no-referrer" loading="lazy" />
         ) : (
           <span className="gr-avatar" aria-hidden="true">
             {review.authorName.charAt(0)}

@@ -307,7 +307,7 @@ export default function Order() {
 
   return (
     <main>
-      <title>ご注文 | Kalpna (カルプナ)</title>
+      <title>ご注文 | Kalpana (カルプナ)</title>
       <meta name="robots" content="noindex" />
       <div className="section" style={{ backgroundColor: 'var(--cream)', paddingTop: '120px', minHeight: '70vh' }}>
         <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '0 16px' }}>
@@ -338,7 +338,7 @@ export default function Order() {
                 <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                   {lines.map(line => (
                     <li key={line.id} style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #eee' }}>
-                      <img src={line.img} alt={line.name || "ご注文商品写真"} width={56} height={56} style={{ borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }} />
+                      <img src={line.img} alt="" width={56} height={56} style={{ borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }} />
                       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
                         <div style={{ fontWeight: 'bold', color: 'var(--dark-bark)' }}>{line.name}</div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>

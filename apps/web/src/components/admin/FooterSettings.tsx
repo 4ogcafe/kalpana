@@ -100,7 +100,7 @@ export default function FooterSettings({ onOpenRestaurantSettings }: { onOpenRes
     }
   };
 
-  const copyrightPreview = (form.footerCopyright.trim() || `© {year} ${contact.name || 'Kalpna'}. All Rights Reserved.`).replace(/\{year\}/g, String(year));
+  const copyrightPreview = (form.footerCopyright.trim() || `© {year} ${contact.name || 'Kalpana'}. All Rights Reserved.`).replace(/\{year\}/g, String(year));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -119,7 +119,7 @@ export default function FooterSettings({ onOpenRestaurantSettings }: { onOpenRes
         </div>
         <label style={label}>
           Name next to the logo
-          <input value={form.footerBrand} onChange={e => update({ footerBrand: e.target.value })} maxLength={60} placeholder={contact.name || 'Kalpna'} style={input} />
+          <input value={form.footerBrand} onChange={e => update({ footerBrand: e.target.value })} maxLength={60} placeholder={contact.name || 'Kalpana'} style={input} />
           <span style={muted}>Leave empty to use the restaurant name ({contact.name || 'not set'}).</span>
         </label>
         <label style={{ ...label, marginTop: '1rem' }}>

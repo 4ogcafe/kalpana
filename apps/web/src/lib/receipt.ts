@@ -73,7 +73,7 @@ export interface ReceiptSettings {
 
 export const DEFAULT_STORE_SETTINGS: Required<ReceiptSettings> = {
   storeNameJa: '本格インド料理 カルプナ',
-  storeNameEn: 'Kalpna Indian Cuisine',
+  storeNameEn: 'Kalpana Indian Cuisine',
   phone: '048-577-7497',
   addressJa: '〒360-0023 埼玉県熊谷市佐谷田2081（国道17号沿い・加賀家食堂隣）',
   registrationNumber: 'T5030001123456',
@@ -788,7 +788,7 @@ export function generateKitchenTicketHtml(order: ReceiptOrder, allergyLine?: str
 </head>
 <body>
   <div class="k-header">
-    <img src="${KALPANA_ICON_LOGO}" alt="Kalpna" class="k-logo" />
+    <img src="${KALPANA_ICON_LOGO}" alt="Kalpana" class="k-logo" />
     <span class="k-title">【 調 理 伝 票 】</span>
     <span style="font-size: 11px; font-weight: 700;">KITCHEN</span>
   </div>
