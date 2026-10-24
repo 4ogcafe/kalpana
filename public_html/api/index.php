@@ -948,6 +948,184 @@ if ($method === 'GET' && ($subPath === '/menu/categories' || $subPath === '/menu
 }
 
 // -------------------------------------------------------------
+// Endpoint: POST /menu/categories
+// -------------------------------------------------------------
+if ($method === 'POST' && ($subPath === '/menu/categories' || $subPath === '/menu/categories/')) {
+    requireAdminUser($jwtSecret, $pdo);
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+    $nameEn = trim((string)($input['nameEn'] ?? ''));
+    if ($nameEn === '') {
+        http_response_code(400);
+        echo json_encode(['error' => ['code' => 'VALIDATION_FAILED', 'message' => 'nameEn is required']]);
+        exit;
+    }
+    $nameJa = trim((string)($input['nameJa'] ?? ''));
+    if ($nameJa === '') $nameJa = $nameEn;
+    $parentId = !empty($input['parentId']) ? trim((string)$input['parentId']) : null;
+
+    $newId = generateUuidV4();
+    $now = (new DateTime('now', new DateTimeZone('UTC')))->format('Y-m-d H:i:s.v');
+    $stmt = $pdo->prepare('INSERT INTO Category (id, nameEn, nameJa, sortOrder, parentId, createdAt, updatedAt) VALUES (?, ?, ?, 0, ?, ?, ?)');
+    $stmt->execute([$newId, $nameEn, $nameJa, $parentId, $now, $now]);
+
+    http_response_code(201);
+    echo json_encode([
+        'id' => $newId,
+        'nameEn' => $nameEn,
+        'nameJa' => $nameJa,
+        'sortOrder' => 0,
+        'parentId' => $parentId,
+    ]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: PUT /menu/categories-reorder
+// -------------------------------------------------------------
+if ($method === 'PUT' && ($subPath === '/menu/categories-reorder' || $subPath === '/menu/categories-reorder/')) {
+    requireAdminUser($jwtSecret, $pdo);
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+    $orders = isset($input['orders']) && is_array($input['orders']) ? $input['orders'] : [];
+
+    $pdo->beginTransaction();
+    try {
+        $stmt = $pdo->prepare('UPDATE Category SET sortOrder = ? WHERE id = ?');
+        foreach ($orders as $item) {
+            if (isset($item['id']) && isset($item['sortOrder'])) {
+                $stmt->execute([(int)$item['sortOrder'], (string)$item['id']]);
+            }
+        }
+        $pdo->commit();
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        http_response_code(400);
+        echo json_encode(['error' => ['code' => 'SAVE_FAILED', 'message' => 'Could not reorder categories']]);
+        exit;
+    }
+
+    echo json_encode(['success' => true]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: PUT /menu/categories/:id
+// -------------------------------------------------------------
+if (($method === 'PUT' || $method === 'PATCH') && preg_match('#^/menu/categories/([a-zA-Z0-9_-]+)/?$#', $subPath, $matches)) {
+    $catId = $matches[1];
+    requireAdminUser($jwtSecret, $pdo);
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+
+    $stmt = $pdo->prepare('SELECT * FROM Category WHERE id = ? LIMIT 1');
+    $stmt->execute([$catId]);
+    $existing = $stmt->fetch();
+    if (!$existing) {
+        http_response_code(404);
+        echo json_encode(['error' => ['code' => 'NOT_FOUND', 'message' => 'Category not found']]);
+        exit;
+    }
+
+    if (array_key_exists('parentId', $input) && $input['parentId'] === $catId) {
+        http_response_code(400);
+        echo json_encode(['error' => ['code' => 'VALIDATION_ERROR', 'message' => 'A category cannot be its own parent']]);
+        exit;
+    }
+
+    $isFixed = in_array(strtolower(trim((string)$existing['nameEn'])), ['lunch menu', 'takeout menu', 'grand menu'], true);
+    if ($isFixed) {
+        if (isset($input['nameEn']) && strtolower(trim((string)$input['nameEn'])) !== strtolower(trim((string)$existing['nameEn']))) {
+            http_response_code(400);
+            echo json_encode(['error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Cannot rename fixed main categories (Lunch Menu, Takeout Menu, Grand Menu)']]);
+            exit;
+        }
+        if (array_key_exists('parentId', $input) && !empty($input['parentId'])) {
+            http_response_code(400);
+            echo json_encode(['error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Main menu categories cannot have a parent category']]);
+            exit;
+        }
+    }
+
+    $cols = [];
+    $params = [];
+    if (array_key_exists('nameEn', $input)) {
+        $cols[] = '`nameEn` = ?';
+        $params[] = trim((string)$input['nameEn']);
+    }
+    if (array_key_exists('nameJa', $input)) {
+        $cols[] = '`nameJa` = ?';
+        $params[] = trim((string)$input['nameJa']);
+    }
+    if (array_key_exists('sortOrder', $input)) {
+        $cols[] = '`sortOrder` = ?';
+        $params[] = (int)$input['sortOrder'];
+    }
+    if (array_key_exists('parentId', $input)) {
+        $cols[] = '`parentId` = ?';
+        $params[] = !empty($input['parentId']) ? (string)$input['parentId'] : null;
+    }
+
+    if (!empty($cols)) {
+        $cols[] = '`updatedAt` = ?';
+        $params[] = (new DateTime('now', new DateTimeZone('UTC')))->format('Y-m-d H:i:s.v');
+        $params[] = $catId;
+        $pdo->prepare('UPDATE Category SET ' . implode(', ', $cols) . ' WHERE id = ?')->execute($params);
+    }
+
+    echo json_encode(['success' => true]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: DELETE /menu/categories/:id
+// -------------------------------------------------------------
+if ($method === 'DELETE' && preg_match('#^/menu/categories/([a-zA-Z0-9_-]+)/?$#', $subPath, $matches)) {
+    $catId = $matches[1];
+    requireAdminUser($jwtSecret, $pdo);
+
+    $stmt = $pdo->prepare('SELECT * FROM Category WHERE id = ? LIMIT 1');
+    $stmt->execute([$catId]);
+    $existing = $stmt->fetch();
+    if (!$existing) {
+        http_response_code(404);
+        echo json_encode(['error' => ['code' => 'NOT_FOUND', 'message' => 'Category not found']]);
+        exit;
+    }
+
+    $isFixed = in_array(strtolower(trim((string)$existing['nameEn'])), ['lunch menu', 'takeout menu', 'grand menu'], true);
+    if ($isFixed) {
+        http_response_code(400);
+        echo json_encode(['error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Cannot delete fixed main categories (Lunch Menu, Takeout Menu, Grand Menu)']]);
+        exit;
+    }
+
+    $ids = [$catId];
+    $frontier = [$catId];
+    while (!empty($frontier)) {
+        $inClause = implode(',', array_fill(0, count($frontier), '?'));
+        $cStmt = $pdo->prepare("SELECT id FROM Category WHERE parentId IN ($inClause)");
+        $cStmt->execute($frontier);
+        $children = $cStmt->fetchAll(PDO::FETCH_COLUMN);
+        $frontier = array_values(array_diff($children, $ids));
+        $ids = array_merge($ids, $frontier);
+    }
+
+    $pdo->beginTransaction();
+    try {
+        $inClause = implode(',', array_fill(0, count($ids), '?'));
+        $pdo->prepare("DELETE FROM MenuItem WHERE categoryId IN ($inClause)")->execute($ids);
+        $pdo->prepare("DELETE FROM Category WHERE id IN ($inClause)")->execute($ids);
+        $pdo->commit();
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        http_response_code(400);
+        echo json_encode(['error' => ['code' => 'DELETE_FAILED', 'message' => 'Could not delete category']]);
+        exit;
+    }
+
+    echo json_encode(['success' => true]);
+    exit;
+}
+
+// -------------------------------------------------------------
 // Endpoint: GET /menu/items
 // -------------------------------------------------------------
 if ($method === 'GET' && ($subPath === '/menu/items' || $subPath === '/menu/items/')) {
@@ -1109,6 +1287,195 @@ if ($method === 'POST' && ($subPath === '/menu/items' || $subPath === '/menu/ite
 }
 
 // -------------------------------------------------------------
+// Endpoint: POST /menu/items/import
+// -------------------------------------------------------------
+if ($method === 'POST' && ($subPath === '/menu/items/import' || $subPath === '/menu/items/import/')) {
+    requireAdminUser($jwtSecret, $pdo);
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+
+    $mode = isset($input['mode']) && in_array($input['mode'], ['upsert', 'create'], true) ? $input['mode'] : 'upsert';
+    $targetCategoryId = isset($input['targetCategoryId']) && is_string($input['targetCategoryId']) ? trim($input['targetCategoryId']) : null;
+    $rows = isset($input['rows']) && is_array($input['rows']) ? $input['rows'] : [];
+    $rowNumbers = isset($input['rowNumbers']) && is_array($input['rowNumbers']) ? $input['rowNumbers'] : [];
+
+    if (empty($rows)) {
+        http_response_code(400);
+        echo json_encode(['error' => ['code' => 'VALIDATION_FAILED', 'message' => 'No rows provided']]);
+        exit;
+    }
+
+    $categories = [];
+    try {
+        $cStmt = $pdo->query('SELECT * FROM Category');
+        $categories = $cStmt->fetchAll();
+    } catch (Exception $e) {}
+
+    $explicitCategory = null;
+    if (!empty($targetCategoryId)) {
+        foreach ($categories as $cat) {
+            if ($cat['id'] === $targetCategoryId) {
+                $explicitCategory = $cat;
+                break;
+            }
+        }
+    }
+
+    $sameName = function ($a, $b) {
+        return mb_strtolower(trim((string)($a ?? ''))) === mb_strtolower(trim((string)($b ?? '')));
+    };
+
+    $categoryCache = [];
+    $resolveCategory = function ($path) use ($explicitCategory, &$categoryCache, $categories, $sameName) {
+        if ($explicitCategory) {
+            return $explicitCategory['id'];
+        }
+        if (!is_array($path) || empty($path)) {
+            throw new Exception('Category path is required');
+        }
+        $parentId = null;
+        $count = count($path);
+        for ($depth = 0; $depth < $count; $depth++) {
+            $key = strtolower(implode("\0", array_slice($path, 0, $depth + 1)));
+            if (isset($categoryCache[$key])) {
+                $parentId = $categoryCache[$key];
+                continue;
+            }
+            $name = (string)$path[$depth];
+            $found = null;
+            foreach ($categories as $c) {
+                $cParent = $c['parentId'] ?? null;
+                if ($cParent === $parentId && ($sameName($c['nameEn'], $name) || $sameName($c['nameJa'] ?? '', $name))) {
+                    $found = $c;
+                    break;
+                }
+            }
+            if (!$found) {
+                // Fallback: match by root category name without parent restriction
+                foreach ($categories as $c) {
+                    if ($sameName($c['nameEn'], $name) || $sameName($c['nameJa'] ?? '', $name)) {
+                        $found = $c;
+                        break;
+                    }
+                }
+            }
+            if (!$found) {
+                throw new Exception("Category \"{$name}\" does not exist. Please create categories first or import into a selected category.");
+            }
+            $categoryCache[$key] = $found['id'];
+            $parentId = $found['id'];
+        }
+        return $parentId;
+    };
+
+    $created = 0;
+    $updated = 0;
+    $errors = [];
+
+    foreach ($rows as $index => $row) {
+        $rowNumber = isset($rowNumbers[$index]) && is_numeric($rowNumbers[$index]) ? (int)$rowNumbers[$index] : ($index + 1);
+
+        if (!is_array($row)) {
+            $errors[] = ['row' => $rowNumber, 'message' => 'Row must be an object'];
+            continue;
+        }
+
+        $nameEn = trim((string)($row['nameEn'] ?? ''));
+        if ($nameEn === '') {
+            $errors[] = ['row' => $rowNumber, 'message' => 'nameEn: Required'];
+            continue;
+        }
+
+        if (!isset($row['price']) || !is_numeric($row['price']) || (float)$row['price'] < 0) {
+            $errors[] = ['row' => $rowNumber, 'message' => 'price: Expected positive number'];
+            continue;
+        }
+
+        $categoryPath = isset($row['categoryPath']) && is_array($row['categoryPath']) ? $row['categoryPath'] : [];
+
+        try {
+            $catId = $resolveCategory($categoryPath);
+
+            $existing = null;
+            if ($mode === 'upsert') {
+                $nameJa = isset($row['nameJa']) && trim((string)$row['nameJa']) !== '' ? trim((string)$row['nameJa']) : null;
+                if ($nameJa !== null) {
+                    $chk = $pdo->prepare('SELECT id FROM MenuItem WHERE categoryId = ? AND (nameEn = ? OR nameJa = ?) LIMIT 1');
+                    $chk->execute([$catId, $nameEn, $nameJa]);
+                } else {
+                    $chk = $pdo->prepare('SELECT id FROM MenuItem WHERE categoryId = ? AND nameEn = ? LIMIT 1');
+                    $chk->execute([$catId, $nameEn]);
+                }
+                $existing = $chk->fetch();
+            }
+
+            $now = (new DateTime('now', new DateTimeZone('UTC')))->format('Y-m-d H:i:s.v');
+            $fields = $row;
+            unset($fields['categoryPath']);
+
+            if ($existing) {
+                $cols = menuItemColumns($fields);
+                $cols['updatedAt'] = $now;
+
+                $sets = [];
+                foreach (array_keys($cols) as $c) $sets[] = "`{$c}` = ?";
+                $params = array_values($cols);
+                $params[] = $existing['id'];
+                $pdo->prepare('UPDATE MenuItem SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($params);
+
+                if (isset($row['optionGroupIds']) && is_array($row['optionGroupIds'])) {
+                    setMenuItemOptionGroups($pdo, $existing['id'], $row['optionGroupIds']);
+                }
+                $updated++;
+            } else {
+                $defaults = [
+                    'descriptionEn' => '',
+                    'descriptionJa' => null,
+                    'imageUrl' => '',
+                    'rating' => null,
+                    'spiceLevel' => 0,
+                    'menuTypes' => '[]',
+                    'allergens' => '[]',
+                    'isVegetarian' => 0,
+                    'isVegan' => 0,
+                    'isHalal' => 0,
+                    'isGlutenFree' => 0,
+                    'isRecommended' => 0,
+                    'isSoldOut' => 0,
+                    'isOrderable' => 1,
+                    'isActive' => 1,
+                    'sortOrder' => 0,
+                ];
+                $cols = array_merge($defaults, menuItemColumns($fields));
+                $cols['categoryId'] = $catId;
+                $newId = generateUuidV4();
+                $cols['id'] = $newId;
+                $cols['createdAt'] = $now;
+                $cols['updatedAt'] = $now;
+
+                $names = array_keys($cols);
+                $sql = 'INSERT INTO MenuItem (`' . implode('`, `', $names) . '`) VALUES (' . implode(', ', array_fill(0, count($names), '?')) . ')';
+                $pdo->prepare($sql)->execute(array_values($cols));
+
+                if (isset($row['optionGroupIds']) && is_array($row['optionGroupIds'])) {
+                    setMenuItemOptionGroups($pdo, $newId, $row['optionGroupIds']);
+                }
+                $created++;
+            }
+        } catch (Exception $err) {
+            $errors[] = ['row' => $rowNumber, 'message' => $err->getMessage() ?: 'Could not save'];
+        }
+    }
+
+    echo json_encode([
+        'created' => $created,
+        'updated' => $updated,
+        'failed' => count($errors),
+        'errors' => $errors,
+    ]);
+    exit;
+}
+
+// -------------------------------------------------------------
 // Endpoint: PUT /menu/items/:id
 // -------------------------------------------------------------
 if (($method === 'PUT' || $method === 'PATCH') && preg_match('#^/menu/items/([a-zA-Z0-9_-]+)/?$#', $subPath, $matches) && $matches[1] !== 'import') {
@@ -1196,6 +1563,108 @@ if ($method === 'GET' && ($subPath === '/menu/option-groups' || $subPath === '/m
         ];
     }, $groups);
     echo json_encode($formatted);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: POST /menu/option-groups
+// -------------------------------------------------------------
+if ($method === 'POST' && ($subPath === '/menu/option-groups' || $subPath === '/menu/option-groups/')) {
+    requireAdminUser($jwtSecret, $pdo);
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+    $newId = generateUuidV4();
+    $now = (new DateTime('now', new DateTimeZone('UTC')))->format('Y-m-d H:i:s.v');
+    $optionsJson = json_encode(isset($input['options']) && is_array($input['options']) ? array_values($input['options']) : [], JSON_UNESCAPED_UNICODE);
+    $stmt = $pdo->prepare('INSERT INTO OptionGroup (id, nameJa, nameEn, type, required, options, sortOrder, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    $stmt->execute([
+        $newId,
+        $input['nameJa'] ?? '',
+        $input['nameEn'] ?? '',
+        $input['type'] ?? 'RADIO',
+        !empty($input['required']) ? 1 : 0,
+        $optionsJson,
+        (int)($input['sortOrder'] ?? 0),
+        $now,
+        $now,
+    ]);
+    http_response_code(201);
+    echo json_encode([
+        'id' => $newId,
+        'nameJa' => $input['nameJa'] ?? '',
+        'nameEn' => $input['nameEn'] ?? '',
+        'type' => $input['type'] ?? 'RADIO',
+        'required' => !empty($input['required']),
+        'options' => isset($input['options']) && is_array($input['options']) ? array_values($input['options']) : [],
+        'sortOrder' => (int)($input['sortOrder'] ?? 0),
+    ]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: PUT /menu/option-groups/:id
+// -------------------------------------------------------------
+if (($method === 'PUT' || $method === 'PATCH') && preg_match('#^/menu/option-groups/([a-zA-Z0-9_-]+)/?$#', $subPath, $matches)) {
+    $ogId = $matches[1];
+    requireAdminUser($jwtSecret, $pdo);
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+
+    $chk = $pdo->prepare('SELECT * FROM OptionGroup WHERE id = ? LIMIT 1');
+    $chk->execute([$ogId]);
+    $existing = $chk->fetch();
+    if (!$existing) {
+        http_response_code(404);
+        echo json_encode(['error' => ['code' => 'NOT_FOUND', 'message' => 'OptionGroup not found']]);
+        exit;
+    }
+
+    $cols = [];
+    $params = [];
+    if (array_key_exists('nameJa', $input)) { $cols[] = '`nameJa` = ?'; $params[] = (string)$input['nameJa']; }
+    if (array_key_exists('nameEn', $input)) { $cols[] = '`nameEn` = ?'; $params[] = (string)$input['nameEn']; }
+    if (array_key_exists('type', $input)) { $cols[] = '`type` = ?'; $params[] = (string)$input['type']; }
+    if (array_key_exists('required', $input)) { $cols[] = '`required` = ?'; $params[] = $input['required'] ? 1 : 0; }
+    if (array_key_exists('options', $input)) {
+        $cols[] = '`options` = ?';
+        $params[] = json_encode(is_array($input['options']) ? array_values($input['options']) : [], JSON_UNESCAPED_UNICODE);
+    }
+    if (array_key_exists('sortOrder', $input)) { $cols[] = '`sortOrder` = ?'; $params[] = (int)$input['sortOrder']; }
+
+    if (!empty($cols)) {
+        $cols[] = '`updatedAt` = ?';
+        $params[] = (new DateTime('now', new DateTimeZone('UTC')))->format('Y-m-d H:i:s.v');
+        $params[] = $ogId;
+        $pdo->prepare('UPDATE OptionGroup SET ' . implode(', ', $cols) . ' WHERE id = ?')->execute($params);
+    }
+
+    $chk->execute([$ogId]);
+    $updated = $chk->fetch();
+    echo json_encode([
+        'id' => $updated['id'],
+        'nameJa' => $updated['nameJa'],
+        'nameEn' => $updated['nameEn'],
+        'type' => $updated['type'],
+        'required' => (bool)$updated['required'],
+        'options' => is_string($updated['options']) ? (json_decode($updated['options'], true) ?: []) : ($updated['options'] ?: []),
+        'sortOrder' => (int)$updated['sortOrder'],
+    ]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: DELETE /menu/option-groups/:id
+// -------------------------------------------------------------
+if ($method === 'DELETE' && preg_match('#^/menu/option-groups/([a-zA-Z0-9_-]+)/?$#', $subPath, $matches)) {
+    $ogId = $matches[1];
+    requireAdminUser($jwtSecret, $pdo);
+    $pdo->prepare('DELETE FROM _MenuItemToOptionGroup WHERE B = ?')->execute([$ogId]);
+    $del = $pdo->prepare('DELETE FROM OptionGroup WHERE id = ?');
+    $del->execute([$ogId]);
+    if ($del->rowCount() === 0) {
+        http_response_code(404);
+        echo json_encode(['error' => ['code' => 'NOT_FOUND', 'message' => 'OptionGroup not found']]);
+        exit;
+    }
+    http_response_code(204);
     exit;
 }
 
