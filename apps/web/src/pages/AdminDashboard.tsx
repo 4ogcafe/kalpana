@@ -152,7 +152,7 @@ export default function AdminDashboard() {
   return (
     <div className="adm-root" style={{ display: 'flex', height: '100vh', backgroundColor: '#f3f4f6', fontFamily: "'Inter', sans-serif" }}>
       {sidebarOpen && <div className="adm-backdrop" onClick={() => setSidebarOpen(false)} aria-hidden="true" />}
-      <title>Admin | Kalpana</title>
+      <title>Admin | Kalpna</title>
       <meta name="robots" content="noindex, nofollow" />
       
       {/* Sidebar */}
@@ -168,7 +168,7 @@ export default function AdminDashboard() {
           <div style={{ width: '40px', height: '40px', backgroundColor: '#000', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 'bold', fontSize: '1.2rem' }}>
             K
           </div>
-          <span style={{ fontSize: '1.25rem', fontWeight: '700', color: '#111827', letterSpacing: '-0.5px' }}>Kalpana Admin</span>
+          <span style={{ fontSize: '1.25rem', fontWeight: '700', color: '#111827', letterSpacing: '-0.5px' }}>Kalpna Admin</span>
           <button type="button" className="adm-close-btn" onClick={() => setSidebarOpen(false)} aria-label="Close menu">
             <X size={22} aria-hidden="true" />
           </button>

@@ -76,6 +76,7 @@ describe('stamp card rules', () => {
   });
 
   it('reads member codes the way people type or scanners send them', () => {
+    expect(normalizeMemberCode('kalpna:k7mp-2qxa')).toBe('K7MP2QXA');
     expect(normalizeMemberCode('kalpana:k7mp-2qxa')).toBe('K7MP2QXA');
     expect(normalizeMemberCode(' K7MP 2QXA ')).toBe('K7MP2QXA');
   });

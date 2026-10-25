@@ -202,7 +202,7 @@ export default function Account() {
 
   return (
     <div className="acc">
-      <title>マイページ | Kalpana (カルプナ)</title>
+      <title>マイページ | Kalpna (カルプナ)</title>
       <meta name="robots" content="noindex" />
 
       <aside className="acc-sidebar">
@@ -240,7 +240,7 @@ export default function Account() {
             <>
               <section className="acc-hero" aria-label="ポイント残高">
                 <div>
-                  <div className="acc-hero-label">Kalpana Points</div>
+                  <div className="acc-hero-label">Kalpna Points</div>
                   <div className="acc-hero-points">{balance.toLocaleString('ja-JP')}<span>pt</span></div>
                   <div className="acc-hero-sub">
                     {yen(balance * (loyalty?.pointValueYen ?? 1))}分としてご利用いただけます

@@ -99,7 +99,7 @@ export function newMemberCode(): string {
   return [...bytes].map((byte) => CODE_ALPHABET[byte % CODE_ALPHABET.length]).join('');
 }
 
-/** Accepts what a person types or a scanner sends: lower case, spaces, a dash or a "KALPANA:" prefix. */
+/** Accepts what a person types or a scanner sends: lower case, spaces, a dash or a "KALPNA:" / "KALPANA:" prefix. */
 export function normalizeMemberCode(input: string): string {
-  return input.toUpperCase().replace(/^KALPANA:/, '').replace(/[\s-]/g, '');
+  return input.toUpperCase().replace(/^(KALPNA|KALPANA):/, '').replace(/[\s-]/g, '');
 }

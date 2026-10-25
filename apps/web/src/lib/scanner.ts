@@ -36,7 +36,7 @@ export const DEFAULT_SCANNER_CONFIG: ScannerConfig = {
   model: 'NETUM_NT_EM61',
   interfaceType: 'USB_HID',
   globalListening: true,
-  stripPrefix: 'KALPANA:',
+  stripPrefix: 'KALPNA:',
   terminator: 'ENTER',
   baudRate: 9600,
   speedThresholdMs: 50,
@@ -69,10 +69,11 @@ const MEMBER_CODE_REGEX = /^[2-9A-HJKMNP-Z]{8}$/;
 
 /**
  * Normalizes scanned input:
- * Removes "KALPANA:" prefix, URL wrappers, whitespace, hyphens, and uppercase.
+ * Removes "KALPNA:" or "KALPANA:" prefix, URL wrappers, whitespace, hyphens, and uppercase.
  */
-export function normalizeScannedMemberCode(raw: string, stripPrefix = 'KALPANA:'): string {
+export function normalizeScannedMemberCode(raw: string, stripPrefix = 'KALPNA:'): string {
   let val = raw.trim();
+  val = val.replace(/^(KALPNA|KALPANA):/i, '');
   if (stripPrefix && val.toUpperCase().startsWith(stripPrefix.toUpperCase())) {
     val = val.slice(stripPrefix.length);
   }

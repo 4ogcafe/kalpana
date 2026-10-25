@@ -37,7 +37,7 @@ export default function MemberQrModal({
 
   const path = useMemo(() => {
     const qr = qrcode(0, 'M');
-    qr.addData(`KALPANA:${code}`);
+    qr.addData(`KALPNA:${code}`);
     qr.make();
     const size = qr.getModuleCount();
     let d = '';

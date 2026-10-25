@@ -100,10 +100,10 @@ describe('authentication', () => {
 describe('settings', () => {
   it('only updates the fields that were sent', async () => {
     await request(app).put('/api/v1/settings').set('Cookie', adminCookie)
-      .send({ name: 'Kalpana', phone: '000', googleMapsLink: 'https://maps.google.com/x' }).expect(200);
+      .send({ name: 'Kalpna', phone: '000', googleMapsLink: 'https://maps.google.com/x' }).expect(200);
     await request(app).put('/api/v1/settings').set('Cookie', adminCookie).send({ aboutJa: 'about' }).expect(200);
     const res = await request(app).get('/api/v1/settings').expect(200);
-    expect(res.body).toMatchObject({ name: 'Kalpana', phone: '000', googleMapsLink: 'https://maps.google.com/x', aboutJa: 'about' });
+    expect(res.body).toMatchObject({ name: 'Kalpna', phone: '000', googleMapsLink: 'https://maps.google.com/x', aboutJa: 'about' });
   });
 
   it('rejects non-https links', async () => {

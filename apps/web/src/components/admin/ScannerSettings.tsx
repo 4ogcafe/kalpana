@@ -411,10 +411,10 @@ export default function ScannerSettings() {
               type="text"
               value={config.stripPrefix}
               onChange={e => setConfig(prev => ({ ...prev, stripPrefix: e.target.value }))}
-              placeholder="KALPANA:"
+              placeholder="KALPNA:"
               style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '0.9rem', boxSizing: 'border-box' }}
             />
-            <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>会員QRは「KALPANA:コード」形式で発行されます</span>
+            <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>会員QRは「KALPNA:コード」形式で発行されます</span>
           </div>
 
           <div>
@@ -538,7 +538,7 @@ export default function ScannerSettings() {
               </div>
 
               <div style={{ background: '#fff', borderRadius: '8px', padding: '12px', border: '1px solid #d8b4fe', fontSize: '0.8rem', color: '#6b21a8' }}>
-                💡 <strong>ヒント:</strong> 会員証QRコードには「KALPANA:K7MP2QXA」というプレフィックスが含まれており、一般的な商品バーコードやクーポンの誤認を防ぐ安全設計になっています。
+                💡 <strong>ヒント:</strong> 会員証QRコードには「KALPNA:K7MP2QXA」というプレフィックスが含まれており、一般的な商品バーコードやクーポンの誤認を防ぐ安全設計になっています。
               </div>
             </div>
           </div>
