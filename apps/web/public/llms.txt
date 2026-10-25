@@ -35,4 +35,5 @@
 - [テイクアウトメニュー](https://kalpnacurry.com/menu/takeout)
 - [グランドメニュー](https://kalpnacurry.com/menu/grand)
 - [私たちについて](https://kalpnacurry.com/about)
+- [ブログ・スパイスコラム](https://kalpnacurry.com/blog)
 - [お問い合わせ・アクセス](https://kalpnacurry.com/contact)

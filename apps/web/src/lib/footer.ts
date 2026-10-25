@@ -10,6 +10,7 @@ export const DEFAULT_FOOTER_LINKS: FooterLink[] = [
   { label: 'ホーム', url: '/' },
   { label: '私たちについて', url: '/about' },
   { label: 'メニュー', url: '/menu/grand' },
+  { label: 'ブログ・コラム', url: '/blog' },
   { label: '採用情報', url: '/careers' },
   { label: 'お問い合わせ', url: '/contact' },
   { label: '管理者ログイン', url: '/login' },

@@ -287,6 +287,77 @@ function ensureDefaultDatabaseData(PDO $pdo): array {
         }
     } catch (Exception $e) {}
 
+    // 7. Seed Initial SEO & AI DEO Blog Posts
+    try {
+        $stmt = $pdo->query('SELECT COUNT(*) FROM `BlogPost`');
+        if ($stmt && (int)$stmt->fetchColumn() === 0) {
+            $postIns = $pdo->prepare('INSERT INTO `BlogPost` (
+                id, slug, title, content, excerpt, coverImage, category, tags,
+                author, readTimeMinutes, isPublished, publishedAt, metaTitle, metaDescription,
+                createdAt, updatedAt
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)');
+
+            $posts = [
+                [
+                    'post_seed_01',
+                    'kumagaya-indian-curry-spices-guide',
+                    '本場インドのスパイス30種が織りなす極上カレー：熊谷で味わう香り高い本格インド料理の秘密',
+                    "## スパイスは「味付け」ではなく「料理の魂」\n\n本格インド料理におけるスパイスは、単に辛さを加える調味料ではありません。何百年ものアーユルヴェーダ（伝統医学）の知恵に基づき、**食材の旨味を引き出し、身体を内側から整える薬効**を併せ持つ自然の恵みです。\n\nKalpna（カルプナ）熊谷店では、インド各地の特産地から厳選直輸入した**30種類以上の高品質スパイス**を使用。シェフが毎朝その日の気温・湿度に合わせて調合し、挽きたてのフレッシュな状態で調理しています。\n\n### 代表的なキー・スパイスとその特徴\n\n1. **ターメリック（ウコン / Turmeric）**\n   鮮やかな黄金色のベース。ポリフェノールの一種クルクミンを豊富に含み、抗酸化作用や肝機能サポートで知られます。\n2. **クミン（Cumin / ジーラ）**\n   カレー特有の香ばしい芳香を放つ主役。消化促進や食欲増進をサポートします。\n3. **カルダモン（Cardamom）**\n   「スパイスの女王」と称される爽やかで高貴な甘い香り。食後の胃もたれを予防し、リフレッシュ効果をもたらします。\n4. **コリアンダー（Coriander / ダニア）**\n   柑橘系に似た爽やかな香り。複数のスパイス同士の個性をまとめ上げるバランサーです。\n5. **クローブ（Clove）＆ シナモン（Cinnamon）**\n   体を芯から温め、深いコクと甘やかな余韻をカレーに与えます。\n\n> **シェフのひとこと：**\n> 「市販のカレールーとは異なり、小麦粉や過剰な油分に頼らず、玉ねぎやトマト、そしてスパイスの自然なとろみだけで仕上げています。そのため、たっぷり食べても胃もたれせず、食後も身体がポカポカと軽やかです。」\n\n### 辛さはお子様向けマイルドから激辛まで自由自在\n\nKalpnaではスパイスの豊かな香りはそのままに、辛さレベルを甘口（Mild）から激辛（Very Hot）まで細かく調整可能です。スパイスの奥深い魅力をぜひご家族・ご友人とご体感ください。",
+                    'インド直輸入の数十種類の厳選スパイスを毎朝調合。ターメリック、クミン、カルダモンなど、体に優しく豊かな香りを引き出すKalpna独自のスパイス調合の秘密と健康効果をお届けします。',
+                    'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=1200&q=80',
+                    'スパイスのこだわり',
+                    json_encode(['スパイス', '熊谷カレー', 'インド料理', '健康', 'ランチ']),
+                    'Kalpna シェフ',
+                    4,
+                    $now,
+                    '本場インドのスパイスの秘密と健康効果 | Kalpna（カルプナ）熊谷店',
+                    '埼玉県熊谷市の本格インド料理Kalpnaがお届けするスパイスガイド。毎朝挽きたての30種以上の直輸入スパイスの効能や調合のこだわりをシェフが詳しく解説します。',
+                    $now,
+                    $now
+                ],
+                [
+                    'post_seed_02',
+                    'binchotan-charcoal-tandoor-naan-special',
+                    '特注の備長炭タンドール（土窯）で焼き上げる！外サク中モチの絶品ナン＆タンドリーチキン',
+                    "## なぜ「備長炭タンドール」で焼くナンは格別に美味しいのか？\n\nインド料理の醍醐味である「焼きたてナン」と「ジューシーなタンドリーチキン」。その美味しさの決定打となるのが、厨房に鎮座する特注の**備長炭タンドール（土窯）**です。\n\n近年は扱いが容易なガス式や電気式のオーブンを採用する店舗も増えていますが、Kalpna（カルプナ）では本場インドの伝統製法を守り、**高温の備長炭土窯**での手焼き調理に徹底してこだわっています。\n\n### 炭火粘土窯ならではの3つの理由\n\n- **超高温・瞬間焼き上げ（約400℃以上）**\n  タンドール内の高温で一気に焼き上げるため、生地内部の水分を逃しません。外側はパリッと香ばしく、内側はふっくらモチモチの理想的な食感に仕上がります。\n- **遠赤外線効果で芯までふっくら**\n  備長炭から放射される強力な遠赤外線が肉や生地の芯まで素早く熱を伝え、旨味をギュッと閉じ込めます。\n- **芳醇な炭火の燻香**\n  タンドリーチキンから落ちた肉汁が備長炭で煙となり、肉全体を包み込むことで、家庭のオーブンでは決して出せない極上のスモーキーフレーバーが生まれます。\n\n### 一番人気の「とろ〜りチーズナン」\n\n厳選したナチュラルモッツァレラチーズをたっぷりと包み込んでタンドールで焼き上げる「チーズナン」は、当店の一番人気メニューです。熱々をちぎるとトロ〜リと伸びる濃厚チーズと、ほんのり甘いナンの生地がスパイスカレーと抜群の相性を誇ります。\n\nランチセットやテイクアウトでも大好評ですので、ぜひ焼きたての香ばしさをお楽しみください。",
+                    'ガスや電気ではなく最高級の備長炭を使用した伝統の土窯（タンドール）。高温で一気に焼き上げるからこそ実現するモチモチのナンとジューシーなタンドリーチキンの魅力をご紹介。',
+                    'https://images.unsplash.com/photo-1589302168068-964664d93dc0?auto=format&fit=crop&w=1200&q=80',
+                    'シェフのこだわり',
+                    json_encode(['チーズナン', 'タンドール窯', '備長炭', '焼き立てナン', 'タンドリーチキン']),
+                    'Kalpna シェフ',
+                    3,
+                    $now,
+                    '備長炭タンドール窯焼きナンの秘密 | Kalpna（カルプナ）熊谷店',
+                    '熊谷のインド料理店Kalpnaの看板メニュー、備長炭土窯で焼く本格ナンとタンドリーチキン。炭火ならではの香ばしさと人気のチーズナンが美味しい理由を解説します。',
+                    $now,
+                    $now
+                ],
+                [
+                    'post_seed_03',
+                    'kumagaya-lunch-curry-free-refill-guide',
+                    '熊谷・国道17号沿いランチに大人気！ナン・ライスおかわり無料＆テイクアウトもOKなインドカレー',
+                    "## 熊谷でランチをお探しなら！Kalpna（カルプナ）のお得なランチサービス\n\n埼玉県熊谷市佐谷田、国道17号沿いに位置する「Kalpna（カルプナ）」は、広い専用駐車場（12台完備）と居心地の良い落ち着いたテーブル席を備えた本格インド料理レストランです。\n\nビジネスの合間のランチ、ご家族連れでのお食事、ドライブ途中の立ち寄りにも大変便利にご利用いただいております。\n\n### Kalpnaランチの嬉しいポイント\n\n1. **ナン・ライスのおかわり無料！**\n   ランチセットをご注文のお客様は、焼きたてプレーンナンおよびライスが何度でもおかわり自由です。お腹いっぱい満足できるボリュームをお約束します。\n2. **選べる本格カレー＆辛さ調節**\n   日替わりカレーをはじめ、定番のチキンカレー、濃厚バターチキン、キーマ、マトン、ベジタブルなど豊富なラインナップをご用意。お子様用甘口から激辛までお好みに合わせて調整できます。\n3. **WEB＆電話で事前テイクアウト注文OK**\n   お忙しいランチタイムやご自宅での夕食には、テイクアウト事前予約が便利です。店頭での待ち時間ゼロで出来立て熱々のカレーをお持ち帰りいただけます。\n\n### 店舗情報・アクセス\n\n- **所在地：** 〒360-0831 埼玉県熊谷市佐谷田2081（国道17号沿い・加賀家食堂様隣）\n- **営業時間：** ランチ 11:30〜15:00 / ディナー 17:00〜22:00（火曜定休日）\n- **駐車場：** 敷地内12台（無料）\n- **お電話：** 048-514-8386\n\nスタッフ一同、温かいおもてなしと本格スパイスの香りで皆様のご来店を心よりお待ちしております。",
+                    '熊谷市佐谷田・国道17号沿い、駐車場12台完備。ランチタイムはお得なセットメニューと焼きたてプレーンナン・ライスのおかわり無料サービスをご提供しています。',
+                    'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80',
+                    'お知らせ・ランチ',
+                    json_encode(['熊谷ランチ', '国道17号', 'おかわり無料', 'テイクアウト', '駐車場完備']),
+                    'Kalpna スタッフ',
+                    3,
+                    $now,
+                    '熊谷のおすすめカレーランチ！ナン・ライスおかわり無料 | Kalpna',
+                    '熊谷市佐谷田の本格インド料理Kalpnaのお得なランチ。日替わりカレーからバターチキンまで、ナン・ライスおかわり無料やテイクアウト事前注文の利用方法をご案内。',
+                    $now,
+                    $now
+                ]
+            ];
+
+            foreach ($posts as $p) {
+                $postIns->execute($p);
+            }
+            $seeded['blog_posts'] = count($posts);
+        }
+    } catch (Exception $e) {}
+
     return $seeded;
 }
 
@@ -758,6 +829,29 @@ function runDatabaseMigrations(PDO $pdo): array {
             `B` VARCHAR(191) NOT NULL,
             UNIQUE INDEX `_MenuItemToOptionGroup_AB_unique`(`A`, `B`),
             INDEX `_MenuItemToOptionGroup_B_index`(`B`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+
+        'BlogPost' => "CREATE TABLE IF NOT EXISTS `BlogPost` (
+            `id` VARCHAR(191) NOT NULL,
+            `slug` VARCHAR(191) NOT NULL,
+            `title` VARCHAR(255) NOT NULL,
+            `content` MEDIUMTEXT NOT NULL,
+            `excerpt` TEXT NULL,
+            `coverImage` VARCHAR(255) NULL,
+            `category` VARCHAR(100) NULL,
+            `tags` JSON NULL,
+            `author` VARCHAR(100) NULL DEFAULT 'Kalpna シェフ',
+            `readTimeMinutes` INT NOT NULL DEFAULT 3,
+            `isPublished` BOOLEAN NOT NULL DEFAULT true,
+            `publishedAt` DATETIME(3) NULL,
+            `metaTitle` VARCHAR(255) NULL,
+            `metaDescription` TEXT NULL,
+            `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+            `updatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+            UNIQUE INDEX `BlogPost_slug_key`(`slug`),
+            INDEX `BlogPost_published_idx`(`isPublished`, `publishedAt`),
+            INDEX `BlogPost_category_idx`(`category`),
+            PRIMARY KEY (`id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
     ];
 
@@ -839,9 +933,10 @@ function runDatabaseMigrations(PDO $pdo): array {
     ];
 }
 
-// Auto-run migrations if Settings table is missing
+// Auto-run migrations if Settings or BlogPost table is missing
 try {
     $pdo->query('SELECT 1 FROM `Settings` LIMIT 1');
+    $pdo->query('SELECT 1 FROM `BlogPost` LIMIT 1');
 } catch (Exception $e) {
     runDatabaseMigrations($pdo);
 }
@@ -2808,6 +2903,262 @@ if ($method === 'GET' && ($subPath === '/reviews' || $subPath === '/reviews/')) 
         'writeReviewUrl' => $settings['storeReviewLink'] ?? null,
         'reviews' => $featured,
         'fetchedAt' => null,
+    ]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: GET /blogs/admin/all (Admin all posts)
+// -------------------------------------------------------------
+if ($method === 'GET' && ($subPath === '/blogs/admin/all' || $subPath === '/blog/admin/all')) {
+    requireAdminUser($jwtSecret, $pdo);
+    $stmt = $pdo->query('SELECT id, slug, title, content, excerpt, coverImage, category, tags, author, readTimeMinutes, isPublished, publishedAt, metaTitle, metaDescription, createdAt, updatedAt FROM BlogPost ORDER BY createdAt DESC');
+    $posts = $stmt->fetchAll();
+    foreach ($posts as &$p) {
+        $p['isPublished'] = (bool)$p['isPublished'];
+        $p['readTimeMinutes'] = (int)$p['readTimeMinutes'];
+        $p['tags'] = !empty($p['tags']) ? (is_array($p['tags']) ? $p['tags'] : (json_decode($p['tags'], true) ?: [])) : [];
+    }
+    echo json_encode(['posts' => $posts]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: POST /blogs/admin (Admin create post)
+// -------------------------------------------------------------
+if ($method === 'POST' && ($subPath === '/blogs/admin' || $subPath === '/blog/admin')) {
+    requireAdminUser($jwtSecret, $pdo);
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+
+    $title = trim($input['title'] ?? '');
+    if (empty($title)) {
+        http_response_code(400);
+        echo json_encode(['error' => ['code' => 'VALIDATION_ERROR', 'message' => 'タイトルを入力してください']]);
+        exit;
+    }
+
+    $slug = trim($input['slug'] ?? '');
+    if (empty($slug)) {
+        $slug = 'post-' . bin2hex(random_bytes(4));
+    } else {
+        $slug = strtolower(preg_replace('/[^a-zA-Z0-9_\x{3040}-\x{309F}\x{30A0}-\x{30FF}\x{4E00}-\x{9FAF}-]+/u', '-', $slug));
+        $slug = trim($slug, '-');
+        if (empty($slug)) $slug = 'post-' . bin2hex(random_bytes(4));
+    }
+
+    // Ensure slug uniqueness
+    $stmt = $pdo->prepare('SELECT COUNT(*) FROM BlogPost WHERE slug = ?');
+    $stmt->execute([$slug]);
+    if ((int)$stmt->fetchColumn() > 0) {
+        $slug .= '-' . bin2hex(random_bytes(2));
+    }
+
+    $id = 'post_' . bin2hex(random_bytes(6));
+    $content = trim($input['content'] ?? '');
+    $excerpt = !empty($input['excerpt']) ? trim($input['excerpt']) : (mb_substr(strip_tags($content), 0, 160) . '...');
+    $coverImage = !empty($input['coverImage']) ? trim($input['coverImage']) : null;
+    $category = !empty($input['category']) ? trim($input['category']) : 'スパイスのこだわり';
+    $rawT = $input['tags'] ?? [];
+    if (is_array($rawT)) {
+        $tags = json_encode($rawT, JSON_UNESCAPED_UNICODE);
+    } elseif (is_string($rawT)) {
+        $tags = json_encode(array_values(array_filter(array_map('trim', explode(',', $rawT)))), JSON_UNESCAPED_UNICODE);
+    } else {
+        $tags = json_encode([]);
+    }
+    $author = !empty($input['author']) ? trim($input['author']) : 'Kalpna シェフ';
+    $readTimeMinutes = !empty($input['readTimeMinutes']) ? max(1, (int)$input['readTimeMinutes']) : max(1, (int)ceil(mb_strlen(strip_tags($content)) / 500));
+    $isPublished = isset($input['isPublished']) ? (bool)$input['isPublished'] : true;
+    $now = date('Y-m-d H:i:s');
+    $publishedAt = !empty($input['publishedAt']) ? $input['publishedAt'] : ($isPublished ? $now : null);
+    $metaTitle = !empty($input['metaTitle']) ? trim($input['metaTitle']) : null;
+    $metaDescription = !empty($input['metaDescription']) ? trim($input['metaDescription']) : null;
+
+    $ins = $pdo->prepare('INSERT INTO BlogPost (
+        id, slug, title, content, excerpt, coverImage, category, tags,
+        author, readTimeMinutes, isPublished, publishedAt, metaTitle, metaDescription,
+        createdAt, updatedAt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+
+    $ins->execute([
+        $id, $slug, $title, $content, $excerpt, $coverImage, $category, $tags,
+        $author, $readTimeMinutes, $isPublished ? 1 : 0, $publishedAt, $metaTitle, $metaDescription,
+        $now, $now
+    ]);
+
+    $getStmt = $pdo->prepare('SELECT * FROM BlogPost WHERE id = ?');
+    $getStmt->execute([$id]);
+    $newPost = $getStmt->fetch();
+    if ($newPost) {
+        $newPost['isPublished'] = (bool)$newPost['isPublished'];
+        $newPost['tags'] = json_decode($newPost['tags'], true) ?: [];
+    }
+
+    http_response_code(201);
+    echo json_encode(['success' => true, 'post' => $newPost]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: PUT /blogs/admin/:id (Admin update post)
+// -------------------------------------------------------------
+if ($method === 'PUT' && preg_match('#^/blogs?/admin/([a-zA-Z0-9_-]+)/?$#', $subPath, $matches)) {
+    $postId = $matches[1];
+    requireAdminUser($jwtSecret, $pdo);
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+
+    $fields = [];
+    $params = [];
+    $allowed = ['title', 'slug', 'content', 'excerpt', 'coverImage', 'category', 'author', 'readTimeMinutes', 'isPublished', 'publishedAt', 'metaTitle', 'metaDescription'];
+
+    foreach ($allowed as $f) {
+        if (array_key_exists($f, $input)) {
+            $val = $input[$f];
+            if ($f === 'isPublished') {
+                $val = $val ? 1 : 0;
+            } elseif ($f === 'readTimeMinutes') {
+                $val = max(1, (int)$val);
+            } elseif ($f === 'slug') {
+                $val = trim($val);
+                $slugCheck = $pdo->prepare('SELECT COUNT(*) FROM BlogPost WHERE slug = ? AND id != ?');
+                $slugCheck->execute([$val, $postId]);
+                if ((int)$slugCheck->fetchColumn() > 0) {
+                    $val .= '-' . bin2hex(random_bytes(2));
+                }
+            }
+            $fields[] = "`{$f}` = ?";
+            $params[] = $val;
+        }
+    }
+
+    if (array_key_exists('tags', $input)) {
+        $t = $input['tags'];
+        if (is_array($t)) {
+            $tagsJson = json_encode($t, JSON_UNESCAPED_UNICODE);
+        } elseif (is_string($t)) {
+            $tagsArr = array_values(array_filter(array_map('trim', explode(',', $t))));
+            $tagsJson = json_encode($tagsArr, JSON_UNESCAPED_UNICODE);
+        } else {
+            $tagsJson = json_encode([]);
+        }
+        $fields[] = "`tags` = ?";
+        $params[] = $tagsJson;
+    }
+
+    if (!empty($fields)) {
+        $fields[] = "`updatedAt` = ?";
+        $params[] = date('Y-m-d H:i:s');
+        $params[] = $postId;
+        $sql = "UPDATE BlogPost SET " . implode(', ', $fields) . " WHERE id = ?";
+        $pdo->prepare($sql)->execute($params);
+    }
+
+    $getStmt = $pdo->prepare('SELECT * FROM BlogPost WHERE id = ?');
+    $getStmt->execute([$postId]);
+    $updatedPost = $getStmt->fetch();
+    if ($updatedPost) {
+        $updatedPost['isPublished'] = (bool)$updatedPost['isPublished'];
+        $updatedPost['tags'] = !empty($updatedPost['tags']) ? (json_decode($updatedPost['tags'], true) ?: []) : [];
+    }
+
+    echo json_encode(['success' => true, 'post' => $updatedPost]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: DELETE /blogs/admin/:id (Admin delete post)
+// -------------------------------------------------------------
+if ($method === 'DELETE' && preg_match('#^/blogs?/admin/([a-zA-Z0-9_-]+)/?$#', $subPath, $matches)) {
+    $postId = $matches[1];
+    requireAdminUser($jwtSecret, $pdo);
+    $pdo->prepare('DELETE FROM BlogPost WHERE id = ?')->execute([$postId]);
+    echo json_encode(['success' => true]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: GET /blogs/:slug (Public single post by slug/id)
+// -------------------------------------------------------------
+if ($method === 'GET' && preg_match('#^/blogs?/([^/]+)/?$#', $subPath, $matches) && !in_array($matches[1], ['admin', 'all'])) {
+    $slugOrId = urldecode($matches[1]);
+    $stmt = $pdo->prepare('SELECT * FROM BlogPost WHERE slug = ? OR id = ? LIMIT 1');
+    $stmt->execute([$slugOrId, $slugOrId]);
+    $post = $stmt->fetch();
+
+    if (!$post) {
+        http_response_code(404);
+        echo json_encode(['error' => ['code' => 'NOT_FOUND', 'message' => '記事が見つかりませんでした']]);
+        exit;
+    }
+
+    $post['isPublished'] = (bool)$post['isPublished'];
+    $post['readTimeMinutes'] = (int)$post['readTimeMinutes'];
+    $post['tags'] = !empty($post['tags']) ? (json_decode($post['tags'], true) ?: []) : [];
+
+    // Fetch related published posts for internal linking
+    $relStmt = $pdo->prepare('SELECT id, slug, title, excerpt, coverImage, category, readTimeMinutes, publishedAt FROM BlogPost WHERE id != ? AND isPublished = 1 ORDER BY publishedAt DESC LIMIT 3');
+    $relStmt->execute([$post['id']]);
+    $related = $relStmt->fetchAll();
+    foreach ($related as &$r) {
+        $r['readTimeMinutes'] = (int)$r['readTimeMinutes'];
+    }
+
+    header('Cache-Control: public, max-age=60');
+    echo json_encode(['post' => $post, 'relatedPosts' => $related]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: GET /blogs (Public published posts list)
+// -------------------------------------------------------------
+if ($method === 'GET' && ($subPath === '/blogs' || $subPath === '/blog' || $subPath === '/blogs/' || $subPath === '/blog/')) {
+    $category = $_GET['category'] ?? null;
+    $search = $_GET['search'] ?? null;
+    $limit = !empty($_GET['limit']) ? min(50, max(1, (int)$_GET['limit'])) : 30;
+    $offset = !empty($_GET['offset']) ? max(0, (int)$_GET['offset']) : 0;
+
+    $sql = 'SELECT id, slug, title, excerpt, coverImage, category, tags, author, readTimeMinutes, isPublished, publishedAt, createdAt FROM BlogPost WHERE isPublished = 1';
+    $countSql = 'SELECT COUNT(*) FROM BlogPost WHERE isPublished = 1';
+    $params = [];
+
+    if ($category && $category !== 'all' && $category !== 'すべて') {
+        $sql .= ' AND category = ?';
+        $countSql .= ' AND category = ?';
+        $params[] = $category;
+    }
+
+    if ($search) {
+        $sql .= ' AND (title LIKE ? OR excerpt LIKE ? OR content LIKE ?)';
+        $countSql .= ' AND (title LIKE ? OR excerpt LIKE ? OR content LIKE ?)';
+        $searchTerm = "%{$search}%";
+        $params[] = $searchTerm;
+        $params[] = $searchTerm;
+        $params[] = $searchTerm;
+    }
+
+    $countStmt = $pdo->prepare($countSql);
+    $countStmt->execute($params);
+    $total = (int)$countStmt->fetchColumn();
+
+    $sql .= " ORDER BY publishedAt DESC, createdAt DESC LIMIT {$limit} OFFSET {$offset}";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $posts = $stmt->fetchAll();
+
+    foreach ($posts as &$p) {
+        $p['isPublished'] = (bool)$p['isPublished'];
+        $p['readTimeMinutes'] = (int)$p['readTimeMinutes'];
+        $p['tags'] = !empty($p['tags']) ? (json_decode($p['tags'], true) ?: []) : [];
+    }
+
+    $catStmt = $pdo->query('SELECT DISTINCT category FROM BlogPost WHERE isPublished = 1 AND category IS NOT NULL AND category != ""');
+    $categories = $catStmt ? $catStmt->fetchAll(PDO::FETCH_COLUMN) : [];
+
+    header('Cache-Control: public, max-age=60');
+    echo json_encode([
+        'posts' => $posts,
+        'total' => $total,
+        'categories' => $categories
     ]);
     exit;
 }

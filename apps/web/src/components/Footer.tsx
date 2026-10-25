@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Clock, Mail, MapPin, Phone } from 'lucide-react';
+import { BookOpen, Clock, Mail, MapPin, Phone } from 'lucide-react';
 import { assetUrl, getPublic } from '../lib/api';
 import { DEFAULT_FOOTER_LINKS, DEFAULT_TAGLINE, type FooterLink } from '../lib/footer';
 
@@ -65,11 +65,14 @@ export default function Footer() {
   const name = s.name?.trim() ?? '';
   const brand = s.footerBrand?.trim() || name;
   const rawLinks = s.footerLinks?.length ? s.footerLinks : DEFAULT_FOOTER_LINKS;
-  const links = (rawLinks || []).filter(
+  let links = (rawLinks || []).filter(
     link => link &&
             !['/privacy-policy', '/refund-policy'].includes(link.url) &&
             !['プライバシーポリシー', '返金・キャンセルポリシー'].includes(link.label)
   );
+  if (!links.some(l => l.url === '/blog')) {
+    links = [...links, { label: 'ブログ・コラム', url: '/blog' }];
+  }
   const copyright = (s.footerCopyright?.trim() || `© {year} ${name || 'Kalpna'}. All Rights Reserved.`).replace(/\{year\}/g, year);
   
   const activeSocials = s.footerShowSocials === false ? [] : SOCIALS
@@ -93,6 +96,30 @@ export default function Footer() {
             {brand && <h3 style={{ margin: 0 }}>{brand}<span>.</span></h3>}
           </div>
           <p style={{ whiteSpace: 'pre-line' }}>{settings ? s.footerTaglineJa?.trim() || DEFAULT_TAGLINE : ''}</p>
+          <div style={{ marginTop: '16px', marginBottom: '16px' }}>
+            <Link 
+              to="/blog" 
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                backgroundColor: '#c75626',
+                color: '#fff',
+                padding: '9px 18px',
+                borderRadius: '8px',
+                fontSize: '0.85rem',
+                fontWeight: '600',
+                textDecoration: 'none',
+                boxShadow: '0 2px 8px rgba(199, 86, 38, 0.35)',
+                transition: 'transform 0.15s, background-color 0.2s',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#d86330'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#c75626'; e.currentTarget.style.transform = 'translateY(0)'; }}
+            >
+              <BookOpen size={16} aria-hidden="true" />
+              <span>公式ブログ・スパイスコラム</span>
+            </Link>
+          </div>
           {activeSocials.length > 0 && (
             <ul className="footer-socials" aria-label="SNS">
               {activeSocials.map(social => (
