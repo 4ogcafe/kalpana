@@ -177,7 +177,7 @@ export default function MessagesTab() {
         }
         toast.success(nextRead ? '既読・確認済みにしました' : '未読に戻しました');
       } else {
-        toast.error('更新に失敗しました');
+        toast.error(await errorMessage(res, '更新に失敗しました'));
       }
     } catch {
       toast.error('通信エラーが発生しました');
@@ -201,7 +201,7 @@ export default function MessagesTab() {
         setMessages(prev => prev.map(m => (unreadIds.includes(m.id) ? { ...m, isRead: true } : m)));
         toast.success(`${unreadIds.length}件を既読にしました`);
       } else {
-        toast.error('更新に失敗しました');
+        toast.error(await errorMessage(res, '更新に失敗しました'));
       }
     } catch {
       toast.error('通信エラーが発生しました');

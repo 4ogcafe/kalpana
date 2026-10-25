@@ -3207,8 +3207,87 @@ if ($method === 'POST' && ($subPath === '/contact' || $subPath === '/contact/'))
 if ($method === 'GET' && ($subPath === '/contact' || $subPath === '/contact/')) {
     requireAdminUser($jwtSecret, $pdo);
     $stmt = $pdo->query('SELECT * FROM ContactMessage ORDER BY createdAt DESC');
-    $messages = $stmt->fetchAll();
+    $rows = $stmt->fetchAll();
+    $messages = array_map(function($r) {
+        return [
+            'id' => (string)$r['id'],
+            'name' => (string)$r['name'],
+            'email' => (string)$r['email'],
+            'phone' => $r['phone'] !== null ? (string)$r['phone'] : null,
+            'type' => (string)$r['type'],
+            'date' => $r['date'] !== null ? (string)$r['date'] : null,
+            'guests' => $r['guests'] !== null ? (int)$r['guests'] : null,
+            'message' => (string)$r['message'],
+            'isRead' => (bool)$r['isRead'],
+            'ip' => $r['ip'] !== null ? (string)$r['ip'] : null,
+            'createdAt' => (string)$r['createdAt'],
+        ];
+    }, $rows);
     echo json_encode($messages);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: POST /contact/mark-read
+// -------------------------------------------------------------
+if ($method === 'POST' && ($subPath === '/contact/mark-read' || $subPath === '/contact/mark-read/')) {
+    requireAdminUser($jwtSecret, $pdo);
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+    $ids = $input['ids'] ?? [];
+
+    if (!is_array($ids)) {
+        http_response_code(400);
+        echo json_encode(['error' => ['code' => 'VALIDATION_FAILED', 'message' => 'ids must be an array']]);
+        exit;
+    }
+
+    $cleanIds = array_values(array_filter($ids, function($v) {
+        return is_string($v) && strlen(trim($v)) > 0;
+    }));
+
+    if (!empty($cleanIds)) {
+        $placeholders = implode(',', array_fill(0, count($cleanIds), '?'));
+        $stmt = $pdo->prepare("UPDATE ContactMessage SET isRead = 1 WHERE id IN ($placeholders)");
+        $stmt->execute($cleanIds);
+    }
+
+    echo json_encode(['success' => true, 'count' => count($cleanIds)]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: PUT/PATCH /contact/:id
+// -------------------------------------------------------------
+if (($method === 'PUT' || $method === 'PATCH') && preg_match('#^/contact/([a-zA-Z0-9_-]+)/?$#', $subPath, $matches)) {
+    requireAdminUser($jwtSecret, $pdo);
+    $id = $matches[1];
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+
+    if (!isset($input['isRead'])) {
+        http_response_code(400);
+        echo json_encode(['error' => ['code' => 'VALIDATION_FAILED', 'message' => 'isRead is required']]);
+        exit;
+    }
+
+    $isReadVal = !empty($input['isRead']) ? 1 : 0;
+    $stmt = $pdo->prepare('UPDATE ContactMessage SET isRead = ? WHERE id = ?');
+    $stmt->execute([$isReadVal, $id]);
+
+    echo json_encode(['success' => true]);
+    exit;
+}
+
+// -------------------------------------------------------------
+// Endpoint: DELETE /contact/:id
+// -------------------------------------------------------------
+if ($method === 'DELETE' && preg_match('#^/contact/([a-zA-Z0-9_-]+)/?$#', $subPath, $matches)) {
+    requireAdminUser($jwtSecret, $pdo);
+    $id = $matches[1];
+
+    $stmt = $pdo->prepare('DELETE FROM ContactMessage WHERE id = ?');
+    $stmt->execute([$id]);
+
+    echo json_encode(['success' => true]);
     exit;
 }
 
