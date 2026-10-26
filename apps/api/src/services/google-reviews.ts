@@ -277,7 +277,7 @@ export async function searchPlaces(query: string, fetchImpl: Fetch = fetch) {
     return [{
       placeId: extractedPlaceId,
       name: 'Kalpna Indian Cuisine (カルプナ)',
-      address: '〒360-0831 埼玉県熊谷市佐谷田2081',
+      address: '〒360-0023 埼玉県熊谷市佐谷田2081',
       rating: 4.5,
       userRatingCount: 185,
     }];
@@ -308,7 +308,7 @@ export async function searchPlaces(query: string, fetchImpl: Fetch = fetch) {
         return [{
           placeId: 'ChIJH2xEBQYrH2AR1rPBoQakMRo',
           name: 'Kalpna Indian Cuisine (カルプナ)',
-          address: '〒360-0831 埼玉県熊谷市佐谷田2081',
+          address: '〒360-0023 埼玉県熊谷市佐谷田2081',
           rating: 4.5,
           userRatingCount: 185,
         }];

@@ -189,7 +189,7 @@ export default function BlogPost() {
         'streetAddress': '佐谷田2081',
         'addressLocality': '熊谷市',
         'addressRegion': '埼玉県',
-        'postalCode': '360-0831',
+        'postalCode': '360-0023',
         'addressCountry': 'JP'
       },
       'telephone': '048-514-8386'

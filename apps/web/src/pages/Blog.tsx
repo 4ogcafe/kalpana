@@ -103,7 +103,7 @@ export default function Blog() {
         'streetAddress': '佐谷田2081',
         'addressLocality': '熊谷市',
         'addressRegion': '埼玉県',
-        'postalCode': '360-0831',
+        'postalCode': '360-0023',
         'addressCountry': 'JP'
       }
     },

@@ -162,8 +162,8 @@ function ensureDefaultDatabaseData(PDO $pdo): array {
             $ins->execute([
                 'default',
                 'Kalpna Indian Cuisine',
-                '2081 Sayada, Kumagaya, Saitama 360-0831, Japan',
-                '〒360-0831 埼玉県熊谷市佐谷田2081',
+                '2081 Sayada, Kumagaya, Saitama 360-0023, Japan',
+                '〒360-0023 埼玉県熊谷市佐谷田2081',
                 '048-514-8386',
                 'info@kalpnacurry.com',
                 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3221.724944983944!2d139.41883000000002!3d36.1251!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x601f2b0605446c1f%3A0x1a31a406a1c1b3d6!2sKalpna%20Indian%20Cuisine!5e0!3m2!1sen!2sjp!4v1715000000000!5m2!1sen!2sjp',
@@ -336,7 +336,7 @@ function ensureDefaultDatabaseData(PDO $pdo): array {
                     'post_seed_03',
                     'kumagaya-lunch-curry-free-refill-guide',
                     '熊谷・国道17号沿いランチに大人気！ナン・ライスおかわり無料＆テイクアウトもOKなインドカレー',
-                    "## 熊谷でランチをお探しなら！Kalpna（カルプナ）のお得なランチサービス\n\n埼玉県熊谷市佐谷田、国道17号沿いに位置する「Kalpna（カルプナ）」は、広い専用駐車場（12台完備）と居心地の良い落ち着いたテーブル席を備えた本格インド料理レストランです。\n\nビジネスの合間のランチ、ご家族連れでのお食事、ドライブ途中の立ち寄りにも大変便利にご利用いただいております。\n\n### Kalpnaランチの嬉しいポイント\n\n1. **ナン・ライスのおかわり無料！**\n   ランチセットをご注文のお客様は、焼きたてプレーンナンおよびライスが何度でもおかわり自由です。お腹いっぱい満足できるボリュームをお約束します。\n2. **選べる本格カレー＆辛さ調節**\n   日替わりカレーをはじめ、定番のチキンカレー、濃厚バターチキン、キーマ、マトン、ベジタブルなど豊富なラインナップをご用意。お子様用甘口から激辛までお好みに合わせて調整できます。\n3. **WEB＆電話で事前テイクアウト注文OK**\n   お忙しいランチタイムやご自宅での夕食には、テイクアウト事前予約が便利です。店頭での待ち時間ゼロで出来立て熱々のカレーをお持ち帰りいただけます。\n\n### 店舗情報・アクセス\n\n- **所在地：** 〒360-0831 埼玉県熊谷市佐谷田2081（国道17号沿い・加賀家食堂様隣）\n- **営業時間：** ランチ 11:30〜15:00 / ディナー 17:00〜22:00（火曜定休日）\n- **駐車場：** 敷地内12台（無料）\n- **お電話：** 048-514-8386\n\nスタッフ一同、温かいおもてなしと本格スパイスの香りで皆様のご来店を心よりお待ちしております。",
+                    "## 熊谷でランチをお探しなら！Kalpna（カルプナ）のお得なランチサービス\n\n埼玉県熊谷市佐谷田、国道17号沿いに位置する「Kalpna（カルプナ）」は、広い専用駐車場（12台完備）と居心地の良い落ち着いたテーブル席を備えた本格インド料理レストランです。\n\nビジネスの合間のランチ、ご家族連れでのお食事、ドライブ途中の立ち寄りにも大変便利にご利用いただいております。\n\n### Kalpnaランチの嬉しいポイント\n\n1. **ナン・ライスのおかわり無料！**\n   ランチセットをご注文のお客様は、焼きたてプレーンナンおよびライスが何度でもおかわり自由です。お腹いっぱい満足できるボリュームをお約束します。\n2. **選べる本格カレー＆辛さ調節**\n   日替わりカレーをはじめ、定番のチキンカレー、濃厚バターチキン、キーマ、マトン、ベジタブルなど豊富なラインナップをご用意。お子様用甘口から激辛までお好みに合わせて調整できます。\n3. **WEB＆電話で事前テイクアウト注文OK**\n   お忙しいランチタイムやご自宅での夕食には、テイクアウト事前予約が便利です。店頭での待ち時間ゼロで出来立て熱々のカレーをお持ち帰りいただけます。\n\n### 店舗情報・アクセス\n\n- **所在地：** 〒360-0023 埼玉県熊谷市佐谷田2081（国道17号沿い・加賀家食堂様隣）\n- **営業時間：** ランチ 11:30〜15:00 / ディナー 17:00〜22:00（火曜定休日）\n- **駐車場：** 敷地内12台（無料）\n- **お電話：** 048-514-8386\n\nスタッフ一同、温かいおもてなしと本格スパイスの香りで皆様のご来店を心よりお待ちしております。",
                     '熊谷市佐谷田・国道17号沿い、駐車場12台完備。ランチタイムはお得なセットメニューと焼きたてプレーンナン・ライスのおかわり無料サービスをご提供しています。',
                     'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80',
                     'お知らせ・ランチ',
@@ -922,6 +922,12 @@ function runDatabaseMigrations(PDO $pdo): array {
         $pdo->exec("UPDATE `Settings` SET `heroSubJa` = REPLACE(`heroSubJa`, 'Kalpana', 'Kalpna') WHERE `heroSubJa` LIKE '%Kalpana%'");
         $pdo->exec("UPDATE `AppSecret` SET `publicKey` = REPLACE(`publicKey`, 'Kalpana', 'Kalpna') WHERE `id` = 'PAGE_SETTINGS_EXT' AND `publicKey` LIKE '%Kalpana%'");
         $pdo->exec("UPDATE `User` SET `name` = REPLACE(`name`, 'Kalpana', 'Kalpna') WHERE `name` LIKE '%Kalpana%'");
+
+        // Update postal code to correct 〒360-0023
+        $pdo->exec("UPDATE `Settings` SET `addressJa` = REPLACE(`addressJa`, '360-0831', '360-0023') WHERE `addressJa` LIKE '%360-0831%'");
+        $pdo->exec("UPDATE `Settings` SET `addressEn` = REPLACE(`addressEn`, '360-0831', '360-0023') WHERE `addressEn` LIKE '%360-0831%'");
+        $pdo->exec("UPDATE `AppSecret` SET `publicKey` = REPLACE(`publicKey`, '360-0831', '360-0023') WHERE `id` = 'PAGE_SETTINGS_EXT' AND `publicKey` LIKE '%360-0831%'");
+        $pdo->exec("UPDATE `BlogPost` SET `content` = REPLACE(`content`, '360-0831', '360-0023') WHERE `content` LIKE '%360-0831%'");
     } catch (Exception $e) {}
 
     return [
@@ -1015,8 +1021,8 @@ if ($method === 'GET' && ($subPath === '/settings' || $subPath === '/settings/')
 
     $defaultSettings = [
         'name' => 'Kalpna Indian Cuisine',
-        'addressEn' => '2081 Sayada, Kumagaya, Saitama 360-0831, Japan',
-        'addressJa' => '〒360-0831 埼玉県熊谷市佐谷田2081',
+        'addressEn' => '2081 Sayada, Kumagaya, Saitama 360-0023, Japan',
+        'addressJa' => '〒360-0023 埼玉県熊谷市佐谷田2081',
         'phone' => '048-514-8386',
         'email' => 'info@kalpnacurry.com',
         'mapUrl' => 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3221.724944983944!2d139.41883000000002!3d36.1251!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x601f2b0605446c1f%3A0x1a31a406a1c1b3d6!2sKalpna%20Indian%20Cuisine!5e0!3m2!1sen!2sjp!4v1715000000000!5m2!1sen!2sjp',
@@ -1038,6 +1044,12 @@ if ($method === 'GET' && ($subPath === '/settings' || $subPath === '/settings/')
         'stampCardEnabled' => true,
     ];
     $settings = array_merge($defaultSettings, array_filter($settings, fn($v) => $v !== null && $v !== ''));
+    if (isset($settings['addressJa'])) {
+        $settings['addressJa'] = str_replace('360-0831', '360-0023', (string)$settings['addressJa']);
+    }
+    if (isset($settings['addressEn'])) {
+        $settings['addressEn'] = str_replace('360-0831', '360-0023', (string)$settings['addressEn']);
+    }
 
     echo json_encode($settings);
     exit;

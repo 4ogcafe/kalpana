@@ -46,8 +46,8 @@ async function main() {
   await prisma.settings.create({
     data: {
       name: 'Kalpna Indian Cuisine',
-      addressEn: '2081 Sayada, Kumagaya, Saitama 360-0831, Japan',
-      addressJa: '〒360-0831 埼玉県熊谷市佐谷田2081',
+      addressEn: '2081 Sayada, Kumagaya, Saitama 360-0023, Japan',
+      addressJa: '〒360-0023 埼玉県熊谷市佐谷田2081',
       lat: 36.1250995,
       lng: 139.4214049,
       phone: '048-577-7497',
