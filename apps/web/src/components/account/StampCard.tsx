@@ -5,6 +5,7 @@ import { formatDateTime, yen } from '../../lib/format';
 import { stampChime } from '../../lib/push';
 import MemberQrModal from './MemberQrModal';
 import type { StampCardData } from './types';
+import siteLogo from '../../assets/site-logo.webp';
 
 const MAX_PER_ROW = 5;
 const SEEN_KEY = 'kalpana_stamps_seen';
@@ -131,7 +132,7 @@ export default function StampCard({ card, memberName, preview = false, onCardUpd
                   className={`stamp-slot${stamped ? ' is-stamped' : ''}${isNewlyStamped ? ' is-new' : ''}${milestone ? ' is-milestone' : ''}${isGoal ? ' is-goal' : ''}`}
                   aria-label={`${position}個目${isGoal ? '（ゴール）' : ''}${stamped ? '：押印済み' : ''}`}
                 >
-                  {stamped ? <StampMark date={date} /> : <img src="/site-logo-01.webp" alt="" className="stamp-ghost" />}
+                  {stamped ? <StampMark date={date} /> : <img src={siteLogo} alt="" className="stamp-ghost" />}
                   {!stamped && isGoal && <span className="stamp-gift" aria-hidden="true" title="ゴール">🏁</span>}
                   {!stamped && !isGoal && milestone && <span className="stamp-gift" aria-hidden="true">🎁</span>}
                 </span>

@@ -5,6 +5,7 @@ import { apiFetch } from '../lib/api';
 import { useCustomer } from '../lib/customer-context';
 import { useCart } from '../lib/cart-context';
 import { Menu, ShoppingCart, UserRound, X } from 'lucide-react';
+import siteLogo from '../assets/site-logo.webp';
 
 const NAV_LINKS = [
   { to: '/', label: 'ホーム' },
@@ -91,7 +92,7 @@ export default function Navbar() {
         <div className="nav-inner">
           <Link className="nav-logo" to="/">
             <div style={{ height: '40px', display: 'flex', alignItems: 'center' }}>
-              <img src="/site-logo-01.webp" alt="Kalpna" width={40} height={40} style={{ height: '100%', width: 'auto', objectFit: 'contain' }} />
+              <img src={siteLogo} alt="Kalpna" width={40} height={40} style={{ height: '100%', width: 'auto', objectFit: 'contain' }} />
             </div>
             <div>
               <div className="nav-logo-text">カルプナ<span>.</span></div>
