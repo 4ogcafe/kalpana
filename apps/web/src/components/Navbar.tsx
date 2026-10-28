@@ -96,7 +96,7 @@ export default function Navbar() {
             </div>
             <div>
               <div className="nav-logo-text">カルプナ<span>.</span></div>
-              <span className="nav-logo-sub">本格インド料理店 ・ 熊谷</span>
+              <span className="nav-logo-sub">本格インド料理店</span>
             </div>
           </Link>
 
