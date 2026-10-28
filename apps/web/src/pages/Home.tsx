@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { toast } from 'react-hot-toast';
-import { apiFetch, assetUrl, getPublic } from '../lib/api';
+import { assetUrl, getPublic } from '../lib/api';
 import OfferSticker from '../components/MemberOffers';
 import GoogleReviews from '../components/GoogleReviews';
 import { loadReviews } from '../lib/reviews';
@@ -37,35 +36,9 @@ export default function Home() {
   const [carousels, setCarousels] = useState<any[]>([]);
   const [menuItems, setMenuItems] = useState<any[]>([]);
   const [settings, setSettings] = useState<any>({});
-  const [newsletterEmail, setNewsletterEmail] = useState('');
   const [menuSlideIndex, setMenuSlideIndex] = useState(0);
   // Only slides that have been shown (plus the next one) are mounted, so hidden hero images don't compete with the first one.
   const [loadedSlides, setLoadedSlides] = useState(1);
-
-  const handleNewsletterSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newsletterEmail) return;
-    try {
-      const res = await apiFetch('/api/v1/contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: 'Newsletter Subscriber',
-          email: newsletterEmail,
-          message: 'Subscribed to Newsletter',
-          type: 'GENERAL'
-        })
-      });
-      if (res.ok) {
-        toast.success('ご登録ありがとうございます！');
-        setNewsletterEmail('');
-      } else {
-        toast.error('登録に失敗しました。');
-      }
-    } catch (err) {
-      toast.error('Network error.');
-    }
-  };
 
   useEffect(() => {
     // Fetch Settings
@@ -456,22 +429,6 @@ export default function Home() {
 
       {/* Google Reviews Section: live from Google, refreshed monthly */}
       <GoogleReviews fallbackLink={settings.storeReviewLink || settings.googleMapsLink || 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(settings.name || 'Kalpna Indian Cuisine')} />
-      
-      {/* Subscription Section */}
-      <div className="section" style={{ position: 'relative', padding: '100px 20px', backgroundColor: 'var(--dark-bark)', color: 'white', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0.15, backgroundImage: `url(${settings.newsletterBgImage || 'https://images.unsplash.com/photo-1596797038530-2c107229654b?auto=format&fit=crop&w=1920&q=80'})`, backgroundSize: 'cover', backgroundPosition: 'center', zIndex: 0 }}></div>
-        <div style={{ position: 'relative', zIndex: 1, maxWidth: '800px', margin: '0 auto', textAlign: 'center' }}>
-          <h2 style={{ fontSize: '2.5rem', fontFamily: 'var(--font-display)', marginBottom: '16px', letterSpacing: '2px' }}>{settings.newsletterTitleJa || 'ニュースレターに登録'}</h2>
-          <p style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.8)', marginBottom: '40px', lineHeight: '1.6', whiteSpace: 'pre-line' }}>{settings.newsletterSubJa || <>最新のメニュー、シークレットレシピ、そして限定のお得な情報を<br/>あなたのメールボックスへ直接お届けします。</>}</p>
-          
-          <form style={{ display: 'flex', gap: '10px', maxWidth: '500px', margin: '0 auto', flexWrap: 'wrap', justifyContent: 'center' }} onSubmit={handleNewsletterSubmit}>
-            <input type="email" aria-label="メールアドレス" value={newsletterEmail} onChange={(e) => setNewsletterEmail(e.target.value)} placeholder="メールアドレスを入力" required style={{ flex: '1', minWidth: '250px', padding: '16px 24px', borderRadius: '50px', border: 'none', fontSize: '1rem', outline: 'none' }} />
-            <button type="submit" style={{ backgroundColor: 'var(--spice)', color: 'white', border: 'none', padding: '16px 36px', borderRadius: '50px', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', transition: 'all 0.3s', whiteSpace: 'nowrap', boxShadow: '0 4px 15px rgba(181, 69, 27, 0.4)' }}>
-              登録する
-            </button>
-          </form>
-        </div>
-      </div>
     </main>
   );
 }
