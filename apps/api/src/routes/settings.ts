@@ -60,6 +60,10 @@ const settingsSchema = z.object({
   aboutStoryPillar2DescJa: text(LONG_TEXT),
   aboutStoryPillar3TitleJa: text(),
   aboutStoryPillar3DescJa: text(LONG_TEXT),
+  aboutStoryPillar4TitleJa: text(),
+  aboutStoryPillar4DescJa: text(LONG_TEXT),
+  aboutStoryPillar5TitleJa: text(),
+  aboutStoryPillar5DescJa: text(LONG_TEXT),
   aboutSpiceLabelJa: text(),
   aboutSpiceTitleJa: text(),
   aboutSpiceDescJa: text(LONG_TEXT),
@@ -181,6 +185,10 @@ const EXT_KEYS = [
   'aboutStoryPillar2DescJa',
   'aboutStoryPillar3TitleJa',
   'aboutStoryPillar3DescJa',
+  'aboutStoryPillar4TitleJa',
+  'aboutStoryPillar4DescJa',
+  'aboutStoryPillar5TitleJa',
+  'aboutStoryPillar5DescJa',
 ] as const;
 
 router.get('/', publicCache, async (_req, res) => {

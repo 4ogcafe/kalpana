@@ -2001,6 +2001,8 @@ if ($method === 'PUT' && ($subPath === '/settings' || $subPath === '/settings/')
         'aboutStoryOriginTextJa', 'aboutStoryBadgeSubJa', 'aboutStoryBadgeTitleJa',
         'aboutStoryPillar1TitleJa', 'aboutStoryPillar1DescJa', 'aboutStoryPillar2TitleJa',
         'aboutStoryPillar2DescJa', 'aboutStoryPillar3TitleJa', 'aboutStoryPillar3DescJa',
+        'aboutStoryPillar4TitleJa', 'aboutStoryPillar4DescJa', 'aboutStoryPillar5TitleJa',
+        'aboutStoryPillar5DescJa',
     ];
     $hasExt = false;
     $extData = [];

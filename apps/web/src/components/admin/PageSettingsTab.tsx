@@ -51,6 +51,10 @@ interface Settings {
   aboutStoryPillar2DescJa?: string;
   aboutStoryPillar3TitleJa?: string;
   aboutStoryPillar3DescJa?: string;
+  aboutStoryPillar4TitleJa?: string;
+  aboutStoryPillar4DescJa?: string;
+  aboutStoryPillar5TitleJa?: string;
+  aboutStoryPillar5DescJa?: string;
   aboutSpiceLabelJa?: string;
   aboutSpiceTitleJa?: string;
   aboutSpiceDescJa?: string;
@@ -80,6 +84,10 @@ export const DEFAULT_ABOUT_CONTENT: Record<string, string> = {
   aboutStoryPillar2DescJa: 'インド各地より厳選したスパイスを毎朝調合。香り・辛み・薬効の黄金バランスを追求しています。',
   aboutStoryPillar3TitleJa: '日本の皆さまの味覚に寄り添う心',
   aboutStoryPillar3DescJa: '辛さはお子様用甘口〜激辛まで自由に調節。ベジタリアンやアレルギーにも丁寧に対応いたします。',
+  aboutStoryPillar4TitleJa: '本場インドで腕を磨いた熟練シェフ',
+  aboutStoryPillar4DescJa: '長年の経験を積んだプロのシェフが、伝統の技法で一皿一皿心を込めて手作りします。',
+  aboutStoryPillar5TitleJa: '出来立て・手作りの妥協なき鮮度',
+  aboutStoryPillar5DescJa: '作り置きをせず注文ごとに一鍋ずつ調理。熱々のナンと香り立つ本物のカレーをお届けします。',
   aboutSpiceLabelJa: 'こだわり',
   aboutSpiceTitleJa: '命を吹き込む、<em>スパイス</em>',
   aboutSpiceDescJa: 'カレーの味の決め手となるスパイスは、インドから直接取り寄せた最高品質のものを使用しています。クミン、コリアンダー、ターメリック、カルダモン... それぞれのスパイスが持つ薬効や香りを最大限に引き出すため、独自に配合し、挽きたてを使用しています。',
@@ -435,6 +443,10 @@ function AboutPageTab({ settings, setSettings }: { settings: Settings; setSettin
         aboutStoryPillar2DescJa: settings.aboutStoryPillar2DescJa,
         aboutStoryPillar3TitleJa: settings.aboutStoryPillar3TitleJa,
         aboutStoryPillar3DescJa: settings.aboutStoryPillar3DescJa,
+        aboutStoryPillar4TitleJa: settings.aboutStoryPillar4TitleJa,
+        aboutStoryPillar4DescJa: settings.aboutStoryPillar4DescJa,
+        aboutStoryPillar5TitleJa: settings.aboutStoryPillar5TitleJa,
+        aboutStoryPillar5DescJa: settings.aboutStoryPillar5DescJa,
         aboutSpiceLabelJa: settings.aboutSpiceLabelJa,
         aboutSpiceTitleJa: settings.aboutSpiceTitleJa,
         aboutSpiceDescJa: settings.aboutSpiceDescJa,
@@ -462,7 +474,7 @@ function AboutPageTab({ settings, setSettings }: { settings: Settings; setSettin
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
         <div>
           <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: '0 0 0.25rem 0', color: '#111827' }}>About ページ設定（私たちについて）</h2>
-          <p style={{ margin: 0, color: '#6b7280', fontSize: '0.85rem' }}>ブランドストーリー、店名の由来、3つのこだわり、スパイス、シェフ紹介などすべての日本語コンテンツを動的に管理できます。</p>
+          <p style={{ margin: 0, color: '#6b7280', fontSize: '0.85rem' }}>ブランドストーリー、店名の由来、5つのこだわり、スパイス、シェフ紹介などすべての日本語コンテンツを動的に管理できます。</p>
         </div>
         <button
           type="button"
@@ -551,9 +563,9 @@ function AboutPageTab({ settings, setSettings }: { settings: Settings; setSettin
           <textarea style={{ ...inp, height: 140, resize: 'vertical', fontFamily: 'inherit' }} value={settings.aboutStoryJa ?? ''} onChange={set('aboutStoryJa')} placeholder="レストランの歴史やミッションについて..." />
         </label>
 
-        {/* 3つのこだわり・特徴（Story Pillars） */}
+        {/* 5つのこだわり・特徴（Story Pillars） */}
         <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px dashed #e5e7eb' }}>
-          <h4 style={{ margin: '0 0 0.75rem', fontSize: '1rem', color: '#111827', fontWeight: 700 }}>こだわり・特徴 3本柱（Story Pillars）</h4>
+          <h4 style={{ margin: '0 0 0.75rem', fontSize: '1rem', color: '#111827', fontWeight: 700 }}>こだわり・特徴 5本柱（Story Pillars）</h4>
           
           <div style={{ display: 'grid', gap: '0.75rem' }}>
             <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '8px', padding: '0.85rem' }}>
@@ -577,6 +589,22 @@ function AboutPageTab({ settings, setSettings }: { settings: Settings; setSettin
               <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) 2fr', gap: '0.75rem' }}>
                 <input style={inp} type="text" value={settings.aboutStoryPillar3TitleJa ?? ''} onChange={set('aboutStoryPillar3TitleJa')} placeholder="日本の皆さまの味覚に寄り添う心" />
                 <input style={inp} type="text" value={settings.aboutStoryPillar3DescJa ?? ''} onChange={set('aboutStoryPillar3DescJa')} placeholder="辛さはお子様用甘口〜激辛まで自由に調節..." />
+              </div>
+            </div>
+
+            <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '8px', padding: '0.85rem' }}>
+              <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#ea580c', marginBottom: '0.4rem' }}>こだわり 4</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) 2fr', gap: '0.75rem' }}>
+                <input style={inp} type="text" value={settings.aboutStoryPillar4TitleJa ?? ''} onChange={set('aboutStoryPillar4TitleJa')} placeholder="本場インドで腕を磨いた熟練シェフ" />
+                <input style={inp} type="text" value={settings.aboutStoryPillar4DescJa ?? ''} onChange={set('aboutStoryPillar4DescJa')} placeholder="長年の経験を積んだプロのシェフが、伝統の技法で一皿一皿心を込めて手作りします..." />
+              </div>
+            </div>
+
+            <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '8px', padding: '0.85rem' }}>
+              <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#ea580c', marginBottom: '0.4rem' }}>こだわり 5</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) 2fr', gap: '0.75rem' }}>
+                <input style={inp} type="text" value={settings.aboutStoryPillar5TitleJa ?? ''} onChange={set('aboutStoryPillar5TitleJa')} placeholder="出来立て・手作りの妥協なき鮮度" />
+                <input style={inp} type="text" value={settings.aboutStoryPillar5DescJa ?? ''} onChange={set('aboutStoryPillar5DescJa')} placeholder="作り置きをせず注文ごとに一鍋ずつ調理。熱々のナンと香り立つ本物のカレーをお届けします..." />
               </div>
             </div>
           </div>

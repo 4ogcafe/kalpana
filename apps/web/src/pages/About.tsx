@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Sparkles, Flame, Heart, Quote } from 'lucide-react';
+import { Sparkles, Flame, Heart, ChefHat, Utensils, Quote } from 'lucide-react';
 import { assetUrl, getPublic } from '../lib/api';
 import EmphasisText from '../components/EmphasisText';
 
@@ -281,7 +281,7 @@ export default function About() {
                 ))}
               </div>
 
-              {/* 3 Core Quality Pillars */}
+              {/* 5 Core Quality Pillars */}
               <div style={{ display: 'grid', gap: '12px', marginTop: '24px' }}>
                 <StoryPillar
                   icon={Flame}
@@ -297,6 +297,16 @@ export default function About() {
                   icon={Heart}
                   title={settings.aboutStoryPillar3TitleJa || '日本の皆さまの味覚に寄り添う心'}
                   desc={settings.aboutStoryPillar3DescJa || '辛さはお子様用甘口〜激辛まで自由に調節。ベジタリアンやアレルギーにも丁寧に対応いたします。'}
+                />
+                <StoryPillar
+                  icon={ChefHat}
+                  title={settings.aboutStoryPillar4TitleJa || '本場インドで腕を磨いた熟練シェフ'}
+                  desc={settings.aboutStoryPillar4DescJa || '長年の経験を積んだプロのシェフが、伝統の技法で一皿一皿心を込めて手作りします。'}
+                />
+                <StoryPillar
+                  icon={Utensils}
+                  title={settings.aboutStoryPillar5TitleJa || '出来立て・手作りの妥協なき鮮度'}
+                  desc={settings.aboutStoryPillar5DescJa || '作り置きをせず注文ごとに一鍋ずつ調理。熱々のナンと香り立つ本物のカレーをお届けします。'}
                 />
               </div>
             </div>
