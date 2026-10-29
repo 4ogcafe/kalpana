@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { assetUrl, getPublic } from '../lib/api';
 import { useCart } from '../lib/cart-context';
@@ -229,6 +229,43 @@ export default function Menu() {
 
   const closeLightbox = () => setSelectedIndex(null);
 
+  // Swipe left/right on the popup card (touch devices) to move to the next/previous item.
+  const swipeStart = useRef<{ x: number; y: number; horizontal: boolean | null } | null>(null);
+  const [swipeDx, setSwipeDx] = useState(0);
+  const SWIPE_THRESHOLD = 60;
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length !== 1) return;
+    swipeStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, horizontal: null };
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const start = swipeStart.current;
+    if (!start) return;
+    const dx = e.touches[0].clientX - start.x;
+    const dy = e.touches[0].clientY - start.y;
+    // Decide the gesture direction once, so vertical scrolling inside the card still works.
+    if (start.horizontal === null && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
+      start.horizontal = Math.abs(dx) > Math.abs(dy);
+    }
+    if (start.horizontal) setSwipeDx(dx);
+  };
+
+  const handleTouchEnd = () => {
+    const start = swipeStart.current;
+    swipeStart.current = null;
+    if (start?.horizontal && selectedIndex !== null && flatItems.length > 1) {
+      if (swipeDx <= -SWIPE_THRESHOLD) {
+        setSelectedIndex((selectedIndex + 1) % flatItems.length);
+        setShareOpen(false);
+      } else if (swipeDx >= SWIPE_THRESHOLD) {
+        setSelectedIndex((selectedIndex - 1 + flatItems.length) % flatItems.length);
+        setShareOpen(false);
+      }
+    }
+    setSwipeDx(0);
+  };
+
   const handleAfterAdd = (item: OrderableItem) => {
     const panelItem = flatItems.find(i => i.id === item.id);
     if (panelItem) setRelatedTrigger(panelItem as PanelItem);
@@ -458,7 +495,15 @@ export default function Menu() {
           
           <button onClick={handlePrev} aria-label="前の商品" style={{ position: 'absolute', left: '20px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontSize: '2rem', cursor: 'pointer', padding: '15px 20px', borderRadius: '50%' }}>❮</button>
           
-          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: 'white', borderRadius: '12px', overflowX: 'hidden', overflowY: 'auto', display: 'flex', flexDirection: 'column', maxWidth: '600px', width: '100%', maxHeight: '100%' }}>
+          <div
+            key={selectedIndex}
+            onClick={(e) => e.stopPropagation()}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onTouchCancel={handleTouchEnd}
+            style={{ backgroundColor: 'white', borderRadius: '12px', overflowX: 'hidden', overflowY: 'auto', display: 'flex', flexDirection: 'column', maxWidth: '600px', width: '100%', maxHeight: '100%', touchAction: 'pan-y', transform: `translateX(${swipeDx}px) rotate(${swipeDx / 40}deg)`, opacity: 1 - Math.min(Math.abs(swipeDx) / 600, 0.4), transition: swipeDx === 0 ? 'transform 0.25s ease, opacity 0.25s ease' : 'none' }}
+          >
             {/* Shorter photo on small screens so the order buttons stay in view; the panel scrolls if needed. */}
             <div style={{ width: '100%', height: 'min(350px, 38vh)', flexShrink: 0, backgroundColor: '#f9f6f0', padding: '0', position: 'relative' }}>
               <img src={flatItems[selectedIndex].img} alt={flatItems[selectedIndex].name} onError={handleMenuImgError} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
