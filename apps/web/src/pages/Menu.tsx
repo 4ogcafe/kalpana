@@ -27,7 +27,22 @@ function getSpiceLabel(level: number): string {
   return SPICE_LABELS[level] || `辛さ Lv.${level}`;
 }
 
-const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1589302168068-964664d93dc0?auto=format&fit=crop&w=800&q=80';
+const DEFAULT_IMAGE = '/bg-hero-img.webp';
+
+function handleMenuImgError(e: React.SyntheticEvent<HTMLImageElement>) {
+  const img = e.currentTarget;
+  const step = img.dataset.retryStep || '0';
+  if (step === '0') {
+    img.dataset.retryStep = '1';
+    const base = img.src.split('?')[0];
+    setTimeout(() => {
+      img.src = `${base}?retry=${Date.now()}`;
+    }, 300);
+  } else if (step === '1') {
+    img.dataset.retryStep = '2';
+    img.src = DEFAULT_IMAGE;
+  }
+}
 
 export default function Menu() {
   const { type } = useParams();
@@ -326,7 +341,7 @@ export default function Menu() {
                       return (
                         <article key={item.id} className={`menu-card${item.soldOut ? ' is-sold-out' : ''}`} onClick={() => setSelectedIndex(globalIndex)}>
                           <div className="menu-card-media">
-                            <img src={item.img} alt={item.name} loading="lazy" decoding="async" width={400} height={300} />
+                            <img src={item.img} alt={item.name} loading="lazy" decoding="async" width={400} height={300} onError={handleMenuImgError} />
                             <div className="menu-card-badges">
                               {item.soldOut && <span className="menu-badge menu-badge-dark">売り切れ</span>}
                               {!item.soldOut && item.recommended && <span className="menu-badge menu-badge-gold">おすすめ</span>}
@@ -433,7 +448,7 @@ export default function Menu() {
           <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: 'white', borderRadius: '12px', overflowX: 'hidden', overflowY: 'auto', display: 'flex', flexDirection: 'column', maxWidth: '600px', width: '100%', maxHeight: '90vh' }}>
             {/* Shorter photo on small screens so the order buttons stay in view; the panel scrolls if needed. */}
             <div style={{ width: '100%', height: 'min(350px, 38vh)', flexShrink: 0, backgroundColor: '#f9f6f0', padding: '0', position: 'relative' }}>
-              <img src={flatItems[selectedIndex].img} alt={flatItems[selectedIndex].name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img src={flatItems[selectedIndex].img} alt={flatItems[selectedIndex].name} onError={handleMenuImgError} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               {/* Share + Like buttons */}
               <div style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                 {/* Share button with dropdown */}

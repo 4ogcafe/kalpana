@@ -7,7 +7,9 @@ import { loadReviews } from '../lib/reviews';
 import EmphasisText from '../components/EmphasisText';
 
 const DEFAULT_HERO_IMAGES = [
-  "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1920&q=80",
+  "/uploads/1792484379649-8d372e4a42c3ddf9.jpg",
+  "/uploads/1792268554871-2f79adbc5cc35dfe.webp",
+  "/bg-hero-img.webp",
 ];
 
 const MAP_EMBED_PREFIX = 'https://www.google.com/maps/embed';
@@ -59,7 +61,8 @@ export default function Home() {
       .catch(console.error);
   }, []);
 
-  const heroImages = carousels.length > 0 ? carousels.map(c => assetUrl(c.imageUrl)) : DEFAULT_HERO_IMAGES;
+  const validCarouselImages = carousels.map(c => assetUrl(c.imageUrl)).filter((u): u is string => Boolean(u));
+  const heroImages = validCarouselImages.length > 0 ? validCarouselImages : DEFAULT_HERO_IMAGES;
   const recommendedItems = menuItems.filter(item => item.isRecommended).slice(0, 4);
   const regularItems = menuItems.filter(item => !item.isRecommended);
 
@@ -98,6 +101,13 @@ export default function Home() {
             alt=""
             fetchPriority={index === 0 ? 'high' : 'low'}
             decoding="async" 
+            onError={(e) => {
+              const target = e.currentTarget;
+              if (!target.dataset.fallback) {
+                target.dataset.fallback = '1';
+                target.src = '/bg-hero-img.webp';
+              }
+            }}
             className="slide-bg-img" 
             style={{ 
               opacity: currentSlide === index ? 0.6 : 0, 
@@ -254,7 +264,22 @@ export default function Home() {
               {regularItems.length > 0 ? [...regularItems, ...regularItems, ...regularItems].map((item, idx) => (
                 <div key={`${item.id}-${idx}`} style={{ minWidth: '280px', flex: '0 0 280px', backgroundColor: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column' }}>
                   <div style={{ height: '220px', width: '100%', backgroundColor: '#f9f6f0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-                    <img src={assetUrl(item.imageUrl) || "https://images.unsplash.com/photo-1589302168068-964664d93dc0?auto=format&fit=crop&w=400&q=80"} alt={item.nameJa || item.nameEn} loading="lazy" decoding="async" width={240} height={180} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }} />
+                    <img
+                      src={assetUrl(item.imageUrl) || "/bg-hero-img.webp"}
+                      alt={item.nameJa || item.nameEn}
+                      loading="lazy"
+                      decoding="async"
+                      width={240}
+                      height={180}
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        if (!target.dataset.fallback) {
+                          target.dataset.fallback = '1';
+                          target.src = '/bg-hero-img.webp';
+                        }
+                      }}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }}
+                    />
                   </div>
                   <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', flex: '1' }}>
                     <h3 style={{ fontSize: '1.2rem', color: 'var(--dark-bark)', margin: '0 0 10px 0' }}>{item.nameJa || item.nameEn}</h3>
@@ -293,7 +318,22 @@ export default function Home() {
               {recommendedItems.map(item => (
                 <div key={item.id} style={{ backgroundColor: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column' }}>
                   <div style={{ height: '220px', width: '100%', backgroundColor: '#f9f6f0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-                    <img src={assetUrl(item.imageUrl) || "https://images.unsplash.com/photo-1551224650-9c25e628120e?auto=format&fit=crop&w=400&q=80"} alt={item.nameJa || item.nameEn} loading="lazy" decoding="async" width={240} height={180} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }} />
+                    <img
+                      src={assetUrl(item.imageUrl) || "/bg-hero-img.webp"}
+                      alt={item.nameJa || item.nameEn}
+                      loading="lazy"
+                      decoding="async"
+                      width={240}
+                      height={180}
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        if (!target.dataset.fallback) {
+                          target.dataset.fallback = '1';
+                          target.src = '/bg-hero-img.webp';
+                        }
+                      }}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }}
+                    />
                   </div>
                   <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', flex: '1' }}>
                     <h3 style={{ fontSize: '1.2rem', color: 'var(--dark-bark)', margin: '0 0 10px 0' }}>{item.nameJa || item.nameEn}</h3>

@@ -928,6 +928,122 @@ function runDatabaseMigrations(PDO $pdo): array {
         $pdo->exec("UPDATE `Settings` SET `addressEn` = REPLACE(`addressEn`, '360-0831', '360-0023') WHERE `addressEn` LIKE '%360-0831%'");
         $pdo->exec("UPDATE `AppSecret` SET `publicKey` = REPLACE(`publicKey`, '360-0831', '360-0023') WHERE `id` = 'PAGE_SETTINGS_EXT' AND `publicKey` LIKE '%360-0831%'");
         $pdo->exec("UPDATE `BlogPost` SET `content` = REPLACE(`content`, '360-0831', '360-0023') WHERE `content` LIKE '%360-0831%'");
+
+        // Restore CarouselSlide images if empty or broken
+        $pdo->exec("UPDATE `CarouselSlide` SET `imageUrl` = '/uploads/1792484379649-8d372e4a42c3ddf9.jpg' WHERE `id` = 'a94a4c65-902a-4431-813d-ac205b285cac' AND (`imageUrl` IS NULL OR `imageUrl` = '')");
+        $pdo->exec("UPDATE `CarouselSlide` SET `imageUrl` = '/uploads/1792268554871-2f79adbc5cc35dfe.webp' WHERE `id` = '3d689f0f-63c2-4f7d-9d78-30defb0408b9' AND (`imageUrl` IS NULL OR `imageUrl` = '')");
+        $pdo->exec("UPDATE `CarouselSlide` SET `imageUrl` = '/uploads/1792268012355-415729a8b06aa65e.webp' WHERE `id` = '5bf7701a-6ea0-4e0f-92a1-90dc84bb19fd' AND (`imageUrl` IS NULL OR `imageUrl` = '')");
+        $pdo->exec("UPDATE `CarouselSlide` SET `imageUrl` = '/uploads/1792268627977-04a9cb4d784139f9.jpg' WHERE `id` = '89c95ac1-a093-47a5-98e4-e8514ee55bc5' AND (`imageUrl` IS NULL OR `imageUrl` = '')");
+        $pdo->exec("UPDATE `CarouselSlide` SET `imageUrl` = '/uploads/1792484379649-8d372e4a42c3ddf9.jpg' WHERE `placement` = 'HOME' AND (`imageUrl` IS NULL OR `imageUrl` = '') AND `sortOrder` = 0");
+        $pdo->exec("UPDATE `CarouselSlide` SET `imageUrl` = '/uploads/1792268554871-2f79adbc5cc35dfe.webp' WHERE `placement` = 'HOME' AND (`imageUrl` IS NULL OR `imageUrl` = '')");
+        $pdo->exec("UPDATE `CarouselSlide` SET `imageUrl` = '/uploads/1792268012355-415729a8b06aa65e.webp' WHERE `placement` = 'CONTACT' AND (`imageUrl` IS NULL OR `imageUrl` = '')");
+
+        // Restore broken Settings images
+        $pdo->exec("UPDATE `Settings` SET `contactHeroImage` = '/uploads/1792268800986-e39305dca03d0356.jpg' WHERE `contactHeroImage` = '/uploads/1792892694-9c0fbb49d9a78676.jpg' OR `contactHeroImage` IS NULL OR `contactHeroImage` = ''");
+        $pdo->exec("UPDATE `Settings` SET `footerLogo` = '/site-logo-01.webp' WHERE `footerLogo` = '/uploads/1793190780-e9bb908ae77c6b3d.webp'");
+
+        // Restore 95 broken MenuItem imageUrls to valid WebP assets
+        $menuImageFixes = [
+            "052413c2-2f9c-4780-88d0-ff223f0c96a0" => "/uploads/1792845269-3c46d03a68dd8916.webp",
+            "05ae7b29-8cf7-4e02-af76-cd0598378eb7" => "/uploads/1792845269-3c46d03a68dd8916.webp",
+            "070aa5ae-8533-458d-90c2-af62e70d44b3" => "/uploads/1793237596-297bab27567b3a55.webp",
+            "1902b5cf-6e69-4f27-a593-a893cae86be3" => "/uploads/1792845269-3c46d03a68dd8916.webp",
+            "1cbb28e2-c246-4ffe-889c-514a76025469" => "/uploads/1793237851-43b9b9170364752d.webp",
+            "211e1e25-d8ec-452d-b9fb-812f2c186f16" => "/uploads/1793235213-85e2b5d1a1529461.webp",
+            "2197b6ac-ffaa-4156-9c03-60914479ffde" => "/uploads/1793237492-a0c2afe0bb832195.webp",
+            "28af08da-3e67-4ec1-b257-46af8ce714b1" => "/uploads/1793237450-d81cc4a6e474160d.webp",
+            "2a0443ec-48d2-4bcc-89eb-dde477ecc919" => "/uploads/1793237043-14ed85c308a6d976.webp",
+            "2ae9affd-66fe-486e-a727-c68471968de3" => "/uploads/1793237737-20e7a2a8137631c0.webp",
+            "2f5aeb9b-d3a8-41b8-aa9d-09fa1cd6d868" => "/uploads/1792845269-3c46d03a68dd8916.webp",
+            "2fc8e808-4f96-4723-aa77-3a3c5cfd01f4" => "/uploads/1793237909-e9299426f5e7f773.webp",
+            "31fd9933-68df-4e43-a18f-68ed37f6b1d8" => "/uploads/1792918636-233117d761e090a4.webp",
+            "338dd417-07f4-4023-8a5a-5d2db5275dcc" => "/uploads/1793237825-3479bcdf05427ff1.webp",
+            "353a2a50-3d27-40aa-b933-f3668eb71b2f" => "/uploads/1793237233-049447aa40fca3d1.webp",
+            "35cc2a19-50a8-40c1-a6ec-aeda73b07c1d" => "/uploads/1793237210-30e1f5a5387be0a1.webp",
+            "39b2bf06-a0a1-46f5-8e85-5a065452b0b4" => "/uploads/1793237381-417c09cb6545a943.webp",
+            "3c88f978-b398-4c11-b42e-ecee7985c74d" => "/uploads/1793235525-e87ec600662cf95c.webp",
+            "3cf99b5a-01b5-46e8-bdf8-699abe2e1393" => "/uploads/1792845269-3c46d03a68dd8916.webp",
+            "3e5ad33f-1143-4ef5-9143-7f0b0d99d04b" => "/uploads/1793237127-a6b097e1ddd52035.webp",
+            "3ef3be0b-a642-4769-aaea-d53595f3b872" => "/uploads/1792918813-e46e9a6319a8c0fb.webp",
+            "4094686f-15cb-466c-a10d-19dc52c2db08" => "/uploads/1793235447-cca6961bdbe44394.webp",
+            "40b10731-78f3-4c5f-80c2-add3e455faf8" => "/uploads/1793237927-f69e4acfa7092906.webp",
+            "44474907-e466-4032-aa5a-473b5dc23536" => "/uploads/1792845269-3c46d03a68dd8916.webp",
+            "44cac72c-a775-4d4a-8971-6904fe46c30f" => "/uploads/1793237372-3fc7b384c566a9b7.webp",
+            "45683d6d-1296-40a1-8e0a-2ac6ffb52ccf" => "/uploads/1793237512-de433eafbc870b09.webp",
+            "4ad7c1a3-ba10-428b-a079-e3c9b754fe47" => "/uploads/1793238066-a77b18f531260574.webp",
+            "4bc6737e-cb40-47a7-ae13-23bc7b3d8a0a" => "/uploads/1793236902-26d6862c021b8b74.webp",
+            "4ddeeecb-11e4-49a7-934c-006afb351320" => "/uploads/1793235456-2962979c7dfa5d7a.webp",
+            "51d3be82-bf0e-46f0-a6d3-ca425a0c6273" => "/uploads/1793236915-0ef596331d7217e4.webp",
+            "522b35fd-2d7c-4c69-887d-361e8db3dd6c" => "/uploads/1793235612-9a9465a6e71eac4e.webp",
+            "581eeaf4-6187-4fb7-a735-546194c99077" => "/uploads/1793237685-0d94b86e5739ae5a.webp",
+            "5844b11f-f990-47f1-b2ca-80e66ca07646" => "/uploads/1793237423-497ba49c85c5cfd9.webp",
+            "59fee578-7bea-4067-9628-cf4707a4c188" => "/uploads/1793237608-d5968486f7c0387c.webp",
+            "5f1d27c4-0c02-4248-bda8-460414804da4" => "/uploads/1792918564-7be3a36883ad1291.webp",
+            "5f90620a-c2ea-4994-8072-163681fbd5fc" => "/uploads/1792917352-a8ade17326901c81.webp",
+            "6234e4fe-1d38-437f-bcbc-1887189b0a4a" => "/uploads/1793237194-3dd903f4f0a14089.webp",
+            "64b6717a-46f1-4fdd-8420-26b19db297fa" => "/uploads/1793237479-99b69d2455749b56.webp",
+            "65a83c02-4b8a-4570-b616-3dc56e2291d0" => "/uploads/1793237111-de885ef9062d14e5.webp",
+            "67cd08a2-1349-4bb3-b12d-2a4f15861753" => "/uploads/1793234898-7c69f28faf3b318f.webp",
+            "6d435665-c406-4ef0-9962-4c762e6502f2" => "/uploads/1793235169-18d888af1f82b668.webp",
+            "6fd322aa-ecb7-4b76-8a45-4f19f4246ee9" => "/uploads/1793237372-3fc7b384c566a9b7.webp",
+            "6fd891b8-187c-4f46-8e62-a236f7e9e997" => "/uploads/1793235593-b65b524965e4f60f.webp",
+            "70ebb794-bd7e-4274-9d6e-93a32a12d723" => "/uploads/1793237706-f41a846ff0795a74.webp",
+            "7748d4c6-7bb7-4538-8cf4-188db0484deb" => "/uploads/1793235423-59b15d5cb3122c5b.webp",
+            "780f5b45-f438-4cc7-935b-80f5af23adca" => "/uploads/1793234841-22464054e63ce25f.webp",
+            "791706cc-56d1-4649-82db-4d167d6a9a70" => "/uploads/1793236882-1014f8688e65874d.webp",
+            "82db2d27-c326-4315-8890-b14b69fc8f52" => "/uploads/1792918892-801f85b48020b998.webp",
+            "875102dd-8c10-485e-81ce-44a3a4b79827" => "/uploads/1793236938-d78f99284b5ede97.webp",
+            "8e7de970-498e-46c8-bcc9-2f05ada0b1d8" => "/uploads/1792918617-64e587a5f0dd9a3f.webp",
+            "8f77646e-3460-4258-bbc1-2ac0b340a549" => "/uploads/1793237940-ff85a868d9fee8b1.webp",
+            "8fb6fd2a-b6e2-4a1a-bece-422ba91c3e3e" => "/uploads/1793237838-8b3f6e0223fbe828.webp",
+            "9224165b-f5e9-48f3-a3a4-06e7d5fa3763" => "/uploads/1793237434-bdc57294e206b43c.webp",
+            "9338d077-466d-416e-a704-c609ce702971" => "/uploads/1792845269-3c46d03a68dd8916.webp",
+            "94efcd49-34ad-48c2-a815-acb66ea5a36d" => "/uploads/1793237323-c4a13970a8fcc27d.webp",
+            "96d2e259-4319-4874-bdca-9a1ee0efa22b" => "/uploads/1793237784-9df8fe89db13b43a.webp",
+            "97433144-012a-480e-b5d8-ad0e31c3f115" => "/uploads/1793237661-5dd5cdabd3459789.webp",
+            "9d34f3e6-2121-418d-9251-d23d44a23af5" => "/uploads/1793236853-34a8797844feacef.webp",
+            "9d48a7aa-9e4a-46d8-9119-cf4d4955d589" => "/uploads/1793236989-8c7fa62f10de21ed.webp",
+            "a2119fbc-c865-41fc-84de-680d3ddff4ca" => "/uploads/1793237410-a3ea179b8f1e5a4b.webp",
+            "a5201517-8bb4-407f-ae0b-edd559c2bdad" => "/uploads/1793237527-f3bba274a52e5457.webp",
+            "a6973f16-fa66-4d63-b88d-e6fc603aa573" => "/uploads/1793236956-28cd006450b385a8.webp",
+            "a6bfcb13-0291-4313-b277-c937e65137ea" => "/uploads/1793235169-18d888af1f82b668.webp",
+            "a6f06b3b-ccfb-400d-9f56-63ad08465368" => "/uploads/1793234862-18246fa3e1e375da.webp",
+            "a71e1c86-3b64-4f28-be53-688dff9d9047" => "/uploads/1793235205-bd02e307eb24c66f.webp",
+            "acbc7646-77fb-4f72-8a6b-6e301ae588fa" => "/uploads/1793234879-92f1e21a96b7170d.webp",
+            "ada8307d-9b3d-4406-b420-f5ee234dbf5b" => "/uploads/1793237576-7c50b82e83a235fd.webp",
+            "ae2c9388-1c1d-4da1-a3c1-14ce31454543" => "/uploads/1792917381-56be5fe7920e79ad.webp",
+            "b37f5821-aa68-4710-a59f-32884997dd8f" => "/uploads/1793235576-b8a3fe1ae0ea473b.webp",
+            "b61c2077-4505-49d6-85ab-38f5e8d405f1" => "/uploads/1793237646-2998ff1f3a8d2508.webp",
+            "b68d2ec8-b24f-4a94-ba73-c82cc6864b7b" => "/uploads/1793237752-c3304132bcbdfec1.webp",
+            "baeac1bd-235f-486b-83fd-c33ddbca2eb8" => "/uploads/1792918892-801f85b48020b998.webp",
+            "bbfe1a07-a661-4654-9591-9e2edf664b7f" => "/uploads/1793236928-f81df75978df2558.webp",
+            "c1c1d383-d241-43d2-8ef7-9b30e2c570d3" => "/uploads/1793235466-906d13652fef320e.webp",
+            "c1d45d95-6d7d-4c61-8eb8-7f0c00aa7293" => "/uploads/1793235249-88d1aca1ed89e40d.webp",
+            "c58fc95f-1575-44f4-a639-ec697f06c68a" => "/uploads/1793237150-e9a7ad16f1df8b5a.webp",
+            "c6fa921b-f2c5-4e18-932f-e4ead525871e" => "/uploads/1793236865-01de04ff95234b21.webp",
+            "c74c235f-6a06-4234-a09b-d4ec708f2003" => "/uploads/1793237168-0b29a098a1161861.webp",
+            "cb8192a5-c779-43a3-a739-f59d9682c20f" => "/uploads/1793237812-0740820a56483889.webp",
+            "d2ac7955-71b5-4c26-ba50-109dd15a0017" => "/uploads/1793236970-715944145f175e5e.webp",
+            "d8322ee0-680e-4d04-85a8-6dbe3ffb2980" => "/uploads/1793237909-e9299426f5e7f773.webp",
+            "d899dd3c-cf20-4270-8d98-f716319a5b2d" => "/uploads/1793237909-e9299426f5e7f773.webp",
+            "dd9bbe64-a894-4f7a-9611-27e7b25c1f6c" => "/uploads/1793237718-6ecab4d56fbaa296.webp",
+            "e1d5fde9-2c98-4e51-b8d5-9e72c3d9c166" => "/uploads/1793237246-47f1d2d5065e3514.webp",
+            "e2cd0f34-b07e-4e49-8ea9-ed006298f3df" => "/uploads/1793237631-5d81ffe9d925a489.webp",
+            "e3f367ad-9c92-47ea-aba6-f97033af8ff6" => "/uploads/1793237019-587d4f0db032261b.webp",
+            "e4fa41df-5ec0-432f-bc26-9726cc582ff7" => "/uploads/1793237137-8b8364da6aa602b4.webp",
+            "e53ce228-5619-4564-b8e7-bd0a5437dbcf" => "/uploads/1793235491-e57d05d5d8931c07.webp",
+            "e759ccf4-9020-4d43-a34c-36d7d7df3d94" => "/uploads/1793235234-23a1000a47fa221a.webp",
+            "e8ff64d0-e27f-4260-ac49-0272409430a1" => "/uploads/1793237799-15d095e314ea57f7.webp",
+            "f0799784-0a4f-4e71-a436-40212def2a97" => "/uploads/1793235433-e52c343e967fb5da.webp",
+            "f838953f-58c9-49da-8713-cd4873f185e5" => "/uploads/1793237951-b06413a0e1a0915e.webp",
+            "f9f6c5fc-6ffa-4ac5-b944-391b75d3b242" => "/uploads/1793237967-d25d35b3cbe0b0ee.webp",
+            "fb6c2a59-6731-494c-b44b-adced3e4d2f2" => "/uploads/1793237767-3393fbe1e88a45a6.webp",
+            "fc6aad05-1878-4692-ad4b-4e6a30306e04" => "/uploads/1793235480-f4a3cf18aff465af.webp",
+        ];
+        $fixStmt = $pdo->prepare("UPDATE `MenuItem` SET `imageUrl` = ? WHERE `id` = ? AND (`imageUrl` IS NULL OR `imageUrl` = '' OR `imageUrl` LIKE '%.jpg')");
+        foreach ($menuImageFixes as $itemId => $newImg) {
+            $fixStmt->execute([$newImg, $itemId]);
+        }
     } catch (Exception $e) {}
 
     return [
@@ -964,6 +1080,50 @@ if (($pos = strpos($path, '/api/v1')) !== false) {
     $subPath = $path;
 }
 if (empty($subPath)) $subPath = '/';
+
+// -------------------------------------------------------------
+// Fallback handler for /uploads/:file (survives Git deploy resets)
+// -------------------------------------------------------------
+if ($method === 'GET' && preg_match('#^/uploads/([a-zA-Z0-9_.-]+)$#', $subPath, $uploadMatches)) {
+    $reqFile = basename($uploadMatches[1]);
+    $primaryPath = dirname(__DIR__) . '/uploads/' . $reqFile;
+    $backupPath = dirname(__DIR__, 2) . '/kalpana-uploads/' . $reqFile;
+
+    $servePath = null;
+    if (is_file($primaryPath)) {
+        $servePath = $primaryPath;
+    } elseif (is_file($backupPath)) {
+        // Restore into public_html/uploads/ so Apache serves future requests directly
+        if (!is_dir(dirname($primaryPath))) {
+            @mkdir(dirname($primaryPath), 0755, true);
+        }
+        @copy($backupPath, $primaryPath);
+        $servePath = $backupPath;
+    }
+
+    if ($servePath && is_file($servePath)) {
+        $hdr = @file_get_contents($servePath, false, null, 0, 16) ?: '';
+        $mime = 'application/octet-stream';
+        if (strlen($hdr) >= 12 && substr($hdr, 0, 4) === 'RIFF' && substr($hdr, 8, 4) === 'WEBP') {
+            $mime = 'image/webp';
+        } elseif (strlen($hdr) >= 3 && substr($hdr, 0, 3) === "\xFF\xD8\xFF") {
+            $mime = 'image/jpeg';
+        } elseif (strlen($hdr) >= 8 && substr($hdr, 0, 8) === "\x89PNG\x0D\x0A\x1A\x0A") {
+            $mime = 'image/png';
+        }
+        header('Content-Type: ' . $mime);
+        header('Cache-Control: public, max-age=31536000, immutable');
+        header('Content-Length: ' . filesize($servePath));
+        readfile($servePath);
+        exit;
+    }
+
+    http_response_code(404);
+    header('Content-Type: text/plain; charset=utf-8');
+    header('Cache-Control: no-store');
+    echo 'Image not found';
+    exit;
+}
 
 // -------------------------------------------------------------
 // Endpoint: GET|POST /migrate (Execute complete DB migrations)
@@ -1278,6 +1438,14 @@ if ($method === 'DELETE' && preg_match('#^/menu/categories/([a-zA-Z0-9_-]+)/?$#'
 // Endpoint: GET /menu/items
 // -------------------------------------------------------------
 if ($method === 'GET' && ($subPath === '/menu/items' || $subPath === '/menu/items/')) {
+    // Self-heal broken legacy .jpg menu item imageUrls if any remain
+    try {
+        $brokenImgCheck = (int)$pdo->query("SELECT COUNT(*) FROM MenuItem WHERE imageUrl LIKE '/uploads/17930%.jpg' OR imageUrl LIKE '/uploads/17931%.jpg'")->fetchColumn();
+        if ($brokenImgCheck > 0) {
+            runDatabaseMigrations($pdo);
+        }
+    } catch (Exception $e) {}
+
     // 1. Fetch items
     $items = [];
     try {
@@ -1824,6 +1992,14 @@ if ($method === 'GET' && ($subPath === '/carousels' || $subPath === '/carousels/
     $showAll = isset($_GET['all']) && $_GET['all'] === 'true';
     $placement = isset($_GET['placement']) && $_GET['placement'] === 'CONTACT' ? 'CONTACT' : 'HOME';
 
+    // Self-heal any CarouselSlide rows with empty imageUrl
+    try {
+        $emptyCheck = (int)$pdo->query("SELECT COUNT(*) FROM CarouselSlide WHERE imageUrl IS NULL OR imageUrl = ''")->fetchColumn();
+        if ($emptyCheck > 0) {
+            runDatabaseMigrations($pdo);
+        }
+    } catch (Exception $e) {}
+
     if ($showAll) {
         $stmt = $pdo->query('SELECT * FROM CarouselSlide ORDER BY sortOrder ASC');
     } else {
@@ -1833,6 +2009,15 @@ if ($method === 'GET' && ($subPath === '/carousels' || $subPath === '/carousels/
     $slides = $stmt->fetchAll();
     $formatted = array_map(function ($s) {
         $s['isActive'] = (bool)$s['isActive'];
+        if (empty($s['imageUrl'])) {
+            if (($s['placement'] ?? 'HOME') === 'CONTACT') {
+                $s['imageUrl'] = '/uploads/1792268012355-415729a8b06aa65e.webp';
+            } elseif ((int)($s['sortOrder'] ?? 0) === 0) {
+                $s['imageUrl'] = '/uploads/1792484379649-8d372e4a42c3ddf9.jpg';
+            } else {
+                $s['imageUrl'] = '/uploads/1792268554871-2f79adbc5cc35dfe.webp';
+            }
+        }
         return $s;
     }, $slides);
     echo json_encode($formatted);
@@ -1981,6 +2166,15 @@ if ($method === 'POST' && ($subPath === '/upload' || $subPath === '/upload/')) {
         http_response_code(500);
         echo json_encode(['error' => ['code' => 'UPLOAD_FAILED', 'message' => 'Failed to save uploaded file']]);
         exit;
+    }
+
+    // Also save a persistent backup copy outside the Git working tree so Git deployments never lose runtime uploads
+    $backupDir = dirname(__DIR__, 2) . '/kalpana-uploads';
+    if (!is_dir($backupDir)) {
+        @mkdir($backupDir, 0755, true);
+    }
+    if (is_dir($backupDir)) {
+        @copy($destination, $backupDir . '/' . $filename);
     }
 
     http_response_code(201);

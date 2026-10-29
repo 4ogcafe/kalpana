@@ -25,6 +25,9 @@ Options -Indexes
   RewriteCond %{DOCUMENT_ROOT}/public_html/$1 -d
   RewriteRule ^(.*)$ public_html/$1 [L]
 
-  # 5. Frontend SPA fallback
+  # 5. Route missing /uploads/* requests to PHP API gateway (persistent backup or 404, never index.html)
+  RewriteRule ^uploads(/.*)?$ public_html/api/index.php [QSA,L]
+
+  # 6. Frontend SPA fallback
   RewriteRule ^ public_html/index.html [L]
 </IfModule>

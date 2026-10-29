@@ -14,10 +14,13 @@ DirectoryIndex index.html index.php
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
 
-  # 3. Route API requests to PHP API gateway
+  # 3. Route missing /uploads/* requests to PHP API gateway (persistent backup or 404, never index.html)
+  RewriteRule ^uploads(/.*)?$ api/index.php [QSA,L]
+
+  # 4. Route API requests to PHP API gateway
   RewriteRule ^api(/.*)?$ api/index.php [QSA,L]
 
-  # 4. Frontend SPA fallback
+  # 5. Frontend SPA fallback
   RewriteRule ^ index.html [L]
 </IfModule>
 

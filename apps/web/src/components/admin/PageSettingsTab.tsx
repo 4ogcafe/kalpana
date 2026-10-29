@@ -848,28 +848,28 @@ function CarouselTab() {
       const DEFAULT_SLIDES = [
         {
           placement: 'HOME' as const,
-          imageUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1920&q=80',
+          imageUrl: '/uploads/1792484379649-8d372e4a42c3ddf9.jpg',
           titleEn: 'Authentic Indian Flavors',
           titleJa: 'インドの香りを、そのままに',
           altEn: 'Authentic Indian restaurant atmosphere with traditional dishes',
         },
         {
           placement: 'HOME' as const,
-          imageUrl: 'https://images.unsplash.com/photo-1589302168068-964664d93dc0?auto=format&fit=crop&w=1920&q=80',
+          imageUrl: '/uploads/1792268554871-2f79adbc5cc35dfe.webp',
           titleEn: 'Freshly Baked Naan & Curries',
           titleJa: '焼きたてナンと本格スパイスカレー',
           altEn: 'Freshly baked tandoori naan and rich curry bowls',
         },
         {
           placement: 'HOME' as const,
-          imageUrl: 'https://images.unsplash.com/photo-1552566626-52f8b828add9?auto=format&fit=crop&w=1920&q=80',
+          imageUrl: '/uploads/1792268627977-04a9cb4d784139f9.jpg',
           titleEn: 'Traditional Charcoal Tandoor',
           titleJa: '炭火粘土窯で焼き上げるタンドール料理',
           altEn: 'Master chef preparing tandoori specialties in traditional clay oven',
         },
         {
           placement: 'CONTACT' as const,
-          imageUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1920&q=80',
+          imageUrl: '/uploads/1792268012355-415729a8b06aa65e.webp',
           titleEn: 'Visit Kalpna in Kumagaya',
           titleJa: '熊谷でお待ちしております',
           altEn: 'Kalpna Indian Cuisine dining hall in Kumagaya',
@@ -931,7 +931,18 @@ function CarouselTab() {
             <div key={slide.id} style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'stretch', overflow: 'hidden', opacity: slide.isActive ? 1 : 0.6 }}>
               <div style={{ width: 140, flexShrink: 0, background: '#f3f4f6' }}>
                 {slide.imageUrl ? (
-                  <img src={assetUrl(slide.imageUrl) || slide.imageUrl} alt={slide.altEn || slide.titleEn || ''} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', minHeight: 88 }} />
+                  <img
+                    src={assetUrl(slide.imageUrl) || slide.imageUrl}
+                    alt={slide.altEn || slide.titleEn || ''}
+                    onError={(e) => {
+                      const img = e.currentTarget;
+                      if (!img.dataset.fallback) {
+                        img.dataset.fallback = '1';
+                        img.src = '/bg-hero-img.webp';
+                      }
+                    }}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', minHeight: 88 }}
+                  />
                 ) : (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 88, color: '#9ca3af' }}>
                     <Image size={28} />
