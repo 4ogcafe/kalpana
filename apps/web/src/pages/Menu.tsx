@@ -440,16 +440,30 @@ export default function Menu() {
 
       {/* Lightbox / Popup */}
       {selectedIndex !== null && (
-        <div onClick={closeLightbox} style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', boxSizing: 'border-box' }}>
+        <div onClick={closeLightbox} style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '64px 20px 20px', boxSizing: 'border-box' }}>
           
-          <button onClick={closeLightbox} aria-label="閉じる" style={{ position: 'absolute', top: '20px', right: '20px', background: 'none', border: 'none', color: 'white', fontSize: '2rem', cursor: 'pointer', padding: '10px' }}>×</button>
+          {/* Kept above the card (zIndex) and in the reserved top padding so it stays visible on mobile. */}
+          <button onClick={closeLightbox} aria-label="閉じる" style={{ position: 'absolute', top: '8px', right: '12px', zIndex: 2, background: 'none', border: 'none', color: 'white', fontSize: '2rem', lineHeight: 1, cursor: 'pointer', padding: '10px' }}>×</button>
           
           <button onClick={handlePrev} aria-label="前の商品" style={{ position: 'absolute', left: '20px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontSize: '2rem', cursor: 'pointer', padding: '15px 20px', borderRadius: '50%' }}>❮</button>
           
-          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: 'white', borderRadius: '12px', overflowX: 'hidden', overflowY: 'auto', display: 'flex', flexDirection: 'column', maxWidth: '600px', width: '100%', maxHeight: '90vh' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: 'white', borderRadius: '12px', overflowX: 'hidden', overflowY: 'auto', display: 'flex', flexDirection: 'column', maxWidth: '600px', width: '100%', maxHeight: '100%' }}>
             {/* Shorter photo on small screens so the order buttons stay in view; the panel scrolls if needed. */}
             <div style={{ width: '100%', height: 'min(350px, 38vh)', flexShrink: 0, backgroundColor: '#f9f6f0', padding: '0', position: 'relative' }}>
               <img src={flatItems[selectedIndex].img} alt={flatItems[selectedIndex].name} onError={handleMenuImgError} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              {/* Cancel / close button */}
+              <button
+                type="button"
+                onClick={closeLightbox}
+                aria-label="閉じる"
+                title="閉じる"
+                style={{ position: 'absolute', top: '12px', left: '12px', width: '44px', height: '44px', borderRadius: '50%', border: 'none', background: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.18)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1a1814' }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
               {/* Share + Like buttons */}
               <div style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                 {/* Share button with dropdown */}
