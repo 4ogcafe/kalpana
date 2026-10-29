@@ -1,33 +1,9 @@
-DirectoryIndex index.html index.php
-
-# Rules use relative paths (no RewriteBase) so they work whether this folder
-# is the web root or is reached through the repo-root .htaccess.
 <IfModule mod_rewrite.c>
   RewriteEngine On
-
-  # 1. Block access to hidden files, config files, env, and source code
-  RewriteRule "(^|/)\.(?!well-known)" - [F,L]
-  RewriteRule "(^|/)(kalpana-config\.php|\.env|\.git|composer\.(json|lock)|package(-lock)?\.json|tsconfig.*\.json)$" - [F,L]
-
-  # 2. Serve real files and directories as-is
-  RewriteCond %{REQUEST_FILENAME} -f [OR]
-  RewriteCond %{REQUEST_FILENAME} -d
-  RewriteRule ^ - [L]
-
-  # 3. Route missing /uploads/* requests to PHP API gateway (persistent backup or 404, never index.html)
-  RewriteRule ^uploads(/.*)?$ api/index.php [QSA,L]
-
-  # 4. Route API requests to PHP API gateway
-  RewriteRule ^api(/.*)?$ api/index.php [QSA,L]
-
-  # 5. Frontend SPA fallback
-  RewriteRule ^ index.html [L]
-</IfModule>
-
-# Security Headers
-<IfModule mod_headers.c>
-  Header always set X-Content-Type-Options "nosniff"
-  Header always set X-Frame-Options "SAMEORIGIN"
-  Header always set X-XSS-Protection "1; mode=block"
-  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  RewriteBase /
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteCond %{REQUEST_FILENAME} !-l
+  RewriteRule . /index.html [L]
 </IfModule>
