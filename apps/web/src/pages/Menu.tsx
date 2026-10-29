@@ -450,14 +450,6 @@ export default function Menu() {
             {/* Shorter photo on small screens so the order buttons stay in view; the panel scrolls if needed. */}
             <div style={{ width: '100%', height: 'min(350px, 38vh)', flexShrink: 0, backgroundColor: '#f9f6f0', padding: '0', position: 'relative' }}>
               <img src={flatItems[selectedIndex].img} alt={flatItems[selectedIndex].name} onError={handleMenuImgError} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              {/* Close button — top left */}
-              <button
-                onClick={closeLightbox}
-                aria-label="閉じる"
-                style={{ position: 'absolute', top: '12px', left: '12px', width: '44px', height: '44px', borderRadius: '50%', border: 'none', background: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.18)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', color: '#1a1814', lineHeight: 1 }}
-              >
-                ×
-              </button>
               {/* Share + Like buttons */}
               <div style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                 {/* Share button with dropdown */}
