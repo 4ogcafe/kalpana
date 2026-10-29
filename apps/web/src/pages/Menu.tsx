@@ -440,10 +440,21 @@ export default function Menu() {
 
       {/* Lightbox / Popup */}
       {selectedIndex !== null && (
-        <div onClick={closeLightbox} style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '64px 20px 20px', boxSizing: 'border-box' }}>
+        <div onClick={closeLightbox} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'calc(64px + env(safe-area-inset-top, 0px)) 16px calc(16px + env(safe-area-inset-bottom, 0px))', boxSizing: 'border-box' }}>
           
-          {/* Kept above the card (zIndex) and in the reserved top padding so it stays visible on mobile. */}
-          <button onClick={closeLightbox} aria-label="閉じる" style={{ position: 'absolute', top: '8px', right: '12px', zIndex: 2, background: 'none', border: 'none', color: 'white', fontSize: '2rem', lineHeight: 1, cursor: 'pointer', padding: '10px' }}>×</button>
+          {/* Fixed to the viewport corner (safe-area aware, above the card) so it is visible on every device size. */}
+          <button
+            type="button"
+            onClick={closeLightbox}
+            aria-label="閉じる"
+            title="閉じる"
+            style={{ position: 'fixed', top: 'calc(10px + env(safe-area-inset-top, 0px))', right: 'calc(10px + env(safe-area-inset-right, 0px))', zIndex: 1010, width: '44px', height: '44px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.35)', background: 'rgba(0,0,0,0.55)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.35)' }}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
           
           <button onClick={handlePrev} aria-label="前の商品" style={{ position: 'absolute', left: '20px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontSize: '2rem', cursor: 'pointer', padding: '15px 20px', borderRadius: '50%' }}>❮</button>
           
