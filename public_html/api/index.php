@@ -928,7 +928,10 @@ function runDatabaseMigrations(PDO $pdo): array {
         $pdo->exec("UPDATE `Settings` SET `addressEn` = REPLACE(`addressEn`, '360-0831', '360-0023') WHERE `addressEn` LIKE '%360-0831%'");
         $pdo->exec("UPDATE `AppSecret` SET `publicKey` = REPLACE(`publicKey`, '360-0831', '360-0023') WHERE `id` = 'PAGE_SETTINGS_EXT' AND `publicKey` LIKE '%360-0831%'");
         $pdo->exec("UPDATE `BlogPost` SET `content` = REPLACE(`content`, '360-0831', '360-0023') WHERE `content` LIKE '%360-0831%'");
+    } catch (Exception $e) {}
 
+    // Restore CarouselSlide, Settings, and MenuItem images in isolated try/catch blocks
+    try {
         // Restore CarouselSlide images if empty or broken
         $pdo->exec("UPDATE `CarouselSlide` SET `imageUrl` = '/uploads/1792484379649-8d372e4a42c3ddf9.jpg' WHERE `id` = 'a94a4c65-902a-4431-813d-ac205b285cac' AND (`imageUrl` IS NULL OR `imageUrl` = '')");
         $pdo->exec("UPDATE `CarouselSlide` SET `imageUrl` = '/uploads/1792268554871-2f79adbc5cc35dfe.webp' WHERE `id` = '3d689f0f-63c2-4f7d-9d78-30defb0408b9' AND (`imageUrl` IS NULL OR `imageUrl` = '')");
@@ -937,11 +940,17 @@ function runDatabaseMigrations(PDO $pdo): array {
         $pdo->exec("UPDATE `CarouselSlide` SET `imageUrl` = '/uploads/1792484379649-8d372e4a42c3ddf9.jpg' WHERE `placement` = 'HOME' AND (`imageUrl` IS NULL OR `imageUrl` = '') AND `sortOrder` = 0");
         $pdo->exec("UPDATE `CarouselSlide` SET `imageUrl` = '/uploads/1792268554871-2f79adbc5cc35dfe.webp' WHERE `placement` = 'HOME' AND (`imageUrl` IS NULL OR `imageUrl` = '')");
         $pdo->exec("UPDATE `CarouselSlide` SET `imageUrl` = '/uploads/1792268012355-415729a8b06aa65e.webp' WHERE `placement` = 'CONTACT' AND (`imageUrl` IS NULL OR `imageUrl` = '')");
+    } catch (Exception $e) {}
 
-        // Restore broken Settings images
+    try {
+        // Restore broken Settings images in AppSecret (PAGE_SETTINGS_EXT) and Settings
+        $pdo->exec("UPDATE `AppSecret` SET `publicKey` = REPLACE(`publicKey`, '/uploads/1792892694-9c0fbb49d9a78676.jpg', '/uploads/1792268800986-e39305dca03d0356.jpg') WHERE `id` = 'PAGE_SETTINGS_EXT'");
+        $pdo->exec("UPDATE `AppSecret` SET `publicKey` = REPLACE(`publicKey`, '/uploads/1793190780-e9bb908ae77c6b3d.webp', '/site-logo-01.webp') WHERE `id` = 'PAGE_SETTINGS_EXT'");
         $pdo->exec("UPDATE `Settings` SET `contactHeroImage` = '/uploads/1792268800986-e39305dca03d0356.jpg' WHERE `contactHeroImage` = '/uploads/1792892694-9c0fbb49d9a78676.jpg' OR `contactHeroImage` IS NULL OR `contactHeroImage` = ''");
         $pdo->exec("UPDATE `Settings` SET `footerLogo` = '/site-logo-01.webp' WHERE `footerLogo` = '/uploads/1793190780-e9bb908ae77c6b3d.webp'");
+    } catch (Exception $e) {}
 
+    try {
         // Restore 95 broken MenuItem imageUrls to valid WebP assets
         $menuImageFixes = [
             "052413c2-2f9c-4780-88d0-ff223f0c96a0" => "/uploads/1792845269-3c46d03a68dd8916.webp",
