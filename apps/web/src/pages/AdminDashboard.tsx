@@ -283,7 +283,27 @@ export default function AdminDashboard() {
                   ? user.role === 'ADMIN'
                     ? "What's happening now, and how the restaurant is doing."
                     : "What's happening in the restaurant right now."
-                  : `Manage your restaurant's ${activeTab.toLowerCase()} data and settings.`}
+                  : activeTab === 'Members'
+                  ? 'View and manage registered member accounts, points, and stamp cards.'
+                  : activeTab === 'Orders'
+                  ? 'Review, confirm, and track customer orders.'
+                  : activeTab === 'Menu Management'
+                  ? 'Add, edit, and organise menu items and categories.'
+                  : activeTab === 'Stamps, Offers & Points'
+                  ? 'Configure loyalty stamps, point rewards, and special offers.'
+                  : activeTab === 'Blog Posts'
+                  ? 'Write and publish blog posts for the website.'
+                  : activeTab === 'Careers'
+                  ? 'Manage job listings shown on the Careers page.'
+                  : activeTab === 'Restaurant Settings'
+                  ? 'Update contact details, hours, and operational settings.'
+                  : activeTab === 'Page Settings'
+                  ? 'Edit text, images, and content shown across the website.'
+                  : activeTab === 'Contact Messages'
+                  ? 'Read messages submitted through the Contact page.'
+                  : activeTab === 'Staff Users'
+                  ? 'Manage staff accounts and their access levels.'
+                  : ''}
               </p>
             </div>
           </div>
