@@ -508,19 +508,6 @@ export default function Menu() {
             {/* Shorter photo on small screens so the order buttons stay in view; the panel scrolls if needed. */}
             <div style={{ width: '100%', height: 'min(350px, 38vh)', flexShrink: 0, backgroundColor: '#f9f6f0', padding: '0', position: 'relative' }}>
               <img src={flatItems[selectedIndex].img} alt={flatItems[selectedIndex].name} onError={handleMenuImgError} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              {/* Cancel / close button */}
-              <button
-                type="button"
-                onClick={closeLightbox}
-                aria-label="閉じる"
-                title="閉じる"
-                style={{ position: 'absolute', top: '12px', left: '12px', width: '44px', height: '44px', borderRadius: '50%', border: 'none', background: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.18)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1a1814' }}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
               {/* Share + Like buttons */}
               <div style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                 {/* Share button with dropdown */}
