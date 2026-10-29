@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Sparkles, Flame, Heart, ChefHat, Utensils, Quote } from 'lucide-react';
+import { Sparkles, Flame, Heart, ChefHat, Utensils } from 'lucide-react';
 import { assetUrl, getPublic } from '../lib/api';
 import EmphasisText from '../components/EmphasisText';
 
@@ -12,7 +12,7 @@ export default function About() {
       .catch(console.error);
   }, []);
 
-  const storyParagraphs = (settings.aboutStoryJa || 'Kalpna（カルプナ）は、サンスクリット語で「想像」や「創造」を意味します。\n私たちは、インドの伝統的なスパイスと製法を守りながら、日本の皆さまの味覚に寄り添う新しいインディアン・ダイニングを創造しています。\n\n本場インドのホテルで腕を磨いたシェフが、厳選された数十種類のスパイスを巧みにブレンド。\n特注のタンドール（土窯）で焼き上げる備長炭の香ばしいナンやタンドリーチキンは、多くのお客様に愛されています。').split('\n').filter((p: string) => p.trim().length > 0);
+  const storyParagraphs = (settings.aboutStoryJa || 'カルプナでは、本場インドの伝統と豊かな食文化を大切にしながら、日本の皆さまに本格的なインド料理をお届けしています。\n新鮮な食材、厳選したスパイス、炭火で焼き上げる香ばしいナンやタンドリー料理、そして経験豊富なシェフの技と情熱。一皿一皿にこだわりを込め、「おいしい」「また食べたい」と感じていただける料理を目指しています。\n味・品質・価格・おもてなしを大切にし、皆さまに心からご満足いただけるお店でありたいと考えています。\nここでは、カルプナが大切にしている5つのこだわりをご紹介します。').split('\n').filter((p: string) => p.trim().length > 0);
 
   return (
     <main>
@@ -22,7 +22,7 @@ export default function About() {
       {/* About Hero */}
       <div className="home-hero" style={{ height: '50vh', minHeight: '400px' }}>
         <img
-          src={assetUrl(settings.aboutHeroImage) || "https://images.unsplash.com/photo-1552566626-52f8b828add9?auto=format&fit=crop&w=1920&q=80"}
+          src={assetUrl(settings.aboutHeroImage) || ''}
           alt=""
           fetchPriority="high"
           className="slide-bg-img"
@@ -36,39 +36,21 @@ export default function About() {
         </div>
       </div>
 
-      {/* Story Section — High-End Restaurant Editorial */}
+      {/* Story Section */}
       <section
         style={{
           position: 'relative',
           backgroundColor: '#faf7f2',
           backgroundImage: 'radial-gradient(circle at 10% 20%, rgba(242, 168, 59, 0.08), transparent 40%), radial-gradient(circle at 90% 80%, rgba(181, 69, 27, 0.05), transparent 40%)',
-          padding: 'clamp(4rem, 8vw, 6rem) 20px',
+          padding: 'clamp(2.5rem, 5vw, 3.5rem) 20px',
           overflow: 'hidden',
           borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
         }}
       >
-        {/* Subtle decorative watermark */}
-        <div
-          style={{
-            position: 'absolute',
-            top: '4%',
-            right: '3%',
-            fontFamily: 'var(--font-display)',
-            fontSize: 'clamp(4rem, 12vw, 10rem)',
-            fontWeight: 900,
-            color: 'rgba(181, 69, 27, 0.035)',
-            letterSpacing: '0.08em',
-            pointerEvents: 'none',
-            userSelect: 'none',
-            lineHeight: 1,
-          }}
-        >
-          {settings.aboutStoryWatermark || 'カルプナ'}
-        </div>
+        <div style={{ maxWidth: '1100px', margin: '0 auto', position: 'relative', zIndex: 2 }}>
 
-        <div style={{ maxWidth: '1180px', margin: '0 auto', position: 'relative', zIndex: 2 }}>
           {/* Section Header */}
-          <div style={{ textAlign: 'center', maxWidth: '780px', margin: '0 auto clamp(2.5rem, 5vw, 3.5rem)' }}>
+          <div style={{ textAlign: 'center', maxWidth: '720px', margin: '0 auto 2rem' }}>
             <div
               style={{
                 display: 'inline-flex',
@@ -77,238 +59,77 @@ export default function About() {
                 backgroundColor: '#ffffff',
                 border: '1px solid rgba(181, 69, 27, 0.25)',
                 borderRadius: '9999px',
-                padding: '6px 18px',
-                boxShadow: '0 2px 10px rgba(181, 69, 27, 0.06)',
-                marginBottom: '1.25rem',
+                padding: '5px 16px',
+                marginBottom: '0.9rem',
               }}
             >
-              <Sparkles size={14} color="var(--spice)" />
-              <span
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  color: 'var(--spice)',
-                  fontWeight: 700,
-                  letterSpacing: '2.5px',
-                  fontSize: '0.8rem',
-                  textTransform: 'uppercase',
-                }}
-              >
+              <Sparkles size={13} color="var(--spice)" />
+              <span style={{ color: 'var(--spice)', fontWeight: 700, letterSpacing: '2px', fontSize: '0.77rem', textTransform: 'uppercase' }}>
                 {settings.aboutStoryLabelJa || '私たちの物語'}
               </span>
             </div>
-
             <h2
               className="section-title"
-              style={{
-                fontSize: 'clamp(2rem, 5vw, 3.1rem)',
-                lineHeight: 1.25,
-                margin: '0 0 1.25rem',
-                color: 'var(--dark-bark)',
-                letterSpacing: '-0.02em',
-              }}
+              style={{ fontSize: 'clamp(1.6rem, 4vw, 2.5rem)', lineHeight: 1.25, margin: '0 0 0.9rem', color: 'var(--dark-bark)', letterSpacing: '-0.02em' }}
             >
-              <EmphasisText text={settings.aboutStoryTitleJa || '本場インドの味を、<em>熊谷へ</em>'} />
+              <EmphasisText text={settings.aboutStoryTitleJa || '本場インドの味を支える、<em>5つのこだわり</em>'} />
             </h2>
-
-            <div
-              className="divider"
-              style={{
-                width: '60px',
-                height: '3px',
-                backgroundColor: 'var(--gold)',
-                margin: '0 auto 1.5rem',
-                borderRadius: '2px',
-              }}
-            />
-
-            {/* Sanskrit Origin Callout */}
-            <div
-              style={{
-                display: 'inline-block',
-                backgroundColor: '#ffffff',
-                border: '1px solid rgba(242, 168, 59, 0.35)',
-                borderLeft: '4px solid var(--spice)',
-                borderRadius: '12px',
-                padding: '14px 22px',
-                boxShadow: '0 6px 20px rgba(0, 0, 0, 0.04)',
-                textAlign: 'left',
-                maxWidth: '680px',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  color: 'var(--spice)',
-                  fontWeight: 700,
-                  fontSize: '0.92rem',
-                  marginBottom: '4px',
-                }}
-              >
-                <Quote size={16} />
-                <span>{settings.aboutStoryOriginTitleJa || '店名「Kalpna（カルプナ）」に込めた想い'}</span>
-              </div>
-              <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--dark-bark)', lineHeight: 1.65 }}>
-                {settings.aboutStoryOriginTextJa || 'サンスクリット語で「想像」や「創造」を意味します。インド何千年の食の知恵を受け継ぎ、日本の皆さまの心を満たす新しい美味しさを創り出します。'}
-              </p>
+            <div style={{ width: '48px', height: '3px', backgroundColor: 'var(--gold)', margin: '0 auto 1.1rem', borderRadius: '2px' }} />
+            {/* Intro paragraphs */}
+            <div style={{ fontSize: '0.97rem', lineHeight: 1.85, color: '#5c524c' }}>
+              {storyParagraphs.slice(0, 3).map((para: string, i: number) => (
+                <p key={i} style={{ margin: i === 0 ? 0 : '10px 0 0', fontWeight: i === 0 ? 500 : 400, color: i === 0 ? 'var(--dark-bark)' : '#5c524c' }}>
+                  {para}
+                </p>
+              ))}
             </div>
           </div>
 
-          {/* 2-Column Grid: Visual Framing + Editorial Narrative */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 480px), 1fr))',
-              gap: 'clamp(2.5rem, 5vw, 4.5rem)',
-              alignItems: 'center',
-            }}
-          >
-            {/* Visual Collage Column */}
-            <div style={{ position: 'relative' }}>
-              {/* Backing decorative glow frame */}
-              <div
-                style={{
-                  position: 'absolute',
-                  inset: '-12px',
-                  background: 'linear-gradient(135deg, rgba(242, 168, 59, 0.22), rgba(181, 69, 27, 0.14))',
-                  borderRadius: '26px',
-                  transform: 'rotate(-1.5deg)',
-                  zIndex: 0,
-                }}
-              />
+          {/* Features badge */}
+          <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
+            <span style={{ display: 'inline-block', padding: '6px 20px', background: 'linear-gradient(135deg, #fff7ed, #fef3c7)', borderRadius: '9999px', border: '1px solid rgba(242, 168, 59, 0.45)', fontSize: '0.9rem', fontWeight: 800, color: 'var(--dark-bark)', letterSpacing: '0.04em' }}>
+              {settings.aboutStoryFeaturesBadgeJa || '🌟 当店の5つの特徴 🌟'}
+            </span>
+          </div>
 
-              {/* Main Image Container */}
-              <div
-                style={{
-                  position: 'relative',
-                  borderRadius: '20px',
-                  overflow: 'hidden',
-                  boxShadow: '0 20px 45px -12px rgba(42, 35, 33, 0.22)',
-                  border: '4px solid #ffffff',
-                  zIndex: 1,
-                  aspectRatio: '4 / 3',
-                  backgroundColor: '#2a2321',
-                }}
-              >
-                <img
-                  src={assetUrl(settings.aboutStoryImage) || "https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&w=1200&q=80"}
-                  alt={settings.aboutStoryTitleJa?.replace(/<[^>]*>/g, '') || "本場インドの味を、熊谷へ"}
-                  loading="lazy"
-                  decoding="async"
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                    display: 'block',
-                  }}
-                />
-                {/* Subtle bottom vignette gradient */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    background: 'linear-gradient(to top, rgba(0,0,0,0.45) 0%, transparent 60%)',
-                    pointerEvents: 'none',
-                  }}
-                />
-              </div>
+          {/* 5 Pillars — 2-column responsive grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: '10px', marginBottom: '1.75rem' }}>
+            <StoryPillar
+              icon={Flame}
+              title={settings.aboutStoryPillar1TitleJa || '高品質な料理をお手頃価格で'}
+              desc={settings.aboutStoryPillar1DescJa || '新鮮で高品質な食材を使用し、味と健康の両立を大切にしています。本格的なインド料理を、品質と価格のバランスにこだわりながら、より多くのお客さまに気軽にお楽しみいただけるよう努めています。'}
+            />
+            <StoryPillar
+              icon={Sparkles}
+              title={settings.aboutStoryPillar2TitleJa || '本格的な味の秘密はタンドールに'}
+              desc={settings.aboutStoryPillar2DescJa || '伝統的なタンドール（土窯）で薪炭の火でじっくりと焼き上げることで、香ばしい香りと独特の食感が生まれます。火加減や焼き加減にもこだわり、本場インドならではの味わいをお届けします。'}
+            />
+            <StoryPillar
+              icon={Heart}
+              title={settings.aboutStoryPillar3TitleJa || '経験豊富なシェフの技と情熱'}
+              desc={settings.aboutStoryPillar3DescJa || '伝統的な調理技法を大切にしながら、一品一品を丁寧に調理しています。ナン、ビリヤニ、カレー、タンドリー料理まで、それぞれの料理のおいしさを引き出し、皆さまにご満足いただける一皿を目指しています。'}
+            />
+            <StoryPillar
+              icon={ChefHat}
+              title={settings.aboutStoryPillar4TitleJa || 'インドから厳選したスパイス'}
+              desc={settings.aboutStoryPillar4DescJa || 'スパイスの香りや風味、組み合わせを大切にし、料理ごとにバランスよく調合しています。辛さだけではなく豊かな香りと奥深い味わいを追求し、お好みに合わせて辛さも調整できます。'}
+            />
+            <StoryPillar
+              icon={Utensils}
+              title={settings.aboutStoryPillar5TitleJa || '創業者 セムワル・プラバットの経験と想い'}
+              desc={settings.aboutStoryPillar5DescJa || 'インドで10年以上の調理経験を積み、日本の有名インドレストランチェーンで18年間勤務した創業者が、本場インドの伝統的な味わいを日本の皆さまにお届けします。'}
+            />
+          </div>
 
-              {/* Floating Signature Quality Badge */}
-              <div
-                style={{
-                  position: 'absolute',
-                  bottom: '-22px',
-                  right: '18px',
-                  backgroundColor: '#ffffff',
-                  borderRadius: '16px',
-                  padding: '12px 20px',
-                  boxShadow: '0 12px 30px rgba(0, 0, 0, 0.14)',
-                  border: '1.5px solid rgba(242, 168, 59, 0.45)',
-                  zIndex: 2,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                }}
-              >
-                <div
-                  style={{
-                    width: '42px',
-                    height: '42px',
-                    borderRadius: '12px',
-                    backgroundColor: '#fff7ed',
-                    border: '1px solid #fed7aa',
-                    display: 'grid',
-                    placeItems: 'center',
-                    color: 'var(--spice)',
-                    flexShrink: 0,
-                  }}
-                >
-                  <Flame size={22} />
-                </div>
-                <div>
-                  <div
-                    style={{
-                      fontSize: '0.72rem',
-                      fontWeight: 800,
-                      color: 'var(--spice)',
-                      letterSpacing: '1px',
-                    }}
-                  >
-                    {settings.aboutStoryBadgeSubJa || '炭火仕込み'}
-                  </div>
-                  <div style={{ fontSize: '0.94rem', fontWeight: 800, color: 'var(--dark-bark)' }}>
-                    {settings.aboutStoryBadgeTitleJa || '備長炭タンドール窯焼き'}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Narrative Column */}
-            <div>
-              <div style={{ fontSize: '1.05rem', lineHeight: '2.1', color: 'var(--dark-bark)' }}>
-                {storyParagraphs.map((para: string, i: number) => (
-                  <p
-                    key={i}
-                    style={{
-                      marginBottom: '18px',
-                      color: i === 0 ? 'var(--dark-bark)' : '#5c524c',
-                      fontWeight: i === 0 ? 500 : 400,
-                    }}
-                  >
-                    {para}
-                  </p>
-                ))}
-              </div>
-
-              {/* 5 Core Quality Pillars */}
-              <div style={{ display: 'grid', gap: '12px', marginTop: '24px' }}>
-                <StoryPillar
-                  icon={Flame}
-                  title={settings.aboutStoryPillar1TitleJa || '特注タンドール（土窯）炭火仕立て'}
-                  desc={settings.aboutStoryPillar1DescJa || '高温の備長炭で焼き上げるナンは外サクッ中モチッ。チキンは肉汁を逃さず芳醇な燻香をまといます。'}
-                />
-                <StoryPillar
-                  icon={Sparkles}
-                  title={settings.aboutStoryPillar2TitleJa || '30種以上の厳選直輸入スパイス'}
-                  desc={settings.aboutStoryPillar2DescJa || 'インド各地より厳選したスパイスを毎朝調合。香り・辛み・薬効の黄金バランスを追求しています。'}
-                />
-                <StoryPillar
-                  icon={Heart}
-                  title={settings.aboutStoryPillar3TitleJa || '日本の皆さまの味覚に寄り添う心'}
-                  desc={settings.aboutStoryPillar3DescJa || '辛さはお子様用甘口〜激辛まで自由に調節。ベジタリアンやアレルギーにも丁寧に対応いたします。'}
-                />
-                <StoryPillar
-                  icon={ChefHat}
-                  title={settings.aboutStoryPillar4TitleJa || '本場インドで腕を磨いた熟練シェフ'}
-                  desc={settings.aboutStoryPillar4DescJa || '長年の経験を積んだプロのシェフが、伝統の技法で一皿一皿心を込めて手作りします。'}
-                />
-                <StoryPillar
-                  icon={Utensils}
-                  title={settings.aboutStoryPillar5TitleJa || '出来立て・手作りの妥協なき鮮度'}
-                  desc={settings.aboutStoryPillar5DescJa || '作り置きをせず注文ごとに一鍋ずつ調理。熱々のナンと香り立つ本物のカレーをお届けします。'}
-                />
-              </div>
+          {/* Closing statement */}
+          <div style={{ textAlign: 'center', maxWidth: '640px', margin: '0 auto', padding: '1.5rem 1.75rem', background: 'rgba(255,255,255,0.85)', borderRadius: '16px', border: '1px solid rgba(242, 168, 59, 0.3)' }}>
+            <h3 style={{ fontSize: 'clamp(1.1rem, 2.5vw, 1.35rem)', fontWeight: 800, color: 'var(--dark-bark)', margin: '0 0 0.75rem' }}>
+              {settings.aboutStoryClosingTitleJa || 'カルプナで、心に残るお食事のひとときを'}
+            </h3>
+            <div style={{ color: '#5c524c', lineHeight: 1.75, fontSize: '0.92rem' }}>
+              {(settings.aboutStoryClosingTextJa || '本格的なインド料理を、もっと身近に、もっと気軽に。\nご家族やご友人とのお食事はもちろん、お一人さまでも、皆さまに心地よい時間をお過ごしいただけるよう努めています。\n皆さまのご来店を、心よりお待ちしております。').split('\n').filter((p: string) => p.trim()).map((p: string, i: number) => (
+                <p key={i} style={{ margin: i === 0 ? 0 : '8px 0 0' }}>{p}</p>
+              ))}
             </div>
           </div>
         </div>
@@ -346,7 +167,7 @@ export default function About() {
         <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'flex', flexWrap: 'wrap', gap: '40px', alignItems: 'center', flexDirection: 'row-reverse' }}>
           <div style={{ flex: '1 1 400px' }}>
             <img
-              src={assetUrl(settings.aboutChefImage) || "https://images.unsplash.com/photo-1583394838336-acd977736f90?auto=format&fit=crop&w=800&q=80"}
+              src={assetUrl(settings.aboutChefImage) || ''}
               alt={settings.aboutChefTitleJa?.replace(/<[^>]*>/g, '') || "熟練のシェフ"}
               loading="lazy"
               decoding="async"
@@ -410,12 +231,14 @@ function StoryPillar({
         <Icon size={18} />
       </div>
       <div>
-        <h4 style={{ margin: '0 0 3px', fontSize: '0.96rem', fontWeight: 700, color: 'var(--dark-bark)' }}>
+        <h4 style={{ margin: '0 0 6px', fontSize: '0.96rem', fontWeight: 700, color: 'var(--dark-bark)' }}>
           {title}
         </h4>
-        <p style={{ margin: 0, fontSize: '0.84rem', color: '#6b7280', lineHeight: 1.5 }}>
-          {desc}
-        </p>
+        {desc.split('\n').filter(p => p.trim()).map((p, i) => (
+          <p key={i} style={{ margin: i === 0 ? 0 : '6px 0 0', fontSize: '0.84rem', color: '#6b7280', lineHeight: 1.55 }}>
+            {p}
+          </p>
+        ))}
       </div>
     </div>
   );

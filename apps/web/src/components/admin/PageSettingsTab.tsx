@@ -55,6 +55,9 @@ interface Settings {
   aboutStoryPillar4DescJa?: string;
   aboutStoryPillar5TitleJa?: string;
   aboutStoryPillar5DescJa?: string;
+  aboutStoryFeaturesBadgeJa?: string;
+  aboutStoryClosingTitleJa?: string;
+  aboutStoryClosingTextJa?: string;
   aboutSpiceLabelJa?: string;
   aboutSpiceTitleJa?: string;
   aboutSpiceDescJa?: string;
@@ -68,26 +71,29 @@ interface Settings {
 export const DEFAULT_ABOUT_CONTENT: Record<string, string> = {
   aboutHeroTag: '私たちについて',
   aboutHeroTitle: '私たちに<em>ついて</em>',
-  aboutHeroImage: 'https://images.unsplash.com/photo-1552566626-52f8b828add9?auto=format&fit=crop&w=1920&q=80',
+  aboutHeroImage: '',
   aboutStoryLabelJa: '私たちの物語',
-  aboutStoryTitleJa: '本場インドの味を、<em>熊谷へ</em>',
-  aboutStoryJa: 'Kalpna（カルプナ）は、サンスクリット語で「想像」や「創造」を意味します。\n私たちは、インドの伝統的なスパイスと製法を守りながら、日本の皆さまの味覚に寄り添う新しいインディアン・ダイニングを創造しています。\n\n本場インドのホテルで腕を磨いたシェフが、厳選された数十種類のスパイスを巧みにブレンド。\n特注のタンドール（土窯）で焼き上げる備長炭の香ばしいナンやタンドリーチキンは、多くのお客様に愛されています。',
+  aboutStoryTitleJa: '本場インドの味を支える、<em>5つのこだわり</em>',
+  aboutStoryJa: 'カルプナでは、本場インドの伝統と豊かな食文化を大切にしながら、日本の皆さまに本格的なインド料理をお届けしています。\n新鮮な食材、厳選したスパイス、炭火で焼き上げる香ばしいナンやタンドリー料理、そして経験豊富なシェフの技と情熱。一皿一皿にこだわりを込め、「おいしい」「また食べたい」と感じていただける料理を目指しています。\n味・品質・価格・おもてなしを大切にし、皆さまに心からご満足いただけるお店でありたいと考えています。',
   aboutStoryImage: 'https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&w=1200&q=80',
   aboutStoryWatermark: 'カルプナ',
   aboutStoryOriginTitleJa: '店名「Kalpna（カルプナ）」に込めた想い',
   aboutStoryOriginTextJa: 'サンスクリット語で「想像」や「創造」を意味します。インド何千年の食の知恵を受け継ぎ、日本の皆さまの心を満たす新しい美味しさを創り出します。',
   aboutStoryBadgeSubJa: '炭火仕込み',
   aboutStoryBadgeTitleJa: '備長炭タンドール窯焼き',
-  aboutStoryPillar1TitleJa: '特注タンドール（土窯）炭火仕立て',
-  aboutStoryPillar1DescJa: '高温の備長炭で焼き上げるナンは外サクッ中モチッ。チキンは肉汁を逃さず芳醇な燻香をまといます。',
-  aboutStoryPillar2TitleJa: '30種以上の厳選直輸入スパイス',
-  aboutStoryPillar2DescJa: 'インド各地より厳選したスパイスを毎朝調合。香り・辛み・薬効の黄金バランスを追求しています。',
-  aboutStoryPillar3TitleJa: '日本の皆さまの味覚に寄り添う心',
-  aboutStoryPillar3DescJa: '辛さはお子様用甘口〜激辛まで自由に調節。ベジタリアンやアレルギーにも丁寧に対応いたします。',
-  aboutStoryPillar4TitleJa: '本場インドで腕を磨いた熟練シェフ',
-  aboutStoryPillar4DescJa: '長年の経験を積んだプロのシェフが、伝統の技法で一皿一皿心を込めて手作りします。',
-  aboutStoryPillar5TitleJa: '出来立て・手作りの妥協なき鮮度',
-  aboutStoryPillar5DescJa: '作り置きをせず注文ごとに一鍋ずつ調理。熱々のナンと香り立つ本物のカレーをお届けします。',
+  aboutStoryPillar1TitleJa: '高品質な料理をお手頃価格で',
+  aboutStoryPillar1DescJa: '新鮮で高品質な食材を使用し、味と健康の両立を大切にしています。本格的なインド料理を、品質と価格のバランスにこだわりながら、より多くのお客さまに気軽にお楽しみいただけるよう努めています。',
+  aboutStoryPillar2TitleJa: '本格的な味の秘密はタンドールに',
+  aboutStoryPillar2DescJa: '伝統的なタンドール（土窯）で薪炭の火でじっくりと焼き上げることで、香ばしい香りと独特の食感が生まれます。火加減や焼き加減にもこだわり、本場インドならではの味わいをお届けします。',
+  aboutStoryPillar3TitleJa: '経験豊富なシェフの技と情熱',
+  aboutStoryPillar3DescJa: '伝統的な調理技法を大切にしながら、一品一品を丁寧に調理しています。ナン、ビリヤニ、カレー、タンドリー料理まで、それぞれの料理のおいしさを引き出し、皆さまにご満足いただける一皿を目指しています。',
+  aboutStoryPillar4TitleJa: 'インドから厳選したスパイス',
+  aboutStoryPillar4DescJa: 'スパイスの香りや風味、組み合わせを大切にし、料理ごとにバランスよく調合しています。辛さだけではなく豊かな香りと奥深い味わいを追求し、お好みに合わせて辛さも調整できます。',
+  aboutStoryPillar5TitleJa: '創業者 セムワル・プラバットの経験と想い',
+  aboutStoryPillar5DescJa: 'インドで10年以上の調理経験を積み、日本の有名インドレストランチェーンで18年間勤務した創業者が、本場インドの伝統的な味わいを日本の皆さまにお届けします。',
+  aboutStoryFeaturesBadgeJa: '🌟 当店の5つの特徴 🌟',
+  aboutStoryClosingTitleJa: 'カルプナで、心に残るお食事のひとときを',
+  aboutStoryClosingTextJa: '本格的なインド料理を、もっと身近に、もっと気軽に。\nご家族やご友人とのお食事はもちろん、お一人でのランチやディナーにも、ぜひお気軽にお越しください。\n皆さまのご来店を、心よりお待ちしております。',
   aboutSpiceLabelJa: 'こだわり',
   aboutSpiceTitleJa: '命を吹き込む、<em>スパイス</em>',
   aboutSpiceDescJa: 'カレーの味の決め手となるスパイスは、インドから直接取り寄せた最高品質のものを使用しています。クミン、コリアンダー、ターメリック、カルダモン... それぞれのスパイスが持つ薬効や香りを最大限に引き出すため、独自に配合し、挽きたてを使用しています。',
@@ -95,7 +101,7 @@ export const DEFAULT_ABOUT_CONTENT: Record<string, string> = {
   aboutChefLabelJa: 'シェフ紹介',
   aboutChefTitleJa: '熟練の<em>技</em>',
   aboutChefDescJa: '長年の経験を積み、日本の皆さまに「本物のインド料理」を届けるために来日しました。カレーの奥深さ、スパイスの魔法、そしてインドの温かいおもてなしの心を、一皿一皿に込めて提供しています。辛さの調節や、ベジタリアン対応などもお気軽にお声がけください。',
-  aboutChefImage: 'https://images.unsplash.com/photo-1583394838336-acd977736f90?auto=format&fit=crop&w=800&q=80',
+  aboutChefImage: '',
 };
 
 export const DEFAULT_HOME_CONTENT: Record<string, string> = {
@@ -447,6 +453,9 @@ function AboutPageTab({ settings, setSettings }: { settings: Settings; setSettin
         aboutStoryPillar4DescJa: settings.aboutStoryPillar4DescJa,
         aboutStoryPillar5TitleJa: settings.aboutStoryPillar5TitleJa,
         aboutStoryPillar5DescJa: settings.aboutStoryPillar5DescJa,
+        aboutStoryFeaturesBadgeJa: settings.aboutStoryFeaturesBadgeJa,
+        aboutStoryClosingTitleJa: settings.aboutStoryClosingTitleJa,
+        aboutStoryClosingTextJa: settings.aboutStoryClosingTextJa,
         aboutSpiceLabelJa: settings.aboutSpiceLabelJa,
         aboutSpiceTitleJa: settings.aboutSpiceTitleJa,
         aboutSpiceDescJa: settings.aboutSpiceDescJa,
@@ -568,45 +577,32 @@ function AboutPageTab({ settings, setSettings }: { settings: Settings; setSettin
           <h4 style={{ margin: '0 0 0.75rem', fontSize: '1rem', color: '#111827', fontWeight: 700 }}>こだわり・特徴 5本柱（Story Pillars）</h4>
           
           <div style={{ display: 'grid', gap: '0.75rem' }}>
-            <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '8px', padding: '0.85rem' }}>
-              <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#ea580c', marginBottom: '0.4rem' }}>こだわり 1</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) 2fr', gap: '0.75rem' }}>
-                <input style={inp} type="text" value={settings.aboutStoryPillar1TitleJa ?? ''} onChange={set('aboutStoryPillar1TitleJa')} placeholder="特注タンドール（土窯）炭火仕立て" />
-                <input style={inp} type="text" value={settings.aboutStoryPillar1DescJa ?? ''} onChange={set('aboutStoryPillar1DescJa')} placeholder="高温の備長炭で焼き上げるナンは外サクッ中モチッ..." />
+            {([1, 2, 3, 4, 5] as const).map(n => (
+              <div key={n} style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '8px', padding: '0.85rem' }}>
+                <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#ea580c', marginBottom: '0.4rem' }}>こだわり {n}</div>
+                <div style={{ display: 'grid', gap: '0.5rem' }}>
+                  <input style={inp} type="text" value={settings[`aboutStoryPillar${n}TitleJa` as keyof Settings] as string ?? ''} onChange={set(`aboutStoryPillar${n}TitleJa` as keyof Settings)} placeholder={`こだわり${n}のタイトル`} />
+                  <textarea style={{ ...inp, height: 80, resize: 'vertical', fontFamily: 'inherit' }} value={settings[`aboutStoryPillar${n}DescJa` as keyof Settings] as string ?? ''} onChange={set(`aboutStoryPillar${n}DescJa` as keyof Settings)} placeholder="説明文（改行で複数段落に分けられます）" />
+                </div>
               </div>
-            </div>
+            ))}
+          </div>
 
-            <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '8px', padding: '0.85rem' }}>
-              <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#ea580c', marginBottom: '0.4rem' }}>こだわり 2</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) 2fr', gap: '0.75rem' }}>
-                <input style={inp} type="text" value={settings.aboutStoryPillar2TitleJa ?? ''} onChange={set('aboutStoryPillar2TitleJa')} placeholder="30種以上の厳選直輸入スパイス" />
-                <input style={inp} type="text" value={settings.aboutStoryPillar2DescJa ?? ''} onChange={set('aboutStoryPillar2DescJa')} placeholder="インド各地より厳選したスパイスを毎朝調合..." />
-              </div>
-            </div>
-
-            <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '8px', padding: '0.85rem' }}>
-              <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#ea580c', marginBottom: '0.4rem' }}>こだわり 3</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) 2fr', gap: '0.75rem' }}>
-                <input style={inp} type="text" value={settings.aboutStoryPillar3TitleJa ?? ''} onChange={set('aboutStoryPillar3TitleJa')} placeholder="日本の皆さまの味覚に寄り添う心" />
-                <input style={inp} type="text" value={settings.aboutStoryPillar3DescJa ?? ''} onChange={set('aboutStoryPillar3DescJa')} placeholder="辛さはお子様用甘口〜激辛まで自由に調節..." />
-              </div>
-            </div>
-
-            <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '8px', padding: '0.85rem' }}>
-              <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#ea580c', marginBottom: '0.4rem' }}>こだわり 4</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) 2fr', gap: '0.75rem' }}>
-                <input style={inp} type="text" value={settings.aboutStoryPillar4TitleJa ?? ''} onChange={set('aboutStoryPillar4TitleJa')} placeholder="本場インドで腕を磨いた熟練シェフ" />
-                <input style={inp} type="text" value={settings.aboutStoryPillar4DescJa ?? ''} onChange={set('aboutStoryPillar4DescJa')} placeholder="長年の経験を積んだプロのシェフが、伝統の技法で一皿一皿心を込めて手作りします..." />
-              </div>
-            </div>
-
-            <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: '8px', padding: '0.85rem' }}>
-              <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#ea580c', marginBottom: '0.4rem' }}>こだわり 5</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) 2fr', gap: '0.75rem' }}>
-                <input style={inp} type="text" value={settings.aboutStoryPillar5TitleJa ?? ''} onChange={set('aboutStoryPillar5TitleJa')} placeholder="出来立て・手作りの妥協なき鮮度" />
-                <input style={inp} type="text" value={settings.aboutStoryPillar5DescJa ?? ''} onChange={set('aboutStoryPillar5DescJa')} placeholder="作り置きをせず注文ごとに一鍋ずつ調理。熱々のナンと香り立つ本物のカレーをお届けします..." />
-              </div>
-            </div>
+          {/* Features Badge & Closing Section */}
+          <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px dashed #e5e7eb', display: 'grid', gap: '0.75rem' }}>
+            <label style={lbl}>
+              特徴バッジテキスト（5つの柱の上に表示）
+              <span style={muted}>例: 🌟 当店の5つの特徴 🌟</span>
+              <input style={inp} type="text" value={settings.aboutStoryFeaturesBadgeJa ?? ''} onChange={set('aboutStoryFeaturesBadgeJa')} placeholder="🌟 当店の5つの特徴 🌟" />
+            </label>
+            <label style={lbl}>
+              クロージングセクション タイトル
+              <input style={inp} type="text" value={settings.aboutStoryClosingTitleJa ?? ''} onChange={set('aboutStoryClosingTitleJa')} placeholder="カルプナで、心に残るお食事のひとときを" />
+            </label>
+            <label style={lbl}>
+              クロージングセクション 本文（改行で段落分け）
+              <textarea style={{ ...inp, height: 90, resize: 'vertical', fontFamily: 'inherit' }} value={settings.aboutStoryClosingTextJa ?? ''} onChange={set('aboutStoryClosingTextJa')} placeholder="本格的なインド料理を、もっと身近に、もっと気軽に。..." />
+            </label>
           </div>
         </div>
       </div>

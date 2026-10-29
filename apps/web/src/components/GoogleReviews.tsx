@@ -66,7 +66,7 @@ function ReviewCard({
   );
 }
 
-export default function GoogleReviews({ fallbackLink: _fallbackLink }: { fallbackLink?: string } = {}) {
+export default function GoogleReviews({ fallbackLink }: { fallbackLink?: string } = {}) {
   const [data, setData] = useState<ReviewsData | null | undefined>(undefined);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(true);
@@ -197,6 +197,28 @@ export default function GoogleReviews({ fallbackLink: _fallbackLink }: { fallbac
           </div>
         ) : (
           <p className="section-sub">お客様の声はGoogleマップでご覧いただけます。</p>
+        )}
+        {(data?.mapsUrl ?? fallbackLink) && (
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+            <a
+              href={data?.mapsUrl ?? fallbackLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="gr-action-link"
+            >
+              Googleマップで見る
+            </a>
+            {data?.writeReviewUrl && (
+              <a
+                href={data.writeReviewUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="gr-action-link is-primary"
+              >
+                レビューを書く
+              </a>
+            )}
+          </div>
         )}
       </div>
 

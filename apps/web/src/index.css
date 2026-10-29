@@ -929,6 +929,10 @@ body {
 .gr-actions { display: flex; gap: 18px; justify-content: center; align-items: center; flex-wrap: wrap; margin-top: 1rem; }
 .gr-write { display: inline-flex; align-items: center; gap: 6px; color: var(--spice); font-weight: 700; text-decoration: none; }
 .gr-attrib { text-align: center; color: var(--text-muted); font-size: 0.75rem; margin: 14px 0 0; }
+.gr-action-link { display: inline-flex; align-items: center; gap: 6px; padding: 0.5rem 1.1rem; border-radius: 8px; border: 1.5px solid var(--spice); color: var(--spice); background: #fff; font-weight: 700; font-size: 0.88rem; text-decoration: none; transition: background 0.15s, color 0.15s; }
+.gr-action-link:hover { background: #fff5ef; }
+.gr-action-link.is-primary { background: var(--spice); color: #fff; }
+.gr-action-link.is-primary:hover { opacity: 0.88; }
 @media (max-width: 640px) { .gr-nav { display: none; } }
 
 /* ---- "Your food is ready" ---- */
