@@ -938,7 +938,7 @@ function CarouselTab() {
                       const img = e.currentTarget;
                       if (!img.dataset.fallback) {
                         img.dataset.fallback = '1';
-                        img.src = '/bg-hero-img.webp';
+                        img.src = '/uploads/1792484379649-8d372e4a42c3ddf9.jpg';
                       }
                     }}
                     style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', minHeight: 88 }}

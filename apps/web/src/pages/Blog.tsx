@@ -113,7 +113,7 @@ export default function Blog() {
       'description': p.excerpt || p.title,
       'url': `https://kalpnacurry.com/blog/${p.slug}`,
       'datePublished': p.publishedAt || p.createdAt,
-      'image': p.coverImage || 'https://kalpnacurry.com/bg-hero-img.webp',
+      'image': p.coverImage || 'https://kalpnacurry.com/kalpna.webp',
       'author': {
         '@type': 'Person',
         'name': p.author || 'Kalpna シェフ'
@@ -150,7 +150,7 @@ export default function Blog() {
       <meta property="og:description" content="熊谷の本格インド料理店カルプナの公式ブログ。スパイスの秘密、備長炭窯焼きナン、ランチやイベント情報を発信中。" />
       <meta property="og:type" content="blog" />
       <meta property="og:url" content="https://kalpnacurry.com/blog" />
-      <meta property="og:image" content="https://kalpnacurry.com/bg-hero-img.webp" />
+      <meta property="og:image" content="https://kalpnacurry.com/kalpna.webp" />
 
       {/* Structured Data for Generative AI & Google Rich Snippets */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(blogJsonLd) }} />

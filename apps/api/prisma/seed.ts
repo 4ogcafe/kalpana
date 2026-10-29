@@ -162,7 +162,7 @@ async function main() {
       data: [
         {
           placement: 'HOME',
-          imageUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1920&q=80',
+          imageUrl: '/kalpna.webp',
           titleEn: 'Authentic Indian Flavors',
           titleJa: 'インドの香りを、そのままに',
           altEn: 'Authentic Indian restaurant atmosphere with traditional dishes',
@@ -171,7 +171,7 @@ async function main() {
         },
         {
           placement: 'HOME',
-          imageUrl: 'https://images.unsplash.com/photo-1589302168068-964664d93dc0?auto=format&fit=crop&w=1920&q=80',
+          imageUrl: '/uploads/1792268554871-2f79adbc5cc35dfe.webp',
           titleEn: 'Freshly Baked Naan & Curries',
           titleJa: '焼きたてナンと本格スパイスカレー',
           altEn: 'Freshly baked tandoori naan and rich curry bowls',
@@ -180,7 +180,7 @@ async function main() {
         },
         {
           placement: 'HOME',
-          imageUrl: 'https://images.unsplash.com/photo-1552566626-52f8b828add9?auto=format&fit=crop&w=1920&q=80',
+          imageUrl: '/uploads/1792268627977-04a9cb4d784139f9.jpg',
           titleEn: 'Traditional Charcoal Tandoor',
           titleJa: '炭火粘土窯で焼き上げるタンドール料理',
           altEn: 'Master chef preparing tandoori specialties in traditional clay oven',
@@ -189,7 +189,7 @@ async function main() {
         },
         {
           placement: 'CONTACT',
-          imageUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1920&q=80',
+          imageUrl: '/uploads/1792268012355-415729a8b06aa65e.webp',
           titleEn: 'Visit Kalpna in Kumagaya',
           titleJa: '熊谷でお待ちしております',
           altEn: 'Kalpna Indian Cuisine dining hall in Kumagaya',

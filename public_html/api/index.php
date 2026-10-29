@@ -245,12 +245,12 @@ function ensureDefaultDatabaseData(PDO $pdo): array {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1, 1, ?, ?, ?, ?, ?)');
 
             $samples = [
-                ['item_1', 'cat_curry', 'Butter Chicken Curry', 'バターチキンカレー', 'Creamy tomato-based chicken curry with rich butter aroma.', 'トマトベースの濃厚でコクのあるクリーミーなチキンカレー。', 1200, '/bg-hero-img.webp', 1, 1, 0, 0, 1, 0, 1, ['LUNCH', 'TAKEOUT', 'GRAND'], ['乳']],
-                ['item_2', 'cat_mutton', 'Keema Curry', 'キーマカレー', 'Minced mutton curry spiced with fragrant whole spices.', 'スパイス香る挽肉の旨味たっぷりキーマカレー。', 1100, '/bg-hero-img.webp', 3, 1, 0, 0, 1, 0, 2, ['GRAND', 'TAKEOUT'], []],
-                ['item_3', 'cat_bread', 'Cheese Naan', 'チーズナン', 'Freshly baked naan stuffed with melted mozzarella cheese.', 'とろ〜り溶け出すたっぷりチーズの本格ナン。', 550, '/bg-hero-img.webp', 0, 1, 1, 0, 1, 0, 1, ['LUNCH', 'TAKEOUT', 'GRAND'], ['乳', '小麦']],
-                ['item_4', 'cat_bread', 'Garlic Naan', 'ガーリックナン', 'Crispy naan topped with fresh chopped garlic and herbs.', '香ばしいガーリックをトッピングした風味豊かなナン。', 400, '/bg-hero-img.webp', 0, 0, 1, 1, 1, 0, 2, ['GRAND', 'TAKEOUT'], ['小麦']],
-                ['item_5', 'cat_lunch_set', 'Lunch Set A', 'ランチセット A', 'Choice of curry, plain naan or rice, and mini salad.', 'お好みのカレー1種、プレーンナンまたはライス、ミニサラダ付き。', 950, '/bg-hero-img.webp', 1, 1, 0, 0, 1, 0, 1, ['LUNCH'], ['乳', '小麦']],
-                ['item_6', 'cat_lunch_set', 'Lunch Set B (Cheese Naan)', 'チーズナンランチセット', 'Choice of curry, cheese naan, and mini salad.', 'お好みのカレー、チーズナン、ミニサラダがセットになった大満足ランチ。', 1150, '/bg-hero-img.webp', 1, 1, 0, 0, 1, 0, 2, ['LUNCH'], ['乳', '小麦']],
+                ['item_1', 'cat_curry', 'Butter Chicken Curry', 'バターチキンカレー', 'Creamy tomato-based chicken curry with rich butter aroma.', 'トマトベースの濃厚でコクのあるクリーミーなチキンカレー。', 1200, '/uploads/1792845269-3c46d03a68dd8916.webp', 1, 1, 0, 0, 1, 0, 1, ['LUNCH', 'TAKEOUT', 'GRAND'], ['乳']],
+                ['item_2', 'cat_mutton', 'Keema Curry', 'キーマカレー', 'Minced mutton curry spiced with fragrant whole spices.', 'スパイス香る挽肉の旨味たっぷりキーマカレー。', 1100, '/uploads/1792845269-3c46d03a68dd8916.webp', 3, 1, 0, 0, 1, 0, 2, ['GRAND', 'TAKEOUT'], []],
+                ['item_3', 'cat_bread', 'Cheese Naan', 'チーズナン', 'Freshly baked naan stuffed with melted mozzarella cheese.', 'とろ〜り溶け出すたっぷりチーズの本格ナン。', 550, '/uploads/1793235169-18d888af1f82b668.webp', 0, 1, 1, 0, 1, 0, 1, ['LUNCH', 'TAKEOUT', 'GRAND'], ['乳', '小麦']],
+                ['item_4', 'cat_bread', 'Garlic Naan', 'ガーリックナン', 'Crispy naan topped with fresh chopped garlic and herbs.', '香ばしいガーリックをトッピングした風味豊かなナン。', 400, '/uploads/1793235205-bd02e307eb24c66f.webp', 0, 0, 1, 1, 1, 0, 2, ['GRAND', 'TAKEOUT'], ['小麦']],
+                ['item_5', 'cat_lunch_set', 'Lunch Set A', 'ランチセット A', 'Choice of curry, plain naan or rice, and mini salad.', 'お好みのカレー1種、プレーンナンまたはライス、ミニサラダ付き。', 950, '/uploads/1793237909-e9299426f5e7f773.webp', 1, 1, 0, 0, 1, 0, 1, ['LUNCH'], ['乳', '小麦']],
+                ['item_6', 'cat_lunch_set', 'Lunch Set B (Cheese Naan)', 'チーズナンランチセット', 'Choice of curry, cheese naan, and mini salad.', 'お好みのカレー、チーズナン、ミニサラダがセットになった大満足ランチ。', 1150, '/uploads/1793237909-e9299426f5e7f773.webp', 1, 1, 0, 0, 1, 0, 2, ['LUNCH'], ['乳', '小麦']],
             ];
 
             foreach ($samples as $s) {
@@ -276,10 +276,10 @@ function ensureDefaultDatabaseData(PDO $pdo): array {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)');
 
             $slides = [
-                ['slide_1', 'HOME', '/bg-hero-img.webp', 'Authentic Indian Curry and Naan', '本格インド料理と焼きたてナン', 'Authentic Indian Flavors', '本格スパイスが香る、伝統のインド料理', 'Handcrafted curries and tandoori specials.', 'タンドール窯で焼き上げるナンと極上のスパイスカレー', 1],
-                ['slide_2', 'HOME', '/bg-hero-img.webp', 'Freshly baked tandoori naan and rich curry bowls', '焼きたてナンと本格スパイスカレー', 'Freshly Baked Naan & Curries', '焼きたてナンと本格スパイスカレー', 'Fresh from our charcoal tandoor oven.', '炭火粘土窯で焼き上げるタンドール料理', 2],
-                ['slide_3', 'HOME', '/bg-hero-img.webp', 'Master chef preparing tandoori specialties in traditional clay oven', '熟練シェフの本格タンドール料理', 'Traditional Charcoal Tandoor', '伝統のタンドール炭火焼料理', 'Finest spices blended with culinary passion.', '長年磨き上げたスパイスの魔法', 3],
-                ['slide_4', 'CONTACT', '/bg-hero-img.webp', 'Kalpna Indian Cuisine dining hall in Kumagaya', 'カルプナ熊谷店', 'Visit Kalpna in Kumagaya', '熊谷でお待ちしております', 'Conveniently located with parking available.', '国道17号沿い・駐車場12台完備', 1]
+                ['slide_1', 'HOME', '/uploads/1792484379649-8d372e4a42c3ddf9.jpg', 'Authentic Indian Curry and Naan', '本格インド料理と焼きたてナン', 'Authentic Indian Flavors', '本格スパイスが香る、伝統のインド料理', 'Handcrafted curries and tandoori specials.', 'タンドール窯で焼き上げるナンと極上のスパイスカレー', 1],
+                ['slide_2', 'HOME', '/uploads/1792268554871-2f79adbc5cc35dfe.webp', 'Freshly baked tandoori naan and rich curry bowls', '焼きたてナンと本格スパイスカレー', 'Freshly Baked Naan & Curries', '焼きたてナンと本格スパイスカレー', 'Fresh from our charcoal tandoor oven.', '炭火粘土窯で焼き上げるタンドール料理', 2],
+                ['slide_3', 'HOME', '/uploads/1792268627977-04a9cb4d784139f9.jpg', 'Master chef preparing tandoori specialties in traditional clay oven', '熟練シェフの本格タンドール料理', 'Traditional Charcoal Tandoor', '伝統のタンドール炭火焼料理', 'Finest spices blended with culinary passion.', '長年磨き上げたスパイスの魔法', 3],
+                ['slide_4', 'CONTACT', '/uploads/1792268012355-415729a8b06aa65e.webp', 'Kalpna Indian Cuisine dining hall in Kumagaya', 'カルプナ熊谷店', 'Visit Kalpna in Kumagaya', '熊谷でお待ちしております', 'Conveniently located with parking available.', '国道17号沿い・駐車場12台完備', 1]
             ];
             foreach ($slides as $sl) {
                 $slideIns->execute($sl);
@@ -339,7 +339,7 @@ function ensureDefaultDatabaseData(PDO $pdo): array {
                     '熊谷・国道17号沿いランチに大人気！ナン・ライスおかわり無料＆テイクアウトもOKなインドカレー',
                     "## 熊谷でランチをお探しなら！Kalpna（カルプナ）のお得なランチサービス\n\n埼玉県熊谷市佐谷田、国道17号沿いに位置する「Kalpna（カルプナ）」は、広い専用駐車場（12台完備）と居心地の良い落ち着いたテーブル席を備えた本格インド料理レストランです。\n\nビジネスの合間のランチ、ご家族連れでのお食事、ドライブ途中の立ち寄りにも大変便利にご利用いただいております。\n\n### Kalpnaランチの嬉しいポイント\n\n1. **ナン・ライスのおかわり無料！**\n   ランチセットをご注文のお客様は、焼きたてプレーンナンおよびライスが何度でもおかわり自由です。お腹いっぱい満足できるボリュームをお約束します。\n2. **選べる本格カレー＆辛さ調節**\n   日替わりカレーをはじめ、定番のチキンカレー、濃厚バターチキン、キーマ、マトン、ベジタブルなど豊富なラインナップをご用意。お子様用甘口から激辛までお好みに合わせて調整できます。\n3. **WEB＆電話で事前テイクアウト注文OK**\n   お忙しいランチタイムやご自宅での夕食には、テイクアウト事前予約が便利です。店頭での待ち時間ゼロで出来立て熱々のカレーをお持ち帰りいただけます。\n\n### 店舗情報・アクセス\n\n- **所在地：** 〒360-0023 埼玉県熊谷市佐谷田2081（国道17号沿い・加賀家食堂様隣）\n- **営業時間：** ランチ 11:30〜15:00 / ディナー 17:00〜22:00（火曜定休日）\n- **駐車場：** 敷地内12台（無料）\n- **お電話：** 048-514-8386\n\nスタッフ一同、温かいおもてなしと本格スパイスの香りで皆様のご来店を心よりお待ちしております。",
                     '熊谷市佐谷田・国道17号沿い、駐車場12台完備。ランチタイムはお得なセットメニューと焼きたてプレーンナン・ライスのおかわり無料サービスをご提供しています。',
-                    'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80',
+                    '/uploads/1792268627977-04a9cb4d784139f9.jpg',
                     'お知らせ・ランチ',
                     json_encode(['熊谷ランチ', '国道17号', 'おかわり無料', 'テイクアウト', '駐車場完備']),
                     'Kalpna スタッフ',
@@ -933,14 +933,15 @@ function runDatabaseMigrations(PDO $pdo): array {
 
     // Restore CarouselSlide, Settings, and MenuItem images in isolated try/catch blocks
     try {
-        // Restore CarouselSlide images if empty or broken
-        $pdo->exec("UPDATE `CarouselSlide` SET `imageUrl` = '/uploads/1792484379649-8d372e4a42c3ddf9.jpg' WHERE `id` = 'a94a4c65-902a-4431-813d-ac205b285cac' AND (`imageUrl` IS NULL OR `imageUrl` = '')");
-        $pdo->exec("UPDATE `CarouselSlide` SET `imageUrl` = '/uploads/1792268554871-2f79adbc5cc35dfe.webp' WHERE `id` = '3d689f0f-63c2-4f7d-9d78-30defb0408b9' AND (`imageUrl` IS NULL OR `imageUrl` = '')");
-        $pdo->exec("UPDATE `CarouselSlide` SET `imageUrl` = '/uploads/1792268012355-415729a8b06aa65e.webp' WHERE `id` = '5bf7701a-6ea0-4e0f-92a1-90dc84bb19fd' AND (`imageUrl` IS NULL OR `imageUrl` = '')");
-        $pdo->exec("UPDATE `CarouselSlide` SET `imageUrl` = '/uploads/1792268627977-04a9cb4d784139f9.jpg' WHERE `id` = '89c95ac1-a093-47a5-98e4-e8514ee55bc5' AND (`imageUrl` IS NULL OR `imageUrl` = '')");
-        $pdo->exec("UPDATE `CarouselSlide` SET `imageUrl` = '/uploads/1792484379649-8d372e4a42c3ddf9.jpg' WHERE `placement` = 'HOME' AND (`imageUrl` IS NULL OR `imageUrl` = '') AND `sortOrder` = 0");
-        $pdo->exec("UPDATE `CarouselSlide` SET `imageUrl` = '/uploads/1792268554871-2f79adbc5cc35dfe.webp' WHERE `placement` = 'HOME' AND (`imageUrl` IS NULL OR `imageUrl` = '')");
-        $pdo->exec("UPDATE `CarouselSlide` SET `imageUrl` = '/uploads/1792268012355-415729a8b06aa65e.webp' WHERE `placement` = 'CONTACT' AND (`imageUrl` IS NULL OR `imageUrl` = '')");
+        // Restore CarouselSlide images if empty or broken or using removed bg-hero-img or stock interior photo
+        $pdo->exec("UPDATE `CarouselSlide` SET `imageUrl` = '/uploads/1792484379649-8d372e4a42c3ddf9.jpg' WHERE `id` = 'a94a4c65-902a-4431-813d-ac205b285cac' AND (`imageUrl` IS NULL OR `imageUrl` = '' OR `imageUrl` LIKE '%bg-hero-img%' OR `imageUrl` LIKE '%1517248135467%')");
+        $pdo->exec("UPDATE `CarouselSlide` SET `imageUrl` = '/uploads/1792268554871-2f79adbc5cc35dfe.webp' WHERE `id` = '3d689f0f-63c2-4f7d-9d78-30defb0408b9' AND (`imageUrl` IS NULL OR `imageUrl` = '' OR `imageUrl` LIKE '%bg-hero-img%' OR `imageUrl` LIKE '%1517248135467%')");
+        $pdo->exec("UPDATE `CarouselSlide` SET `imageUrl` = '/uploads/1792268012355-415729a8b06aa65e.webp' WHERE `id` = '5bf7701a-6ea0-4e0f-92a1-90dc84bb19fd' AND (`imageUrl` IS NULL OR `imageUrl` = '' OR `imageUrl` LIKE '%bg-hero-img%' OR `imageUrl` LIKE '%1517248135467%')");
+        $pdo->exec("UPDATE `CarouselSlide` SET `imageUrl` = '/uploads/1792268627977-04a9cb4d784139f9.jpg' WHERE `id` = '89c95ac1-a093-47a5-98e4-e8514ee55bc5' AND (`imageUrl` IS NULL OR `imageUrl` = '' OR `imageUrl` LIKE '%bg-hero-img%' OR `imageUrl` LIKE '%1517248135467%')");
+        $pdo->exec("UPDATE `CarouselSlide` SET `imageUrl` = '/uploads/1792484379649-8d372e4a42c3ddf9.jpg' WHERE `placement` = 'HOME' AND (`imageUrl` IS NULL OR `imageUrl` = '' OR `imageUrl` LIKE '%bg-hero-img%' OR `imageUrl` LIKE '%1517248135467%') AND `sortOrder` <= 1");
+        $pdo->exec("UPDATE `CarouselSlide` SET `imageUrl` = '/uploads/1792268554871-2f79adbc5cc35dfe.webp' WHERE `placement` = 'HOME' AND (`imageUrl` IS NULL OR `imageUrl` = '' OR `imageUrl` LIKE '%bg-hero-img%' OR `imageUrl` LIKE '%1517248135467%')");
+        $pdo->exec("UPDATE `CarouselSlide` SET `imageUrl` = '/uploads/1792268012355-415729a8b06aa65e.webp' WHERE `placement` = 'CONTACT' AND (`imageUrl` IS NULL OR `imageUrl` = '' OR `imageUrl` LIKE '%bg-hero-img%' OR `imageUrl` LIKE '%1517248135467%')");
+        $pdo->exec("UPDATE `BlogPost` SET `coverImage` = '/uploads/1792268627977-04a9cb4d784139f9.jpg' WHERE `coverImage` LIKE '%1517248135467%' OR `coverImage` LIKE '%bg-hero-img%'");
     } catch (Exception $e) {}
 
     try {
@@ -1050,10 +1051,11 @@ function runDatabaseMigrations(PDO $pdo): array {
             "fb6c2a59-6731-494c-b44b-adced3e4d2f2" => "/uploads/1793237767-3393fbe1e88a45a6.webp",
             "fc6aad05-1878-4692-ad4b-4e6a30306e04" => "/uploads/1793235480-f4a3cf18aff465af.webp",
         ];
-        $fixStmt = $pdo->prepare("UPDATE `MenuItem` SET `imageUrl` = ? WHERE `id` = ? AND (`imageUrl` IS NULL OR `imageUrl` = '' OR `imageUrl` LIKE '%.jpg')");
+        $fixStmt = $pdo->prepare("UPDATE `MenuItem` SET `imageUrl` = ? WHERE `id` = ? AND (`imageUrl` IS NULL OR `imageUrl` = '' OR `imageUrl` LIKE '%.jpg' OR `imageUrl` LIKE '%bg-hero-img%')");
         foreach ($menuImageFixes as $itemId => $newImg) {
             $fixStmt->execute([$newImg, $itemId]);
         }
+        $pdo->exec("UPDATE `MenuItem` SET `imageUrl` = '/uploads/1792845269-3c46d03a68dd8916.webp' WHERE `imageUrl` LIKE '%bg-hero-img%'");
     } catch (Exception $e) {}
 
     return [
@@ -1448,9 +1450,9 @@ if ($method === 'DELETE' && preg_match('#^/menu/categories/([a-zA-Z0-9_-]+)/?$#'
 // Endpoint: GET /menu/items
 // -------------------------------------------------------------
 if ($method === 'GET' && ($subPath === '/menu/items' || $subPath === '/menu/items/')) {
-    // Self-heal broken legacy .jpg menu item imageUrls if any remain
+    // Self-heal broken legacy .jpg or removed bg-hero-img menu item imageUrls if any remain
     try {
-        $brokenImgCheck = (int)$pdo->query("SELECT COUNT(*) FROM MenuItem WHERE imageUrl LIKE '/uploads/17930%.jpg' OR imageUrl LIKE '/uploads/17931%.jpg'")->fetchColumn();
+        $brokenImgCheck = (int)$pdo->query("SELECT COUNT(*) FROM MenuItem WHERE imageUrl LIKE '/uploads/17930%.jpg' OR imageUrl LIKE '/uploads/17931%.jpg' OR imageUrl LIKE '%bg-hero-img%'")->fetchColumn();
         if ($brokenImgCheck > 0) {
             runDatabaseMigrations($pdo);
         }
@@ -2002,9 +2004,9 @@ if ($method === 'GET' && ($subPath === '/carousels' || $subPath === '/carousels/
     $showAll = isset($_GET['all']) && $_GET['all'] === 'true';
     $placement = isset($_GET['placement']) && $_GET['placement'] === 'CONTACT' ? 'CONTACT' : 'HOME';
 
-    // Self-heal any CarouselSlide rows with empty imageUrl
+    // Self-heal any CarouselSlide rows with empty or removed bg-hero-img or stock interior imageUrl
     try {
-        $emptyCheck = (int)$pdo->query("SELECT COUNT(*) FROM CarouselSlide WHERE imageUrl IS NULL OR imageUrl = ''")->fetchColumn();
+        $emptyCheck = (int)$pdo->query("SELECT COUNT(*) FROM CarouselSlide WHERE imageUrl IS NULL OR imageUrl = '' OR imageUrl LIKE '%bg-hero-img%' OR imageUrl LIKE '%1517248135467%'")->fetchColumn();
         if ($emptyCheck > 0) {
             runDatabaseMigrations($pdo);
         }
@@ -2019,7 +2021,7 @@ if ($method === 'GET' && ($subPath === '/carousels' || $subPath === '/carousels/
     $slides = $stmt->fetchAll();
     $formatted = array_map(function ($s) {
         $s['isActive'] = (bool)$s['isActive'];
-        if (empty($s['imageUrl'])) {
+        if (empty($s['imageUrl']) || strpos((string)$s['imageUrl'], 'bg-hero-img') !== false || strpos((string)$s['imageUrl'], '1517248135467') !== false) {
             if (($s['placement'] ?? 'HOME') === 'CONTACT') {
                 $s['imageUrl'] = '/uploads/1792268012355-415729a8b06aa65e.webp';
             } elseif ((int)($s['sortOrder'] ?? 0) === 0) {
@@ -3544,6 +3546,9 @@ if ($method === 'POST' && ($subPath === '/reviews/admin/clear-error' || $subPath
 // -------------------------------------------------------------
 if ($method === 'GET' && ($subPath === '/blogs/admin/all' || $subPath === '/blog/admin/all')) {
     requireAdminUser($jwtSecret, $pdo);
+    try {
+        $pdo->exec("UPDATE `BlogPost` SET `coverImage` = '/uploads/1792268627977-04a9cb4d784139f9.jpg' WHERE `coverImage` LIKE '%1517248135467%' OR `coverImage` LIKE '%bg-hero-img%'");
+    } catch (Exception $e) {}
     $stmt = $pdo->query('SELECT id, slug, title, content, excerpt, coverImage, category, tags, author, readTimeMinutes, isPublished, publishedAt, metaTitle, metaDescription, createdAt, updatedAt FROM BlogPost ORDER BY createdAt DESC');
     $posts = $stmt->fetchAll();
     foreach ($posts as &$p) {
@@ -3712,6 +3717,9 @@ if ($method === 'DELETE' && preg_match('#^/blogs?/admin/([a-zA-Z0-9_-]+)/?$#', $
 // Endpoint: GET /blogs/:slug (Public single post by slug/id)
 // -------------------------------------------------------------
 if ($method === 'GET' && preg_match('#^/blogs?/([^/]+)/?$#', $subPath, $matches) && !in_array($matches[1], ['admin', 'all'])) {
+    try {
+        $pdo->exec("UPDATE `BlogPost` SET `coverImage` = '/uploads/1792268627977-04a9cb4d784139f9.jpg' WHERE `coverImage` LIKE '%1517248135467%' OR `coverImage` LIKE '%bg-hero-img%'");
+    } catch (Exception $e) {}
     $slugOrId = urldecode($matches[1]);
     $stmt = $pdo->prepare('SELECT * FROM BlogPost WHERE slug = ? OR id = ? LIMIT 1');
     $stmt->execute([$slugOrId, $slugOrId]);
@@ -3744,6 +3752,9 @@ if ($method === 'GET' && preg_match('#^/blogs?/([^/]+)/?$#', $subPath, $matches)
 // Endpoint: GET /blogs (Public published posts list)
 // -------------------------------------------------------------
 if ($method === 'GET' && ($subPath === '/blogs' || $subPath === '/blog' || $subPath === '/blogs/' || $subPath === '/blog/')) {
+    try {
+        $pdo->exec("UPDATE `BlogPost` SET `coverImage` = '/uploads/1792268627977-04a9cb4d784139f9.jpg' WHERE `coverImage` LIKE '%1517248135467%' OR `coverImage` LIKE '%bg-hero-img%'");
+    } catch (Exception $e) {}
     $category = $_GET['category'] ?? null;
     $search = $_GET['search'] ?? null;
     $limit = !empty($_GET['limit']) ? min(50, max(1, (int)$_GET['limit'])) : 30;

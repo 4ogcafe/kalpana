@@ -10,9 +10,9 @@ import NotFound from './NotFound';
 import { getCategoryIcon } from '../lib/category-icons';
 
 const HERO_IMAGES: Record<string, string> = {
-  lunch: 'https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&w=1920&q=80',
-  takeout: 'https://images.unsplash.com/photo-1551224650-9c25e628120e?auto=format&fit=crop&w=1920&q=80',
-  grand: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1920&q=80'
+  lunch: '/uploads/1792268627977-04a9cb4d784139f9.jpg',
+  takeout: '/uploads/1792268719906-8656cdc63fcd1389.jpg',
+  grand: '/uploads/1792268012355-415729a8b06aa65e.webp'
 };
 
 const SPICE_LABELS: Record<number, string> = {
@@ -27,7 +27,7 @@ function getSpiceLabel(level: number): string {
   return SPICE_LABELS[level] || `辛さ Lv.${level}`;
 }
 
-const DEFAULT_IMAGE = '/bg-hero-img.webp';
+const DEFAULT_IMAGE = '/uploads/1792845269-3c46d03a68dd8916.webp';
 
 function handleMenuImgError(e: React.SyntheticEvent<HTMLImageElement>) {
   const img = e.currentTarget;
@@ -192,7 +192,7 @@ export default function Menu() {
       halal: Boolean(item.isHalal),
       spiceLevel: typeof item.spiceLevel === 'number' ? item.spiceLevel : 0,
       allergens: Array.isArray(item.allergens) ? item.allergens : [],
-      img: assetUrl(item.imageUrl) || DEFAULT_IMAGE,
+      img: (item.imageUrl && !item.imageUrl.includes('bg-hero-img') ? assetUrl(item.imageUrl) : null) || DEFAULT_IMAGE,
       categoryId: catId,
       optionGroups: resolvedGroups.length > 0 ? resolvedGroups : undefined,
       rating: typeof item.rating === 'number' ? item.rating : null,
@@ -204,7 +204,8 @@ export default function Menu() {
   categories.forEach(cat => cat.items.sort((a: any, b: any) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)));
   const flatItems = categories.flatMap(cat => cat.items);
 
-  const defaultHero = carousels.length > 0 ? carousels[0].imageUrl : 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1920&q=80';
+  const validCarousels = carousels.filter(c => c.imageUrl && !c.imageUrl.includes('bg-hero-img') && !c.imageUrl.includes('1517248135467'));
+  const defaultHero = validCarousels.length > 0 ? validCarousels[0].imageUrl : '/uploads/1792268012355-415729a8b06aa65e.webp';
 
   const menuInfo = {
     title: menuType === 'lunch' ? 'ランチメニュー' : menuType === 'takeout' ? 'テイクアウト' : 'グランドメニュー',

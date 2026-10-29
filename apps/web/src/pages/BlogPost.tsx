@@ -151,7 +151,7 @@ export default function BlogPost() {
   const canonicalUrl = `https://kalpnacurry.com/blog/${post.slug}`;
   const pageTitle = post.metaTitle?.trim() || `${post.title} | Kalpna (カルプナ) 熊谷`;
   const pageDescription = post.metaDescription?.trim() || post.excerpt || `${post.title} - 埼玉県熊谷市の本格インド料理店Kalpna（カルプナ）公式ブログ。`;
-  const postImage = assetUrl(post.coverImage) || 'https://kalpnacurry.com/bg-hero-img.webp';
+  const postImage = assetUrl(post.coverImage) || 'https://kalpnacurry.com/kalpna.webp';
 
   // AI SEO & DEO (Direct Engine Optimization) BlogPosting Schema
   const blogPostingJsonLd = {

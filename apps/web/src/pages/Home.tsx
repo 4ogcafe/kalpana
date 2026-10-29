@@ -7,10 +7,11 @@ import { loadReviews } from '../lib/reviews';
 import EmphasisText from '../components/EmphasisText';
 
 const DEFAULT_HERO_IMAGES = [
-  "/uploads/1792484379649-8d372e4a42c3ddf9.jpg",
+  "/kalpna.webp",
   "/uploads/1792268554871-2f79adbc5cc35dfe.webp",
-  "/bg-hero-img.webp",
+  "/uploads/1792268627977-04a9cb4d784139f9.jpg",
 ];
+const DEFAULT_MENU_IMAGE = "/uploads/1792845269-3c46d03a68dd8916.webp";
 
 const MAP_EMBED_PREFIX = 'https://www.google.com/maps/embed';
 const DEFAULT_MAP_EMBED = "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3221.724944983944!2d139.41883000000002!3d36.1251!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x601f2b0605446c1f%3A0x1a31a406a1c1b3d6!2sKalpna%20Indian%20Cuisine!5e0!3m2!1sen!2sus!4v1700000000000!5m2!1sen!2sus";
@@ -61,7 +62,9 @@ export default function Home() {
       .catch(console.error);
   }, []);
 
-  const validCarouselImages = carousels.map(c => assetUrl(c.imageUrl)).filter((u): u is string => Boolean(u));
+  const validCarouselImages = carousels
+    .map(c => assetUrl(c.imageUrl))
+    .filter((u): u is string => Boolean(u) && !u.includes('bg-hero-img') && !u.includes('1517248135467'));
   const heroImages = validCarouselImages.length > 0 ? validCarouselImages : DEFAULT_HERO_IMAGES;
   const recommendedItems = menuItems.filter(item => item.isRecommended).slice(0, 4);
   const regularItems = menuItems.filter(item => !item.isRecommended);
@@ -105,7 +108,7 @@ export default function Home() {
               const target = e.currentTarget;
               if (!target.dataset.fallback) {
                 target.dataset.fallback = '1';
-                target.src = '/bg-hero-img.webp';
+                target.src = DEFAULT_HERO_IMAGES[0];
               }
             }}
             className="slide-bg-img" 
@@ -265,7 +268,7 @@ export default function Home() {
                 <div key={`${item.id}-${idx}`} style={{ minWidth: '280px', flex: '0 0 280px', backgroundColor: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column' }}>
                   <div style={{ height: '220px', width: '100%', backgroundColor: '#f9f6f0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
                     <img
-                      src={assetUrl(item.imageUrl) || "/bg-hero-img.webp"}
+                      src={(item.imageUrl && !item.imageUrl.includes('bg-hero-img') ? assetUrl(item.imageUrl) : null) || DEFAULT_MENU_IMAGE}
                       alt={item.nameJa || item.nameEn}
                       loading="lazy"
                       decoding="async"
@@ -275,7 +278,7 @@ export default function Home() {
                         const target = e.currentTarget;
                         if (!target.dataset.fallback) {
                           target.dataset.fallback = '1';
-                          target.src = '/bg-hero-img.webp';
+                          target.src = DEFAULT_MENU_IMAGE;
                         }
                       }}
                       style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }}
@@ -319,7 +322,7 @@ export default function Home() {
                 <div key={item.id} style={{ backgroundColor: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column' }}>
                   <div style={{ height: '220px', width: '100%', backgroundColor: '#f9f6f0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
                     <img
-                      src={assetUrl(item.imageUrl) || "/bg-hero-img.webp"}
+                      src={(item.imageUrl && !item.imageUrl.includes('bg-hero-img') ? assetUrl(item.imageUrl) : null) || DEFAULT_MENU_IMAGE}
                       alt={item.nameJa || item.nameEn}
                       loading="lazy"
                       decoding="async"
@@ -329,7 +332,7 @@ export default function Home() {
                         const target = e.currentTarget;
                         if (!target.dataset.fallback) {
                           target.dataset.fallback = '1';
-                          target.src = '/bg-hero-img.webp';
+                          target.src = DEFAULT_MENU_IMAGE;
                         }
                       }}
                       style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }}

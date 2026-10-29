@@ -160,7 +160,7 @@ export default function Navbar() {
             <button onClick={handleClose} aria-label="閉じる" style={{ position: 'absolute', top: '15px', right: '15px', background: 'white', border: 'none', color: 'var(--text-muted)', fontSize: '1.5rem', cursor: 'pointer', width: '30px', height: '30px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 10px rgba(0,0,0,0.1)', zIndex: 10 }}>×</button>
             
             {/* Header image */}
-            <div style={{ height: '120px', width: '100%', backgroundImage: 'url(https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80)', backgroundSize: 'cover', backgroundPosition: 'center', position: 'relative' }}>
+            <div style={{ height: '120px', width: '100%', backgroundImage: 'url(/uploads/1792268554871-2f79adbc5cc35dfe.webp)', backgroundSize: 'cover', backgroundPosition: 'center', position: 'relative' }}>
               <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(42, 35, 33, 0.6)' }}></div>
               <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '1.8rem', fontWeight: 'bold', fontFamily: 'var(--font-display)', letterSpacing: '1px' }}>
                 オンライン予約
