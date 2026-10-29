@@ -27,6 +27,7 @@ export default function RefundPolicy() {
     <main style={{ backgroundColor: '#faf7f2', minHeight: '100vh', color: '#1f2937' }}>
       <title>返金・キャンセルポリシー (特定商取引法に基づく表記) | Kalpna</title>
       <meta name="description" content="本格インド料理カルプナの返金・キャンセルポリシーです。テイクアウト、デリバリー、お席のご予約に関するキャンセルや返金基準をご案内します。" />
+      <link rel="canonical" href="https://kalpnacurry.com/refund-policy" />
 
       {/* Hero Header */}
       <div style={{

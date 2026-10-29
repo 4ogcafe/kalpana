@@ -18,6 +18,7 @@ export default function About() {
     <main>
       <title>私たちについて | Kalpna (カルプナ)</title>
       <meta name="description" content="熊谷の本格インド料理店カルプナの物語、スパイスへのこだわり、シェフをご紹介します。" />
+      <link rel="canonical" href="https://kalpnacurry.com/about" />
 
       {/* About Hero */}
       <div className="home-hero" style={{ height: '50vh', minHeight: '400px' }}>

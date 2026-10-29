@@ -192,7 +192,7 @@ export default function BlogPost() {
         'postalCode': '360-0023',
         'addressCountry': 'JP'
       },
-      'telephone': '048-514-8386'
+      'telephone': '048-577-7497'
     },
     'keywords': Array.isArray(post.tags) ? post.tags.join(', ') : 'インドカレー, スパイス, 熊谷',
     'articleSection': post.category || 'インド料理',

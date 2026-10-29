@@ -48,6 +48,7 @@ export default function Contact() {
     <main>
       <title>お問い合わせ | Kalpna (カルプナ)</title>
       <meta name="description" content="カルプナへのご予約・貸し切り・ケータリングのご相談はこちらから。住所・電話番号・地図もご確認いただけます。" />
+      <link rel="canonical" href="https://kalpnacurry.com/contact" />
       {/* Hero Section */}
       <div className="home-hero" style={{ height: '40vh', minHeight: '300px' }}>
         <img src={assetUrl(settings.contactHeroImage) || "https://images.unsplash.com/photo-1590846406792-0adc7f928f1d?auto=format&fit=crop&w=1920&q=80"} alt="" fetchPriority="high" className="slide-bg-img" style={{ opacity: 0.5, objectFit: 'cover' }} />

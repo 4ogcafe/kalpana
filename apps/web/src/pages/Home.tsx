@@ -93,6 +93,7 @@ export default function Home() {
     <main>
       <title>Kalpna (カルプナ) | 熊谷の本格インド料理</title>
       <meta name="description" content="埼玉・熊谷の本格インド料理店カルプナ。タンドール窯で焼き上げるナン、スパイス香るカレー、ランチ・テイクアウト・グランドメニューをご案内します。" />
+      <link rel="canonical" href="https://kalpnacurry.com/" />
       {/* Hero Slider */}
       <div className="home-hero">
         {heroImages.slice(0, loadedSlides).map((img, index) => (

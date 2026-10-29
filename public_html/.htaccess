@@ -1,9 +1,11 @@
 DirectoryIndex index.html index.php
 
-# Rules use relative paths (no RewriteBase) so they work whether this folder
-# is the web root or is reached through the repo-root .htaccess.
 <IfModule mod_rewrite.c>
   RewriteEngine On
+
+  # Redirect www to non-www (HTTPS)
+  RewriteCond %{HTTP_HOST} ^www\.kalpnacurry\.com$ [NC]
+  RewriteRule ^(.*)$ https://kalpnacurry.com/$1 [R=301,L]
 
   # 1. Block access to hidden files, config files, env, and source code
   RewriteRule "(^|/)\.(?!well-known)" - [F,L]
@@ -24,10 +26,33 @@ DirectoryIndex index.html index.php
   RewriteRule ^ index.html [L]
 </IfModule>
 
-# Security Headers
+# Caching Configuration
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType image/webp "access plus 1 month"
+  ExpiresByType image/jpeg "access plus 1 month"
+  ExpiresByType image/png "access plus 1 month"
+  ExpiresByType image/svg+xml "access plus 1 month"
+  ExpiresByType text/css "access plus 1 year"
+  ExpiresByType application/javascript "access plus 1 year"
+</IfModule>
+
+# Security Headers & Cache-Control
 <IfModule mod_headers.c>
   Header always set X-Content-Type-Options "nosniff"
   Header always set X-Frame-Options "SAMEORIGIN"
   Header always set X-XSS-Protection "1; mode=block"
   Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+  # Immutable cache for version-hashed assets
+  <FilesMatch "\.(js|css)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+
+  # HTML & Service Worker must revalidate to avoid stale deployments
+  <FilesMatch "(index\.html|sw\.js)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </FilesMatch>
 </IfModule>

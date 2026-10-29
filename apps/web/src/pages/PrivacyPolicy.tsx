@@ -26,6 +26,7 @@ export default function PrivacyPolicy() {
     <main style={{ backgroundColor: '#faf7f2', minHeight: '100vh', color: '#1f2937' }}>
       <title>プライバシーポリシー (個人情報保護方針) | Kalpna</title>
       <meta name="description" content="本格インド料理カルプナのプライバシーポリシーです。お客様の個人情報の適切な保護と取り扱いに関する方針をご案内します。" />
+      <link rel="canonical" href="https://kalpnacurry.com/privacy-policy" />
 
       {/* Hero Header */}
       <div style={{

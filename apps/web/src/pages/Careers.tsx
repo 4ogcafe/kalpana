@@ -119,6 +119,7 @@ export default function Careers() {
     <main style={{ backgroundColor: '#faf7f2', minHeight: '100vh', color: '#1f2937' }}>
       <title>採用情報・求人募集 (Careers) | Kalpna (カルプナ)</title>
       <meta name="description" content="本格インド料理カルプナの求人・採用情報です。ホール、キッチン（カレーシェフ）、デリバリースタッフを募集中。絶品まかない無料、ビザサポートあり！" />
+      <link rel="canonical" href="https://kalpnacurry.com/careers" />
 
       {/* Hero Section */}
       <div style={{

@@ -299,6 +299,7 @@ export default function Menu() {
     <main>
       <title>{`${menuInfo.title} | Kalpna (カルプナ)`}</title>
       <meta name="description" content={`熊谷の本格インド料理店カルプナの${menuInfo.title}。カレー、ナン、タンドール料理などを価格とともにご紹介します。`} />
+      <link rel="canonical" href={`https://kalpnacurry.com/menu/${menuType}`} />
       {/* Hero Section */}
       <div className="home-hero" style={{ height: '40vh', minHeight: '300px' }}>
         <img src={dynamicHeroImages[menuType]} alt="" fetchPriority="high" className="slide-bg-img" style={{ opacity: 0.5, objectFit: 'cover' }} />
