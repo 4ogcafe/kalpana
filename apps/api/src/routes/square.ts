@@ -382,12 +382,21 @@ router.post(
     const sigKey = config.square.webhookSignatureKey;
     if (sigKey) {
       const sig = req.headers['x-square-hmacsha256-signature'] as string | undefined;
+      if (!sig) {
+        res.status(403).json({ error: 'Missing signature header' });
+        return;
+      }
       const payload = config.square.webhookUrl + body;
       const expected = crypto.createHmac('sha256', sigKey).update(payload).digest('base64');
-      if (!sig || sig !== expected) {
+      const sigBuf = Buffer.from(sig);
+      const expectedBuf = Buffer.from(expected);
+      if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) {
         res.status(403).json({ error: 'Invalid signature' });
         return;
       }
+    } else if (config.isProduction) {
+      res.status(500).json({ error: 'Square webhook signature key not configured' });
+      return;
     }
 
     res.json({ ok: true });

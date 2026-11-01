@@ -18,27 +18,50 @@ set_exception_handler(function (Throwable $e) {
 
 // 1. CORS & Response Headers
 header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
-header('Access-Control-Allow-Credentials: true');
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit;
-}
-
-// 2. Database Connection
+// 2. Database & Application Configuration
 // Credentials live outside the web root: <parent of public_html>/kalpana-config.php
 // (see public_html/api/config.example.php), or in environment variables.
-$configFile = dirname(__DIR__, 2) . '/kalpana-config.php';
-$config = is_file($configFile) ? (require $configFile) : [];
-if (!is_array($config)) $config = [];
+$configPaths = [
+    dirname(__DIR__, 2) . '/kalpana-config.php',
+    dirname(__DIR__, 3) . '/kalpana-config.php',
+];
+$config = [];
+foreach ($configPaths as $path) {
+    if (is_file($path)) {
+        $loaded = require $path;
+        if (is_array($loaded)) {
+            $config = array_merge($config, $loaded);
+            break;
+        }
+    }
+}
+
 $cfg = function (string $key, $default = null) use ($config) {
     if (isset($config[$key]) && $config[$key] !== '') return $config[$key];
     $env = getenv('KALPANA_' . strtoupper($key));
     return ($env !== false && $env !== '') ? $env : $default;
 };
+
+// Safe Origin & Credentials Handling
+$httpOrigin = $_SERVER['HTTP_ORIGIN'] ?? '';
+$allowedOriginsList = $cfg('cors_origins', 'https://kalpnacurry.com,https://www.kalpnacurry.com,http://localhost:5173,http://127.0.0.1:5173');
+$allowedOrigins = array_filter(array_map('trim', explode(',', $allowedOriginsList)));
+
+if ($httpOrigin && in_array($httpOrigin, $allowedOrigins, true)) {
+    header("Access-Control-Allow-Origin: {$httpOrigin}");
+    header('Access-Control-Allow-Credentials: true');
+    header('Vary: Origin');
+} else {
+    header('Access-Control-Allow-Origin: *');
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
 
 $dbHost = $cfg('db_host', '127.0.0.1');
 $dbName = $cfg('db_name', 'u309882766_kalpanadb');
@@ -2099,13 +2122,16 @@ if ($method === 'POST' && ($subPath === '/carousels' || $subPath === '/carousels
     $placement = ($input['placement'] ?? 'HOME') === 'CONTACT' ? 'CONTACT' : 'HOME';
     $titleEn = trim($input['titleEn'] ?? '');
     $titleJa = trim($input['titleJa'] ?? '');
+    $subtitleEn = trim($input['subtitleEn'] ?? '');
+    $subtitleJa = trim($input['subtitleJa'] ?? '');
+    $ctaLabelEn = trim($input['ctaLabelEn'] ?? '');
+    $ctaLabelJa = trim($input['ctaLabelJa'] ?? '');
+    $ctaLink = trim($input['ctaLink'] ?? '');
     $altEn = trim($input['altEn'] ?? '') ?: ($titleEn ?: $titleJa);
     $imageUrl = trim($input['imageUrl'] ?? '');
 
     if (empty($imageUrl)) {
-        http_response_code(400);
-        echo json_encode(['error' => ['code' => 'VALIDATION_FAILED', 'message' => 'Image URL is required']]);
-        exit;
+        $imageUrl = '/uploads/hero-palace-arch.webp';
     }
 
     $stmtCount = $pdo->prepare('SELECT COUNT(*) FROM CarouselSlide WHERE placement = ?');
@@ -2114,10 +2140,10 @@ if ($method === 'POST' && ($subPath === '/carousels' || $subPath === '/carousels
 
     $newId = generateUuidV4();
     $insertStmt = $pdo->prepare('
-        INSERT INTO CarouselSlide (id, placement, imageUrl, altEn, titleEn, titleJa, isActive, sortOrder)
-        VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+        INSERT INTO CarouselSlide (id, placement, imageUrl, altEn, titleEn, titleJa, subtitleEn, subtitleJa, ctaLabelEn, ctaLabelJa, ctaLink, isActive, sortOrder)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
     ');
-    $insertStmt->execute([$newId, $placement, $imageUrl, $altEn, $titleEn, $titleJa, $count]);
+    $insertStmt->execute([$newId, $placement, $imageUrl, $altEn, $titleEn, $titleJa, $subtitleEn, $subtitleJa, $ctaLabelEn, $ctaLabelJa, $ctaLink, $count]);
 
     $fetchStmt = $pdo->prepare('SELECT * FROM CarouselSlide WHERE id = ? LIMIT 1');
     $fetchStmt->execute([$newId]);
@@ -2203,6 +2229,7 @@ if ($method === 'PUT' && ($subPath === '/settings' || $subPath === '/settings/')
 
     // Extended page settings saved to AppSecret
     $extKeys = [
+        'heroImageSlideEnabled', 'heroBackgroundImage',
         'aboutStoryImage', 'aboutStoryWatermark', 'aboutStoryOriginTitleJa',
         'aboutStoryOriginTextJa', 'aboutStoryBadgeSubJa', 'aboutStoryBadgeTitleJa',
         'aboutStoryPillar1TitleJa', 'aboutStoryPillar1DescJa', 'aboutStoryPillar2TitleJa',
@@ -4669,6 +4696,57 @@ function generateUuidV4() {
     return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
 }
 
+function getClientIp(): string {
+    $ip = $_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+    if (strpos($ip, ',') !== false) {
+        $ip = trim(explode(',', $ip)[0]);
+    }
+    return filter_var($ip, FILTER_VALIDATE_IP) ? $ip : '127.0.0.1';
+}
+
+function checkRateLimit(PDO $pdo, string $key, int $maxAttempts = 10, int $windowSeconds = 900): bool {
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `RateLimitAttempt` (
+            `id` VARCHAR(191) NOT NULL,
+            `actionKey` VARCHAR(191) NOT NULL,
+            `attemptedAt` INT UNSIGNED NOT NULL,
+            PRIMARY KEY (`id`),
+            INDEX `RateLimitAttempt_key_time`(`actionKey`, `attemptedAt`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $now = time();
+        $cutoff = $now - $windowSeconds;
+
+        if (mt_rand(1, 20) === 1) {
+            $del = $pdo->prepare("DELETE FROM `RateLimitAttempt` WHERE attemptedAt < ?");
+            $del->execute([$cutoff]);
+        }
+
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM `RateLimitAttempt` WHERE actionKey = ? AND attemptedAt >= ?");
+        $stmt->execute([$key, $cutoff]);
+        $count = (int)$stmt->fetchColumn();
+
+        return $count < $maxAttempts;
+    } catch (\Throwable $t) {
+        return true;
+    }
+}
+
+function recordRateLimitFailure(PDO $pdo, string $key): void {
+    try {
+        $id = bin2hex(random_bytes(16));
+        $stmt = $pdo->prepare("INSERT INTO `RateLimitAttempt` (id, actionKey, attemptedAt) VALUES (?, ?, ?)");
+        $stmt->execute([$id, $key, time()]);
+    } catch (\Throwable $t) {}
+}
+
+function clearRateLimitAttempts(PDO $pdo, string $key): void {
+    try {
+        $stmt = $pdo->prepare("DELETE FROM `RateLimitAttempt` WHERE actionKey = ?");
+        $stmt->execute([$key]);
+    } catch (\Throwable $t) {}
+}
+
 function requireStaffUser($secret, $pdo) {
     $token = getBearerOrCookie('kalpana_session');
     if (!$token) {
@@ -4757,16 +4835,30 @@ if ($method === 'POST' && ($subPath === '/auth/login' || $subPath === '/auth/log
         exit;
     }
 
+    $ip = getClientIp();
+    $normalizedEmail = function_exists('mb_strtolower') ? mb_strtolower(trim($email), 'UTF-8') : strtolower(trim($email));
+    $limiterKey = "staff_login:{$ip}:" . hash('sha256', $normalizedEmail);
+
+    if (!checkRateLimit($pdo, $limiterKey, 10, 900)) {
+        http_response_code(429);
+        header('Retry-After: 900');
+        echo json_encode(['error' => ['code' => 'TOO_MANY_ATTEMPTS', 'message' => 'Too many failed login attempts. Please try again after 15 minutes.']]);
+        exit;
+    }
+
     $stmt = $pdo->prepare('SELECT id, name, email, role, passwordHash, isActive FROM User WHERE email = ? LIMIT 1');
     $stmt->execute([$email]);
     $user = $stmt->fetch();
 
     $verified = $user && !empty($user['passwordHash']) && password_verify($password, $user['passwordHash']);
     if (!$user || !$verified || !$user['isActive']) {
+        recordRateLimitFailure($pdo, $limiterKey);
         http_response_code(401);
         echo json_encode(['error' => ['code' => 'INVALID_CREDENTIALS', 'message' => 'Invalid email or password']]);
         exit;
     }
+
+    clearRateLimitAttempts($pdo, $limiterKey);
 
     $sessionUser = [
         'id' => $user['id'],
@@ -4854,16 +4946,36 @@ if ($method === 'POST' && ($subPath === '/customers/login' || $subPath === '/cus
     $email = trim($input['email'] ?? '');
     $password = $input['password'] ?? '';
 
+    if (empty($email) || empty($password)) {
+        http_response_code(400);
+        echo json_encode(['error' => ['code' => 'VALIDATION_FAILED', 'message' => 'メールアドレスとパスワードを入力してください。']]);
+        exit;
+    }
+
+    $ip = getClientIp();
+    $normalizedEmail = function_exists('mb_strtolower') ? mb_strtolower(trim($email), 'UTF-8') : strtolower(trim($email));
+    $limiterKey = "customer_login:{$ip}:" . hash('sha256', $normalizedEmail);
+
+    if (!checkRateLimit($pdo, $limiterKey, 10, 900)) {
+        http_response_code(429);
+        header('Retry-After: 900');
+        echo json_encode(['error' => ['code' => 'TOO_MANY_ATTEMPTS', 'message' => 'ログイン試行回数が制限を超えました。15分後にもう一度お試しください。']]);
+        exit;
+    }
+
     $stmt = $pdo->prepare('SELECT * FROM Customer WHERE email = ? LIMIT 1');
     $stmt->execute([$email]);
     $customer = $stmt->fetch();
 
     $verified = $customer && !empty($customer['passwordHash']) && password_verify($password, $customer['passwordHash']);
     if (!$customer || !$verified || (isset($customer['isActive']) && !$customer['isActive'])) {
+        recordRateLimitFailure($pdo, $limiterKey);
         http_response_code(401);
         echo json_encode(['error' => ['code' => 'INVALID_CREDENTIALS', 'message' => 'メールアドレスまたはパスワードが正しくありません。']]);
         exit;
     }
+
+    clearRateLimitAttempts($pdo, $limiterKey);
 
     $ttl = 30 * 86400; // 30 days
     $token = createJwt(['sub' => $customer['id'], 'aud' => 'customer'], $jwtSecret, $ttl);

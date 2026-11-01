@@ -126,6 +126,8 @@ const settingsSchema = z.object({
     .max(12)
     .optional(),
   aboutHeroImage: image,
+  heroImageSlideEnabled: z.boolean().optional(),
+  heroBackgroundImage: image,
   contactHeroImage: image,
   menuGrandHeroImage: image,
   menuLunchHeroImage: image,
@@ -176,6 +178,8 @@ const settingsSchema = z.object({
 });
 
 const EXT_KEYS = [
+  'heroImageSlideEnabled',
+  'heroBackgroundImage',
   'aboutStoryImage',
   'aboutStoryWatermark',
   'aboutStoryOriginTitleJa',

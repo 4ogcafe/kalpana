@@ -13,6 +13,11 @@ const placement = z.enum(['HOME', 'CONTACT']);
 const slideUpdateSchema = z.object({
   titleEn: optionalText(200),
   titleJa: optionalText(200),
+  subtitleEn: optionalText(500),
+  subtitleJa: optionalText(500),
+  ctaLabelEn: optionalText(100),
+  ctaLabelJa: optionalText(100),
+  ctaLink: optionalText(300),
   altEn: optionalText(300),
   imageUrl: imageUrl.optional(),
   isActive: z.boolean().optional(),
@@ -22,8 +27,13 @@ const slideUpdateSchema = z.object({
 const slideCreateSchema = z.object({
   titleEn: optionalText(200),
   titleJa: optionalText(200),
+  subtitleEn: optionalText(500),
+  subtitleJa: optionalText(500),
+  ctaLabelEn: optionalText(100),
+  ctaLabelJa: optionalText(100),
+  ctaLink: optionalText(300),
   altEn: optionalText(300),
-  imageUrl: imageUrl.refine((value) => value !== '', 'An image is required'),
+  imageUrl: imageUrl.optional().default('/uploads/hero-palace-arch.webp'),
   placement: placement.default('HOME'),
 });
 

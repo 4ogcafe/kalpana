@@ -9,7 +9,7 @@ DirectoryIndex index.html index.php
 
   # 1. Block access to hidden files, config files, env, and source code
   RewriteRule "(^|/)\.(?!well-known)" - [F,L]
-  RewriteRule "(^|/)(kalpana-config\.php|\.env|\.git|composer\.(json|lock)|package(-lock)?\.json|tsconfig.*\.json)$" - [F,L]
+  RewriteRule "(^|/)(kalpana-config\.php|\.env|\.git|composer\.(json|lock)|package(-lock)?\.json|tsconfig.*\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|docker-compose\.ya?ml|.*\.md)$" - [F,L]
 
   # 2. Serve real files and directories as-is
   RewriteCond %{REQUEST_FILENAME} -f [OR]

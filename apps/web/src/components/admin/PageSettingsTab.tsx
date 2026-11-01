@@ -7,6 +7,8 @@ import { apiFetch, assetUrl, errorMessage } from '../../lib/api';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface Settings {
+  heroImageSlideEnabled?: boolean;
+  heroBackgroundImage?: string;
   heroTagJa?: string;
   heroSubJa?: string;
   welcomeTitleEn?: string;
@@ -132,6 +134,11 @@ interface Slide {
   id: string;
   titleEn?: string;
   titleJa?: string;
+  subtitleEn?: string;
+  subtitleJa?: string;
+  ctaLabelEn?: string;
+  ctaLabelJa?: string;
+  ctaLink?: string;
   altEn?: string;
   imageUrl: string;
   placement: 'HOME' | 'CONTACT';
@@ -708,21 +715,38 @@ function PageBannersTab({ settings, setSettings }: { settings: Settings; setSett
   );
 }
 
-const BLANK_SLIDE: { titleEn: string; titleJa: string; altEn: string; imageUrl: string; placement: 'HOME' | 'CONTACT' } = {
+const BLANK_SLIDE: {
+  titleEn: string;
+  titleJa: string;
+  subtitleEn: string;
+  subtitleJa: string;
+  ctaLabelEn: string;
+  ctaLabelJa: string;
+  ctaLink: string;
+  altEn: string;
+  imageUrl: string;
+  placement: 'HOME' | 'CONTACT';
+} = {
   titleEn: '',
   titleJa: '',
+  subtitleEn: '',
+  subtitleJa: '',
+  ctaLabelEn: '',
+  ctaLabelJa: '',
+  ctaLink: '',
   altEn: '',
   imageUrl: '',
   placement: 'HOME',
 };
 
-function CarouselTab() {
+function CarouselTab({ settings, setSettings }: { settings?: Settings; setSettings?: (partial: Partial<Settings>) => void }) {
   const [slides, setSlides] = useState<Slide[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Slide | null>(null);
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState(BLANK_SLIDE);
   const [saving, setSaving] = useState(false);
+  const [displaySaving, setDisplaySaving] = useState(false);
   const [filterPlacement, setFilterPlacement] = useState<'ALL' | 'HOME' | 'CONTACT'>('ALL');
 
   const fetch = useCallback(() => {
@@ -735,6 +759,18 @@ function CarouselTab() {
   }, []);
 
   useEffect(() => { fetch(); }, [fetch]);
+
+  const handleSaveDisplaySettings = async () => {
+    setDisplaySaving(true);
+    try {
+      await saveFields({
+        heroImageSlideEnabled: settings?.heroImageSlideEnabled === true,
+        heroBackgroundImage: settings?.heroBackgroundImage || '/uploads/hero-palace-arch.webp',
+      }, 'スライダー表示設定');
+    } finally {
+      setDisplaySaving(false);
+    }
+  };
 
   const handleToggleActive = async (slide: Slide) => {
     const res = await apiFetch(`/api/v1/carousels/${slide.id}`, {
@@ -768,7 +804,18 @@ function CarouselTab() {
       const res = await apiFetch(`/api/v1/carousels/${editing.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ titleEn: editing.titleEn, titleJa: editing.titleJa, altEn: editing.altEn, imageUrl: editing.imageUrl, isActive: editing.isActive }),
+        body: JSON.stringify({
+          titleEn: editing.titleEn,
+          titleJa: editing.titleJa,
+          subtitleEn: editing.subtitleEn,
+          subtitleJa: editing.subtitleJa,
+          ctaLabelEn: editing.ctaLabelEn,
+          ctaLabelJa: editing.ctaLabelJa,
+          ctaLink: editing.ctaLink,
+          altEn: editing.altEn,
+          imageUrl: editing.imageUrl || '/uploads/hero-palace-arch.webp',
+          isActive: editing.isActive,
+        }),
       });
       if (res.ok) {
         setEditing(null);
@@ -786,10 +833,14 @@ function CarouselTab() {
     e.preventDefault();
     setSaving(true);
     try {
+      const payload = {
+        ...form,
+        imageUrl: form.imageUrl || '/uploads/hero-palace-arch.webp',
+      };
       const res = await apiFetch('/api/v1/carousels', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
         setAdding(false);
@@ -888,9 +939,98 @@ function CarouselTab() {
   };
 
   const visible = filterPlacement === 'ALL' ? slides : slides.filter(s => s.placement === filterPlacement);
+  const imageSlideEnabled = settings?.heroImageSlideEnabled === true;
 
   return (
     <div>
+      {/* Hero Display Mode & Background Settings */}
+      <div style={{ ...card, border: '1px solid #fed7aa', background: 'linear-gradient(to right, #fffaf5, #ffffff)', padding: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+          <div>
+            <h3 style={{ ...h3, margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: '#9a3412', fontSize: '1.15rem' }}>
+              👑 ヒーロースライダー表示方式 (Carousel Mode)
+            </h3>
+            <p style={{ margin: '0.35rem 0 0', color: '#6b7280', fontSize: '0.85rem' }}>
+              スライド写真切り替えモード（ON）と、テキストのみスライド＋宮殿背景固定モード（OFF）を切り替えられます。
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleSaveDisplaySettings}
+            disabled={displaySaving}
+            style={{ ...saveBtn, background: '#c2410c', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            {displaySaving ? '保存中…' : 'スライダー表示設定を保存'}
+          </button>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem', alignItems: 'start' }}>
+          {/* Mode switch */}
+          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '1rem' }}>
+            <label style={{ ...lbl, fontWeight: 600, color: '#111827', marginBottom: '0.5rem' }}>
+              スライド写真の切り替え (Image Slide)
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.25rem' }}>
+              <button
+                type="button"
+                onClick={() => setSettings?.({ heroImageSlideEnabled: !imageSlideEnabled })}
+                style={{
+                  padding: '0.5rem 1.1rem',
+                  borderRadius: '9999px',
+                  border: 'none',
+                  fontWeight: 600,
+                  fontSize: '0.88rem',
+                  cursor: 'pointer',
+                  background: imageSlideEnabled ? '#16a34a' : '#dc2626',
+                  color: '#fff',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
+                  transition: 'background 0.2s',
+                }}
+              >
+                {imageSlideEnabled ? '🟢 画像スライド: ON（写真切り替え）' : '🔴 画像スライド: OFF（テキストのみスライド）'}
+              </button>
+            </div>
+            <p style={{ margin: '0.75rem 0 0', fontSize: '0.82rem', color: '#4b5563', lineHeight: 1.5 }}>
+              {imageSlideEnabled ? (
+                <>
+                  <strong>【画像スライド ON】</strong> 各スライドごとに設定された写真が全画面で順に切り替わります。
+                </>
+              ) : (
+                <>
+                  <strong>【画像スライド OFF（王宮テキストスライド）】</strong> 宮殿アーチ背景画像が固定され、中央のタイトル・サブテキスト・ボタンのみが流麗にスライドします。
+                </>
+              )}
+            </p>
+          </div>
+
+          {/* Background image when Image Slide is OFF */}
+          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <label style={{ ...lbl, fontWeight: 600, color: '#111827', margin: 0 }}>
+                固定背景画像（画像スライドOFF時）
+              </label>
+              <button
+                type="button"
+                onClick={() => setSettings?.({ heroBackgroundImage: '/uploads/hero-palace-arch.webp' })}
+                style={{ ...outlineBtn, padding: '2px 8px', fontSize: '0.75rem' }}
+                title="王宮ランタンアーチ画像にリセット"
+              >
+                宮殿アーチ背景にリセット
+              </button>
+            </div>
+            <ImageField
+              label=""
+              hint="画像スライドOFF時に表示される固定背景画像です（初期値：王宮ランタンアーチ）"
+              value={settings?.heroBackgroundImage || '/uploads/hero-palace-arch.webp'}
+              onChange={v => setSettings?.({ heroBackgroundImage: v })}
+            />
+          </div>
+        </div>
+      </div>
+
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           {(['ALL', 'HOME', 'CONTACT'] as const).map(p => (
@@ -934,7 +1074,7 @@ function CarouselTab() {
                       const img = e.currentTarget;
                       if (!img.dataset.fallback) {
                         img.dataset.fallback = '1';
-                        img.src = '/uploads/1792484379649-8d372e4a42c3ddf9.jpg';
+                        img.src = '/uploads/hero-palace-arch.webp';
                       }
                     }}
                     style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', minHeight: 88 }}
@@ -945,13 +1085,19 @@ function CarouselTab() {
                   </div>
                 )}
               </div>
-              <div style={{ flex: 1, padding: '0.9rem 1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '0.2rem', minWidth: 0 }}>
+              <div style={{ flex: 1, padding: '0.9rem 1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '0.25rem', minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '0.95rem', fontWeight: 600, color: '#111' }}>{slide.titleEn || slide.titleJa || '(no title)'}</span>
+                  <span style={{ fontSize: '0.95rem', fontWeight: 600, color: '#111' }}>{slide.titleJa || slide.titleEn || '(no title)'}</span>
                   <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '99px', background: slide.placement === 'HOME' ? '#dbeafe' : '#fef3c7', color: slide.placement === 'HOME' ? '#1d4ed8' : '#92400e', fontWeight: 600 }}>{slide.placement}</span>
                   <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '99px', background: slide.isActive ? '#dcfce7' : '#f3f4f6', color: slide.isActive ? '#16a34a' : '#6b7280', fontWeight: 600 }}>{slide.isActive ? 'Active' : 'Hidden'}</span>
                 </div>
-                {slide.titleJa && <div style={{ fontSize: '0.82rem', color: '#6b7280' }}>{slide.titleJa}</div>}
+                {slide.titleEn && <div style={{ fontSize: '0.82rem', color: '#6b7280' }}>{slide.titleEn}</div>}
+                {slide.subtitleJa && <div style={{ fontSize: '0.8rem', color: '#4b5563', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{slide.subtitleJa}</div>}
+                {slide.ctaLabelJa && (
+                  <div style={{ fontSize: '0.75rem', color: '#c2410c', marginTop: '2px' }}>
+                    🔘 ボタン: {slide.ctaLabelJa} {slide.ctaLink ? `(${slide.ctaLink})` : ''}
+                  </div>
+                )}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0 1rem', flexShrink: 0 }}>
                 <button type="button" title="Move Up" disabled={index === 0} onClick={() => handleMove(slide, 'up')} style={{ ...outlineBtn, padding: '0.5rem', opacity: index === 0 ? 0.3 : 1 }}>
@@ -982,25 +1128,49 @@ function CarouselTab() {
               </select>
             </label>
             <label style={lbl}>
-              Title (EN)
-              <input style={inp} type="text" value={form.titleEn} onChange={e => setForm({ ...form, titleEn: e.target.value })} />
+              Title (JA) *
+              <input style={inp} type="text" value={form.titleJa} onChange={e => setForm({ ...form, titleJa: e.target.value })} placeholder="例: 焼きたてナンと本格スパイスカレー" required />
             </label>
             <label style={lbl}>
-              Title (JA)
-              <input style={inp} type="text" value={form.titleJa} onChange={e => setForm({ ...form, titleJa: e.target.value })} />
+              Title (EN)
+              <input style={inp} type="text" value={form.titleEn} onChange={e => setForm({ ...form, titleEn: e.target.value })} placeholder="例: Freshly Baked Naan & Curries" />
             </label>
+            <label style={lbl}>
+              Subtitle / Description (JA)
+              <textarea
+                style={{ ...inp, minHeight: '60px', resize: 'vertical' }}
+                value={form.subtitleJa}
+                onChange={e => setForm({ ...form, subtitleJa: e.target.value })}
+                placeholder="例: 数十種類の秘伝スパイスと備長炭タンドール窯で仕上げる贅沢な味。"
+              />
+            </label>
+            <label style={lbl}>
+              Subtitle (EN)
+              <input style={inp} type="text" value={form.subtitleEn} onChange={e => setForm({ ...form, subtitleEn: e.target.value })} placeholder="例: Handcrafted with secret spices and charcoal tandoor." />
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <label style={lbl}>
+                CTA Button Text (JA)
+                <input style={inp} type="text" value={form.ctaLabelJa} onChange={e => setForm({ ...form, ctaLabelJa: e.target.value })} placeholder="例: ランチメニューを見る" />
+              </label>
+              <label style={lbl}>
+                CTA Button Link
+                <input style={inp} type="text" value={form.ctaLink} onChange={e => setForm({ ...form, ctaLink: e.target.value })} placeholder="例: /menu/lunch" />
+              </label>
+            </div>
             <label style={lbl}>
               Alt Text
               <input style={inp} type="text" value={form.altEn} onChange={e => setForm({ ...form, altEn: e.target.value })} placeholder="Describe the image for accessibility" />
             </label>
             <ImageField
-              label="Image *"
+              label="Slide Image (画像スライドON時に表示)"
+              hint="画像スライドOFF時は固定背景画像が使われます（未入力時は宮殿アーチ画像が適用されます）"
               value={form.imageUrl}
               onChange={v => setForm({ ...form, imageUrl: v })}
             />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
               <button type="button" onClick={() => setAdding(false)} style={outlineBtn}>Cancel</button>
-              <button type="submit" disabled={saving || !form.imageUrl} style={saveBtn}>{saving ? 'Adding…' : 'Add Slide'}</button>
+              <button type="submit" disabled={saving} style={saveBtn}>{saving ? 'Adding…' : 'Add Slide'}</button>
             </div>
           </form>
         </Modal>
@@ -1016,13 +1186,36 @@ function CarouselTab() {
               <span style={muted}>Placement cannot be changed after creation.</span>
             </label>
             <label style={lbl}>
+              Title (JA) *
+              <input style={inp} type="text" value={editing.titleJa ?? ''} onChange={e => setEditing({ ...editing, titleJa: e.target.value })} />
+            </label>
+            <label style={lbl}>
               Title (EN)
               <input style={inp} type="text" value={editing.titleEn ?? ''} onChange={e => setEditing({ ...editing, titleEn: e.target.value })} />
             </label>
             <label style={lbl}>
-              Title (JA)
-              <input style={inp} type="text" value={editing.titleJa ?? ''} onChange={e => setEditing({ ...editing, titleJa: e.target.value })} />
+              Subtitle / Description (JA)
+              <textarea
+                style={{ ...inp, minHeight: '60px', resize: 'vertical' }}
+                value={editing.subtitleJa ?? ''}
+                onChange={e => setEditing({ ...editing, subtitleJa: e.target.value })}
+                placeholder="スライド表示時のサブタイトル・説明文"
+              />
             </label>
+            <label style={lbl}>
+              Subtitle (EN)
+              <input style={inp} type="text" value={editing.subtitleEn ?? ''} onChange={e => setEditing({ ...editing, subtitleEn: e.target.value })} />
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <label style={lbl}>
+                CTA Button Text (JA)
+                <input style={inp} type="text" value={editing.ctaLabelJa ?? ''} onChange={e => setEditing({ ...editing, ctaLabelJa: e.target.value })} placeholder="例: ランチメニューを見る" />
+              </label>
+              <label style={lbl}>
+                CTA Button Link
+                <input style={inp} type="text" value={editing.ctaLink ?? ''} onChange={e => setEditing({ ...editing, ctaLink: e.target.value })} placeholder="例: /menu/lunch" />
+              </label>
+            </div>
             <label style={lbl}>
               Alt Text
               <input style={inp} type="text" value={editing.altEn ?? ''} onChange={e => setEditing({ ...editing, altEn: e.target.value })} />
@@ -1035,7 +1228,8 @@ function CarouselTab() {
               </select>
             </label>
             <ImageField
-              label="Image"
+              label="Slide Image (画像スライドON時に表示)"
+              hint="画像スライドOFF時は固定背景画像が使われます"
               value={editing.imageUrl}
               onChange={v => setEditing({ ...editing, imageUrl: v })}
             />
@@ -1102,7 +1296,7 @@ export default function PageSettingsTab({ onOpenRestaurantSettings }: { onOpenRe
           {subTab === 'Home Page' && <HomePageTab settings={settings} setSettings={patch} />}
           {subTab === 'About Page' && <AboutPageTab settings={settings} setSettings={patch} />}
           {subTab === 'Page Banners' && <PageBannersTab settings={settings} setSettings={patch} />}
-          {subTab === 'Carousel Slider' && <CarouselTab />}
+          {subTab === 'Carousel Slider' && <CarouselTab settings={settings} setSettings={patch} />}
           {subTab === 'Google Reviews' && <GoogleReviewsSettings />}
           {subTab === 'Footer' && <FooterSettings onOpenRestaurantSettings={onOpenRestaurantSettings} />}
         </>

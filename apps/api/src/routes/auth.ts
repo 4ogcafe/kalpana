@@ -25,7 +25,7 @@ const loginLimiter = rateLimit({
   max: LOGIN_MAX_ATTEMPTS,
   // Lock out after repeated wrong passwords (PRD FR-A1), not after normal successful logins.
   failuresOnly: true,
-  key: (req) => `${req.ip}|${String(req.body?.email ?? '').trim().toLowerCase()}`,
+  key: (req) => `${req.ip}|${String(req.body?.email ?? '').trim().normalize('NFKC').toLowerCase()}`,
 });
 
 router.post('/login', loginLimiter, async (req, res) => {

@@ -46,7 +46,7 @@ const loginLimiter = rateLimit({
   windowMs: LOGIN_WINDOW_MS,
   max: 10,
   failuresOnly: true,
-  key: (req) => `${req.ip}|${String(req.body?.email ?? '').trim().toLowerCase()}`,
+  key: (req) => `${req.ip}|${String(req.body?.email ?? '').trim().normalize('NFKC').toLowerCase()}`,
 });
 
 let dummyHash: string | undefined;

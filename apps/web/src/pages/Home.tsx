@@ -69,6 +69,37 @@ export default function Home() {
   const recommendedItems = menuItems.filter(item => item.isRecommended).slice(0, 4);
   const regularItems = menuItems.filter(item => !item.isRecommended);
 
+  const heroImageSlideEnabled = settings.heroImageSlideEnabled === true;
+  const heroBgImage = assetUrl(settings.heroBackgroundImage) || '/hero-palace-arch.webp';
+
+  const activeHomeSlides = carousels.filter(c => (c.placement ?? 'HOME') === 'HOME' && c.isActive !== false);
+  const fallbackSlides = [
+    {
+      titleJa: 'インドの香りを、そのままに',
+      titleEn: 'Authentic Indian Flavors',
+      subtitleJa: settings.heroSubJa || '愛とスパイス、そして伝統に彩られた数世紀にわたるレシピを。\nKalpna Indian Cuisineで皆様をお待ちしております。',
+      ctaLabelJa: 'ランチメニューを見る',
+      ctaLink: '/menu/lunch',
+    },
+    {
+      titleJa: '焼きたてナンと本格スパイスカレー',
+      titleEn: 'Freshly Baked Naan & Curries',
+      subtitleJa: '備長炭タンドール窯で一気に焼き上げる、外は香ばしく中はふっくらの極上ナン。',
+      ctaLabelJa: 'メニューを見る',
+      ctaLink: '/menu/grand',
+    },
+    {
+      titleJa: '本場シェフが紡ぐ、極上のおもてなし',
+      titleEn: 'Handcrafted Heritage Recipes',
+      subtitleJa: '厳選された数十種類の天然スパイスが織りなす、本格インド料理の真髄をご堪能ください。',
+      ctaLabelJa: 'テイクアウト注文',
+      ctaLink: '/order',
+    },
+  ];
+  const textSlides = activeHomeSlides.length > 0 ? activeHomeSlides : fallbackSlides;
+  const slideCount = heroImageSlideEnabled ? heroImages.length : textSlides.length;
+  const safeIndex = slideCount > 0 ? currentSlide % slideCount : 0;
+
   useEffect(() => {
     if (regularItems.length <= 1 || prefersReducedMotion()) return;
     const timer = setInterval(() => {
@@ -78,16 +109,18 @@ export default function Home() {
   }, [regularItems.length]);
 
   useEffect(() => {
-    setLoadedSlides(prev => Math.max(prev, Math.min(currentSlide + 2, heroImages.length)));
-  }, [currentSlide, heroImages.length]);
+    if (heroImageSlideEnabled) {
+      setLoadedSlides(prev => Math.max(prev, Math.min(currentSlide + 2, heroImages.length)));
+    }
+  }, [currentSlide, heroImages.length, heroImageSlideEnabled]);
 
   useEffect(() => {
-    if (heroImages.length <= 1 || prefersReducedMotion()) return;
+    if (slideCount <= 1 || prefersReducedMotion()) return;
     const timer = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % heroImages.length);
-    }, 5000);
+      setCurrentSlide((prev) => (prev + 1) % slideCount);
+    }, 5500);
     return () => clearInterval(timer);
-  }, [heroImages.length]);
+  }, [slideCount]);
 
   return (
     <main>
@@ -96,57 +129,120 @@ export default function Home() {
       <link rel="canonical" href="https://kalpnacurry.com/" />
       {/* Hero Slider */}
       <div className="home-hero">
-        {heroImages.slice(0, loadedSlides).map((img, index) => (
-          <img 
-            key={index}
-            src={img} 
-            srcSet={responsiveSrcSet(img)}
-            sizes="100vw"
-            alt=""
-            fetchPriority={index === 0 ? 'high' : 'low'}
-            decoding="async" 
-            onError={(e) => {
-              const target = e.currentTarget;
-              if (!target.dataset.fallback) {
-                target.dataset.fallback = '1';
-                target.src = DEFAULT_HERO_IMAGES[0];
-              }
-            }}
-            className="slide-bg-img" 
-            style={{ 
-              opacity: currentSlide === index ? 0.6 : 0, 
-              transition: 'opacity 1s ease-in-out',
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover'
-            }} 
-          />
-        ))}
-        
-        {/* Member offers (Admin → Stamps, Offers & Points): a bouncing gift on the banner */}
-        <OfferSticker />
+        {heroImageSlideEnabled ? (
+          <>
+            {heroImages.slice(0, loadedSlides).map((img, index) => (
+              <img 
+                key={index}
+                src={img} 
+                srcSet={responsiveSrcSet(img)}
+                sizes="100vw"
+                alt=""
+                fetchPriority={index === 0 ? 'high' : 'low'}
+                decoding="async" 
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (!target.dataset.fallback) {
+                    target.dataset.fallback = '1';
+                    target.src = DEFAULT_HERO_IMAGES[0];
+                  }
+                }}
+                className="slide-bg-img" 
+                style={{ 
+                  opacity: safeIndex === index ? 0.6 : 0, 
+                  transition: 'opacity 1s ease-in-out',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover'
+                }} 
+              />
+            ))}
+            
+            {/* Member offers */}
+            <OfferSticker />
 
-        <div className="hero-content">
-          <div className="hero-tag">{settings.heroTagJa || '埼玉・熊谷で味わう、本場のインド料理'}</div>
-          <h1 className="hero-title">{carousels[currentSlide]?.titleJa || 'インドの香りを、そのままに'}</h1>
-          <p className="hero-sub" style={{ whiteSpace: 'pre-line' }}>{settings.heroSubJa || <>愛とスパイス、そして伝統に彩られた数世紀にわたるレシピを。<br/>Kalpna Indian Cuisineで皆様をお待ちしております。</>}</p>
-          <div className="hero-btns">
-            <Link to="/menu/lunch" style={{ textDecoration: 'none' }}>
-              <button className="btn-warm">ランチメニューを見る</button>
-            </Link>
-            <button className="btn-outline-warm" onClick={() => document.getElementById('locations')?.scrollIntoView({ behavior: 'smooth' })}>店舗案内</button>
-          </div>
-        </div>
-        
+            <div className="hero-content">
+              <div className="hero-tag">{settings.heroTagJa || '埼玉・熊谷で味わう、本場のインド料理'}</div>
+              <h1 className="hero-title">{carousels[safeIndex]?.titleJa || 'インドの香りを、そのままに'}</h1>
+              <p className="hero-sub" style={{ whiteSpace: 'pre-line' }}>{settings.heroSubJa || <>愛とスパイス、そして伝統に彩られた数世紀にわたるレシピを。<br/>Kalpna Indian Cuisineで皆様をお待ちしております。</>}</p>
+              <div className="hero-btns">
+                <Link to="/menu/lunch" style={{ textDecoration: 'none' }}>
+                  <button className="btn-warm">ランチメニューを見る</button>
+                </Link>
+                <button className="btn-outline-warm" onClick={() => document.getElementById('locations')?.scrollIntoView({ behavior: 'smooth' })}>店舗案内</button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Palace Arch Static Background */}
+            <img
+              src={heroBgImage}
+              alt="Kalpna Palace Arch"
+              className="slide-bg-img"
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                objectPosition: 'center 20%',
+                opacity: 1,
+                zIndex: 1,
+              }}
+              onError={(e) => {
+                const target = e.currentTarget;
+                if (!target.dataset.fallback) {
+                  target.dataset.fallback = '1';
+                  target.src = '/hero-palace-arch.webp';
+                }
+              }}
+            />
+            <div className="hero-palace-overlay" />
+
+            {/* Member offers */}
+            <OfferSticker />
+
+            {/* Text-Only Sliding Showcase in Palace Arch */}
+            {(() => {
+              const current = textSlides[safeIndex] || textSlides[0];
+              const primaryCtaLabel = current?.ctaLabelJa || 'ランチメニューを見る';
+              const primaryCtaLink = current?.ctaLink || '/menu/lunch';
+              return (
+                <div className="hero-arch-showcase hero-slide-anim" key={safeIndex}>
+                  <div className="hero-tag">{settings.heroTagJa || '埼玉・熊谷で味わう、本場のインド料理'}</div>
+                  {current?.titleEn && <div className="hero-en-tag">{current.titleEn}</div>}
+                  <h1 className="hero-arch-title">{current?.titleJa || 'インドの香りを、そのままに'}</h1>
+                  <p className="hero-arch-sub" style={{ whiteSpace: 'pre-line' }}>
+                    {current?.subtitleJa || settings.heroSubJa || '愛とスパイス、そして伝統に彩られた数世紀にわたるレシピを。\nKalpna Indian Cuisineで皆様をお待ちしております。'}
+                  </p>
+                  <div className="hero-btns">
+                    <Link to={primaryCtaLink} style={{ textDecoration: 'none' }}>
+                      <button className="btn-warm">{primaryCtaLabel}</button>
+                    </Link>
+                    <button
+                      className="btn-outline-warm"
+                      onClick={() => document.getElementById('locations')?.scrollIntoView({ behavior: 'smooth' })}
+                    >
+                      店舗案内
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+          </>
+        )}
+
         {/* Slider Controls (Prev / Next) */}
-        {heroImages.length > 1 && (
+        {slideCount > 1 && (
           <>
             <button
               type="button"
-              onClick={() => setCurrentSlide((prev) => (prev - 1 + heroImages.length) % heroImages.length)}
+              onClick={() => setCurrentSlide((prev) => (prev - 1 + slideCount) % slideCount)}
               aria-label="Previous slide"
               style={{
                 position: 'absolute',
@@ -157,9 +253,9 @@ export default function Home() {
                 width: '44px',
                 height: '44px',
                 borderRadius: '50%',
-                background: 'rgba(0, 0, 0, 0.35)',
+                background: 'rgba(0, 0, 0, 0.45)',
                 color: '#fff',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
+                border: '1px solid rgba(255, 255, 255, 0.35)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -168,14 +264,14 @@ export default function Home() {
                 transition: 'all 0.2s',
                 fontSize: '18px',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(0, 0, 0, 0.65)')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(0, 0, 0, 0.35)')}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(0, 0, 0, 0.75)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(0, 0, 0, 0.45)')}
             >
               ❮
             </button>
             <button
               type="button"
-              onClick={() => setCurrentSlide((prev) => (prev + 1) % heroImages.length)}
+              onClick={() => setCurrentSlide((prev) => (prev + 1) % slideCount)}
               aria-label="Next slide"
               style={{
                 position: 'absolute',
@@ -186,9 +282,9 @@ export default function Home() {
                 width: '44px',
                 height: '44px',
                 borderRadius: '50%',
-                background: 'rgba(0, 0, 0, 0.35)',
+                background: 'rgba(0, 0, 0, 0.45)',
                 color: '#fff',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
+                border: '1px solid rgba(255, 255, 255, 0.35)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -197,8 +293,8 @@ export default function Home() {
                 transition: 'all 0.2s',
                 fontSize: '18px',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(0, 0, 0, 0.65)')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(0, 0, 0, 0.35)')}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(0, 0, 0, 0.75)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(0, 0, 0, 0.45)')}
             >
               ❯
             </button>
@@ -206,20 +302,22 @@ export default function Home() {
         )}
 
         {/* Slider Indicators */}
-        <div style={{ position: 'absolute', bottom: '30px', display: 'flex', gap: '10px', zIndex: 20 }}>
-          {heroImages.map((_, idx) => (
-            <button 
-              key={idx}
-              onClick={() => setCurrentSlide(idx)}
-              style={{
-                width: '12px', height: '12px', borderRadius: '50%', border: 'none', cursor: 'pointer',
-                backgroundColor: currentSlide === idx ? 'var(--gold)' : 'rgba(255,255,255,0.5)',
-                transition: 'background-color 0.3s'
-              }}
-              aria-label={`Go to slide ${idx + 1}`}
-            />
-          ))}
-        </div>
+        {slideCount > 1 && (
+          <div style={{ position: 'absolute', bottom: '30px', display: 'flex', gap: '10px', zIndex: 20 }}>
+            {Array.from({ length: slideCount }).map((_, idx) => (
+              <button 
+                key={idx}
+                onClick={() => setCurrentSlide(idx)}
+                style={{
+                  width: '12px', height: '12px', borderRadius: '50%', border: 'none', cursor: 'pointer',
+                  backgroundColor: safeIndex === idx ? 'var(--gold)' : 'rgba(255,255,255,0.5)',
+                  transition: 'background-color 0.3s'
+                }}
+                aria-label={`Go to slide ${idx + 1}`}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Indian Food Welcome Section */}

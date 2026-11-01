@@ -11,8 +11,8 @@ Options -Indexes
 
   # 1. Block access to hidden files and repo source code
   RewriteRule "(^|/)\.(?!well-known)" - [F,L]
-  RewriteRule "(^|/)(kalpana-config\.php|\.env|\.git|composer\.(json|lock)|package(-lock)?\.json|tsconfig.*\.json)$" - [F,L]
-  RewriteRule "^(apps|packages|docs|\.agents|\.vscode)(/.*)?$" - [F,L]
+  RewriteRule "(^|/)(kalpana-config\.php|\.env|\.git|composer\.(json|lock)|package(-lock)?\.json|tsconfig.*\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|docker-compose\.ya?ml|.*\.md)$" - [F,L]
+  RewriteRule "^(apps|packages|docs|\.agents|\.vscode|CLAUDE.*)(/.*)?$" - [F,L]
 
   # 2. If already inside public_html/, do not rewrite again (prevents LiteSpeed rewrite loop)
   RewriteRule ^public_html(/.*)?$ - [L]
