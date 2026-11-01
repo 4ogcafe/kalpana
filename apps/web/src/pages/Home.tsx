@@ -164,7 +164,7 @@ export default function Home() {
             {/* Member offers */}
             <OfferSticker />
 
-            <div className="hero-content">
+            <div className="hero-content hero-slide-anim" key={safeIndex}>
               <div className="hero-tag">{settings.heroTagJa || '埼玉・熊谷で味わう、本場のインド料理'}</div>
               <h1 className="hero-title">{carousels[safeIndex]?.titleJa || 'インドの香りを、そのままに'}</h1>
               <p className="hero-sub" style={{ whiteSpace: 'pre-line' }}>{settings.heroSubJa || <>愛とスパイス、そして伝統に彩られた数世紀にわたるレシピを。<br/>Kalpna Indian Cuisineで皆様をお待ちしております。</>}</p>
