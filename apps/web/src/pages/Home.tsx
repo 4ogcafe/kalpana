@@ -128,7 +128,7 @@ export default function Home() {
       <meta name="description" content="埼玉・熊谷の本格インド料理店カルプナ。タンドール窯で焼き上げるナン、スパイス香るカレー、ランチ・テイクアウト・グランドメニューをご案内します。" />
       <link rel="canonical" href="https://kalpnacurry.com/" />
       {/* Hero Slider */}
-      <div className="home-hero">
+      <div className={`home-hero ${!heroImageSlideEnabled ? 'home-hero-palace' : ''}`}>
         {heroImageSlideEnabled ? (
           <>
             {heroImages.slice(0, loadedSlides).map((img, index) => (
@@ -178,7 +178,7 @@ export default function Home() {
           </>
         ) : (
           <>
-            {/* Palace Arch Static Background */}
+            {/* Palace Arch Static Background (Clean, 100% natural, no dark overlay) */}
             <img
               src={heroBgImage}
               alt="Kalpna Palace Arch"
@@ -202,12 +202,11 @@ export default function Home() {
                 }
               }}
             />
-            <div className="hero-palace-overlay" />
 
             {/* Member offers */}
             <OfferSticker />
 
-            {/* Text-Only Sliding Showcase in Palace Arch */}
+            {/* Text-Only Sliding Showcase in Palace Arch (No dark box, no dark shadow) */}
             {(() => {
               const current = textSlides[safeIndex] || textSlides[0];
               const primaryCtaLabel = current?.ctaLabelJa || 'ランチメニューを見る';
@@ -253,19 +252,19 @@ export default function Home() {
                 width: '44px',
                 height: '44px',
                 borderRadius: '50%',
-                background: 'rgba(0, 0, 0, 0.45)',
-                color: '#fff',
-                border: '1px solid rgba(255, 255, 255, 0.35)',
+                background: heroImageSlideEnabled ? 'rgba(0, 0, 0, 0.45)' : 'rgba(255, 255, 255, 0.9)',
+                color: heroImageSlideEnabled ? '#fff' : '#230c05',
+                border: heroImageSlideEnabled ? '1px solid rgba(255, 255, 255, 0.35)' : '1px solid rgba(0, 0, 0, 0.12)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
-                backdropFilter: 'blur(4px)',
+                boxShadow: heroImageSlideEnabled ? 'none' : '0 2px 10px rgba(0, 0, 0, 0.1)',
                 transition: 'all 0.2s',
                 fontSize: '18px',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(0, 0, 0, 0.75)')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(0, 0, 0, 0.45)')}
+              onMouseEnter={(e) => (e.currentTarget.style.background = heroImageSlideEnabled ? 'rgba(0, 0, 0, 0.75)' : '#ffffff')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = heroImageSlideEnabled ? 'rgba(0, 0, 0, 0.45)' : 'rgba(255, 255, 255, 0.9)')}
             >
               ❮
             </button>
@@ -282,19 +281,19 @@ export default function Home() {
                 width: '44px',
                 height: '44px',
                 borderRadius: '50%',
-                background: 'rgba(0, 0, 0, 0.45)',
-                color: '#fff',
-                border: '1px solid rgba(255, 255, 255, 0.35)',
+                background: heroImageSlideEnabled ? 'rgba(0, 0, 0, 0.45)' : 'rgba(255, 255, 255, 0.9)',
+                color: heroImageSlideEnabled ? '#fff' : '#230c05',
+                border: heroImageSlideEnabled ? '1px solid rgba(255, 255, 255, 0.35)' : '1px solid rgba(0, 0, 0, 0.12)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
-                backdropFilter: 'blur(4px)',
+                boxShadow: heroImageSlideEnabled ? 'none' : '0 2px 10px rgba(0, 0, 0, 0.1)',
                 transition: 'all 0.2s',
                 fontSize: '18px',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(0, 0, 0, 0.75)')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(0, 0, 0, 0.45)')}
+              onMouseEnter={(e) => (e.currentTarget.style.background = heroImageSlideEnabled ? 'rgba(0, 0, 0, 0.75)' : '#ffffff')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = heroImageSlideEnabled ? 'rgba(0, 0, 0, 0.45)' : 'rgba(255, 255, 255, 0.9)')}
             >
               ❯
             </button>
@@ -310,7 +309,7 @@ export default function Home() {
                 onClick={() => setCurrentSlide(idx)}
                 style={{
                   width: '12px', height: '12px', borderRadius: '50%', border: 'none', cursor: 'pointer',
-                  backgroundColor: safeIndex === idx ? 'var(--gold)' : 'rgba(255,255,255,0.5)',
+                  backgroundColor: safeIndex === idx ? (heroImageSlideEnabled ? 'var(--gold)' : '#c84b2c') : (heroImageSlideEnabled ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.2)'),
                   transition: 'background-color 0.3s'
                 }}
                 aria-label={`Go to slide ${idx + 1}`}
