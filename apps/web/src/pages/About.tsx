@@ -21,21 +21,52 @@ export default function About() {
       <link rel="canonical" href="https://kalpnacurry.com/about" />
 
       {/* About Hero */}
-      <div className="home-hero" style={{ height: '50vh', minHeight: '400px' }}>
-        <img
-          src={assetUrl(settings.aboutHeroImage) || ''}
-          alt=""
-          fetchPriority="high"
-          className="slide-bg-img"
-          style={{ opacity: 0.5, objectFit: 'cover' }}
-        />
-        <div className="hero-content">
-          <div className="hero-tag">{settings.aboutHeroTag || '私たちについて'}</div>
-          <h1 className="hero-title">
-            <EmphasisText text={settings.aboutHeroTitle || '私たちに<em>ついて</em>'} />
-          </h1>
-        </div>
-      </div>
+      {(() => {
+        const isDefaultGraphicBanner = !settings.aboutHeroImage || settings.aboutHeroImage.includes('about-hero-banner');
+        const heroBannerSrc = assetUrl(settings.aboutHeroImage) || '/about-hero-banner.jpg';
+
+        if (isDefaultGraphicBanner) {
+          return (
+            <div className="about-hero-banner-wrap">
+              <img
+                src={heroBannerSrc}
+                alt={settings.aboutHeroTitle ? settings.aboutHeroTitle.replace(/<[^>]+>/g, '') : '私たちについて - カルプナ本格インド料理店'}
+                className="about-hero-banner-img"
+                fetchPriority="high"
+                decoding="async"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (!target.dataset.fallback) {
+                    target.dataset.fallback = '1';
+                    target.src = '/about-hero-banner.jpg';
+                  }
+                }}
+              />
+              <h1 className="sr-only">
+                {settings.aboutHeroTitle ? settings.aboutHeroTitle.replace(/<[^>]+>/g, '') : '私たちについて - カルプナ本格インド料理店'}
+              </h1>
+            </div>
+          );
+        }
+
+        return (
+          <div className="home-hero" style={{ height: '50vh', minHeight: '400px' }}>
+            <img
+              src={heroBannerSrc}
+              alt=""
+              fetchPriority="high"
+              className="slide-bg-img"
+              style={{ opacity: 0.6, objectFit: 'cover' }}
+            />
+            <div className="hero-content">
+              <div className="hero-tag">{settings.aboutHeroTag || '私たちについて'}</div>
+              <h1 className="hero-title">
+                <EmphasisText text={settings.aboutHeroTitle || '私たちに<em>ついて</em>'} />
+              </h1>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Story Section */}
       <section

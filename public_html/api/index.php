@@ -1232,6 +1232,7 @@ if ($method === 'GET' && ($subPath === '/settings' || $subPath === '/settings/')
             'sunday' => 'ランチ 11:30–15:00 / ディナー 17:00–22:00',
         ],
         'holidays' => ['regular' => '火曜日'],
+        'aboutHeroImage' => '/about-hero-banner.jpg',
         'orderingEnabled' => true,
         'pickupEnabled' => true,
         'deliveryEnabled' => false,

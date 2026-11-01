@@ -408,6 +408,37 @@ body {
   }
 }
 
+/* About Us Hero Banner */
+.about-hero-banner-wrap {
+  position: relative;
+  width: 100%;
+  background: #fdf8f0 linear-gradient(135deg, #fdf8f0 0%, #faefe0 100%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  border-bottom: 1px solid rgba(181, 69, 27, 0.12);
+}
+
+.about-hero-banner-img {
+  width: 100%;
+  max-width: 1380px;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  max-height: 520px;
+  object-fit: contain;
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .about-hero-banner-img {
+    aspect-ratio: 16 / 9;
+    max-height: none;
+    object-fit: cover;
+  }
+}
+
 /* Section */
 .section {
   padding: clamp(3rem, 8vw, 5rem) 20px;

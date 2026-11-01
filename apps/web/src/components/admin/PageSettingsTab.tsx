@@ -73,7 +73,7 @@ interface Settings {
 export const DEFAULT_ABOUT_CONTENT: Record<string, string> = {
   aboutHeroTag: '私たちについて',
   aboutHeroTitle: '私たちに<em>ついて</em>',
-  aboutHeroImage: '',
+  aboutHeroImage: '/about-hero-banner.jpg',
   aboutStoryLabelJa: '私たちの物語',
   aboutStoryTitleJa: '本場インドの味を支える、<em>5つのこだわり</em>',
   aboutStoryJa: 'カルプナでは、本場インドの伝統と豊かな食文化を大切にしながら、日本の皆さまに本格的なインド料理をお届けしています。\n新鮮な食材、厳選したスパイス、炭火で焼き上げる香ばしいナンやタンドリー料理、そして経験豊富なシェフの技と情熱。一皿一皿にこだわりを込め、「おいしい」「また食べたい」と感じていただける料理を目指しています。\n味・品質・価格・おもてなしを大切にし、皆さまに心からご満足いただけるお店でありたいと考えています。',
@@ -513,10 +513,21 @@ function AboutPageTab({ settings, setSettings }: { settings: Settings; setSettin
           <span style={muted}>&lt;em&gt; タグでアクセント文字（金色・強調）を付けられます（例: 私たちに&lt;em&gt;ついて&lt;/em&gt;）</span>
           <input style={inp} type="text" value={settings.aboutHeroTitle ?? ''} onChange={set('aboutHeroTitle')} placeholder="私たちに<em>ついて</em>" />
         </label>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <label style={{ ...lbl, margin: 0, fontWeight: 600 }}>ヒーローバナー画像</label>
+          <button
+            type="button"
+            onClick={() => setSettings({ aboutHeroImage: '/about-hero-banner.jpg' })}
+            style={{ ...outlineBtn, padding: '2px 8px', fontSize: '0.75rem' }}
+            title="公式「私たちについて」バナー画像にリセット"
+          >
+            公式バナー画像にリセット
+          </button>
+        </div>
         <ImageField
-          label="ヒーロー背景画像"
-          hint="ページ最上部に表示される大きなバナー画像です。"
-          value={settings.aboutHeroImage ?? ''}
+          label=""
+          hint="私たちについて（About Us）ページ最上部に表示されるバナー画像です（初期値：公式私たちについてバナー）。"
+          value={settings.aboutHeroImage || '/about-hero-banner.jpg'}
           onChange={v => setSettings({ aboutHeroImage: v })}
         />
       </div>
