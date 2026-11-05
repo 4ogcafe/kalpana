@@ -51,7 +51,7 @@ async function main() {
       lat: 36.1250995,
       lng: 139.4214049,
       phone: '048-577-7497',
-      email: 'info@kalpana.com',
+      email: 'kalpnacurry@gmail.com',
       timezone: 'Asia/Tokyo',
       currency: 'JPY',
       weeklyHours: { monday: '11:00-15:00, 17:00-22:00' },

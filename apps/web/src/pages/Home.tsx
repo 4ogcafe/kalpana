@@ -523,6 +523,19 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
+
+                {/* Parking */}
+                <div style={{ display: 'flex', gap: '16px' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #e5dbcd' }}>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '1.2rem' }}>🅿️</span>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: 'bold' }}>駐車場</div>
+                    <div style={{ color: 'var(--dark-bark)', fontSize: '0.95rem', fontWeight: '500', lineHeight: '1.5' }}>
+                      無料駐車場 12台完備
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Reviews Pill */}

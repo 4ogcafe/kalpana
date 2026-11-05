@@ -87,7 +87,7 @@ async function run() {
     const settings = db.collection('Settings');
     await settings.deleteMany({});
     await settings.insertOne({
-      _id: new ObjectId(), name: 'Kalpna Indian Cuisine', addressEn: 'Kumagaya, Saitama, Japan', addressJa: '埼玉県熊谷市', lat: 36.1473, lng: 139.3886, phone: '048-XXX-XXXX', email: 'info@kalpnacurry.com', timezone: 'Asia/Tokyo', currency: 'JPY',
+      _id: new ObjectId(), name: 'Kalpna Indian Cuisine', addressEn: 'Kumagaya, Saitama, Japan', addressJa: '埼玉県熊谷市', lat: 36.1473, lng: 139.3886, phone: '048-XXX-XXXX', email: 'kalpnacurry@gmail.com', timezone: 'Asia/Tokyo', currency: 'JPY',
       weeklyHours: { monday: "11:00-15:00, 17:00-22:00" }, holidays: { regular: "Tuesday" }, socials: { instagram: "@kalpana_restro" }, updatedAt: new Date()
     });
     console.log(`Inserted Settings`);

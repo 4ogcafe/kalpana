@@ -189,7 +189,7 @@ function ensureDefaultDatabaseData(PDO $pdo): array {
                 '2081 Sayada, Kumagaya, Saitama 360-0023, Japan',
                 '〒360-0023 埼玉県熊谷市佐谷田2081',
                 '048-577-7497',
-                'info@kalpnacurry.com',
+                'kalpnacurry@gmail.com',
                 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3221.724944983944!2d139.41883000000002!3d36.1251!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x601f2b0605446c1f%3A0x1a31a406a1c1b3d6!2sKalpna%20Indian%20Cuisine!5e0!3m2!1sen!2sjp!4v1715000000000!5m2!1sen!2sjp',
                 'https://maps.app.goo.gl/92p48n6Zc4X9Nq518',
                 $hours,
@@ -1219,7 +1219,7 @@ if ($method === 'GET' && ($subPath === '/settings' || $subPath === '/settings/')
         'addressEn' => '2081 Sayada, Kumagaya, Saitama 360-0023, Japan',
         'addressJa' => '〒360-0023 埼玉県熊谷市佐谷田2081',
         'phone' => '048-577-7497',
-        'email' => 'info@kalpnacurry.com',
+        'email' => 'kalpnacurry@gmail.com',
         'mapUrl' => 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3221.724944983944!2d139.41883000000002!3d36.1251!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x601f2b0605446c1f%3A0x1a31a406a1c1b3d6!2sKalpna%20Indian%20Cuisine!5e0!3m2!1sen!2sjp!4v1715000000000!5m2!1sen!2sjp',
         'googleMapsLink' => 'https://maps.app.goo.gl/92p48n6Zc4X9Nq518',
         'weeklyHours' => [

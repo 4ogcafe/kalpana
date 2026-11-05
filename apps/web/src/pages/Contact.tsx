@@ -136,11 +136,21 @@ export default function Contact() {
 
                 <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
                   <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #e5dbcd' }}>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>🅿️</span>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: 'bold' }}>駐車場</div>
+                    <div style={{ color: 'var(--dark-bark)', fontSize: '0.95rem', fontWeight: '500' }}>無料駐車場 12台完備</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #e5dbcd' }}>
                     <span style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>✉️</span>
                   </div>
                   <div>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: 'bold' }}>メールアドレス</div>
-                    <div style={{ color: 'var(--dark-bark)', fontSize: '0.95rem' }}>{settings.email || 'info@kalpnacurry.com'}</div>
+                    <div style={{ color: 'var(--dark-bark)', fontSize: '0.95rem' }}>{settings.email || 'kalpnacurry@gmail.com'}</div>
                   </div>
                 </div>
               </div>
